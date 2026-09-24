@@ -48,7 +48,9 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  var resource=load("res://assets3d/"+name)
  var holder=Node3D.new();holder.set_meta("asset",name);parent.add_child(holder);holder.position=pos;holder.rotation.y=rotation_y
  var model:Node3D
- if resource is Mesh:
+ if resource==null:
+  var fallback=MeshInstance3D.new();var cube=BoxMesh.new();cube.size=Vector3(1.4,1.8,1.4);fallback.mesh=cube;fallback.material_override=material(Color("7f8d88"));model=fallback
+ elif resource is Mesh:
   model=MeshInstance3D.new();model.mesh=resource
  else:model=resource.instantiate()
  holder.add_child(model)
