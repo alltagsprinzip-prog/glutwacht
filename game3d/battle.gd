@@ -35,6 +35,8 @@ var manual_deployment=false
 var alarm=false
 var traps:Array=[]
 var combat_texts:Array=[]
+var raid_loot={"wood":0,"stone":0,"gold":0}
+var pending_hits:Array=[]
 func training(attribute:String) -> int:return int(profile.get("training",{}).get("heroes",{}).get(hero_key(),{}).get(attribute,0))
 func entry_position() -> Vector2:
  return {"south":Vector2(0,27),"west":Vector2(-27,0),"east":Vector2(27,0),"north":Vector2(0,-27)}.get(attack_side,Vector2(0,27))
@@ -64,7 +66,7 @@ func form_army():
   var pos=barracks_pos+Vector2(cos(angle)*ring,5.4+sin(angle)*2.0)
   allies.append(soldier(kind,pos.clamp(Vector2(-29,-29),Vector2(29,29))))
 func deployment_valid(pos:Vector2) -> bool:
- if maxf(absf(pos.x),absf(pos.y))<24 or maxf(absf(pos.x),absf(pos.y))>30:return false
+ if maxf(absf(pos.x),absf(pos.y))<20.5 or maxf(absf(pos.x),absf(pos.y))>30.5:return false
  for b in buildings:
   if b.hp>0 and pos.distance_to(b.pos)<float(b.radius)+1:return false
  return true
@@ -81,7 +83,7 @@ func deploy_all():
    n+=1
 func building(kind:String,pos:Vector2,radius:float,hp:float,level:int=1,uid:String="",team:String="enemy",rotation:int=0) -> Dictionary:
  serial+=1
- return {"id":serial,"uid":uid,"kind":kind,"pos":pos,"radius":radius,"hp":hp,"max_hp":hp,"cd":.8,"level":level,"team":team,"rotation":rotation,"objective":false,"flash":0.0,"destroyed":false}
+ return {"id":serial,"uid":uid,"kind":kind,"pos":pos,"radius":radius,"hp":hp,"max_hp":hp,"cd":.8,"level":level,"team":team,"rotation":rotation,"objective":false,"flash":0.0,"destroyed":false,"loot":{"wood":0,"stone":0,"gold":0},"loot_initial":{"wood":0,"stone":0,"gold":0}}
 func home_buildings():
  buildings.clear()
  var p=Progress.new();p.data=profile
@@ -90,7 +92,7 @@ func home_buildings():
   var item=building(b.kind,Vector2(b.x,b.z),Catalog.BUILD[b.kind].radius,hp,b.level,b.uid,"ally",b.rotation)
   item.construction=b.construction;item.stock=float(b.get("stock",0.0));buildings.append(item)
 func reset_battle():
- time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0}
+ time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0};raid_loot={"wood":0,"stone":0,"gold":0};pending_hits.clear()
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
 func layout(index:int):
  selected_village=posmod(index,1000);village=Catalog.matched_village(selected_village,profile)
@@ -115,8 +117,15 @@ func layout(index:int):
   enemies.append(unit(kind,pos,70+level*35,9+level*4,"enemy"))
  for i in range(village.captains):enemies.append(unit("captain",Vector2(-3+i*6,-9),220+level*90,24+level*10,"enemy"))
  buildings.append(building("barracks",Vector2(-16,-18),3.8,200+100*level,clampi(level,1,Progress.MAX_LEVEL),"garrison"))
- buildings.append(building("goldmine",Vector2(16,-18),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_gold"))
- buildings.append(building("lumber",Vector2(-20,10),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_wood"))
+ var gold_b=building("goldmine",Vector2(16,-18),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_gold")
+ var wood_b=building("lumber",Vector2(-20,10),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_wood")
+ var stone_b=building("quarry",Vector2(20,10),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_stone")
+ gold_b.loot.gold=int(round(float(village.gold)*.70));gold_b.loot_initial=gold_b.loot.duplicate(true)
+ wood_b.loot.wood=int(round(float(village.wood)*.70));wood_b.loot_initial=wood_b.loot.duplicate(true)
+ stone_b.loot.stone=int(round(float(village.stone)*.70));stone_b.loot_initial=stone_b.loot.duplicate(true)
+ hall.loot={"wood":int(village.wood)-int(wood_b.loot.wood),"stone":int(village.stone)-int(stone_b.loot.stone),"gold":int(village.gold)-int(gold_b.loot.gold)}
+ hall.loot_initial=hall.loot.duplicate(true)
+ buildings.append(gold_b);buildings.append(wood_b);buildings.append(stone_b)
  for u in enemies:u.anchor=u.pos;u.awake=false
  if level>=2:
   traps.append({"pos":Vector2(0,11),"used":false,"damage":20+level*7})
@@ -204,10 +213,37 @@ func approach(u:Dictionary,goal:Dictionary,speed:float,dt:float):
    d=d.normalized()*.25+Vector2(-delta.y,delta.x).normalized()*side
    break
  move(u,d,speed,dt)
+func loot_from_damage(b:Dictionary,dealt:float):
+ if mode!="raid" or b.get("team","")!="enemy" or not b.has("loot"):return
+ for resource in ["wood","stone","gold"]:
+  var remaining=int(b.loot.get(resource,0))
+  var initial=int(b.get("loot_initial",{}).get(resource,0))
+  if remaining<=0 or initial<=0:continue
+  var amount=mini(remaining,maxi(1,int(ceil(float(initial)*dealt/maxf(1.0,float(b.max_hp))))))
+  if b.hp<=0:amount=remaining
+  b.loot[resource]=remaining-amount
+  raid_loot[resource]=int(raid_loot[resource])+amount
+  if amount>0 and combat_texts.size()<28:combat_texts.append({"pos":b.pos,"value":"+%d"%amount,"heal":true,"life":1.05,"max":1.05})
+
+func resolve_pending_hits(dt:float):
+ for i in range(pending_hits.size()-1,-1,-1):
+  var hit=pending_hits[i];hit.delay=float(hit.delay)-dt
+  if float(hit.delay)>0:continue
+  var target=hit.target
+  if target!=null and target.hp>0:
+   if String(hit.kind)=="projectile_release":
+    attack_effect(hero,target,Color(hit.color))
+    pending_hits.append({"delay":.20,"kind":"impact","target":target,"amount":float(hit.amount),"color":hit.color})
+   else:
+    damage(target,float(hit.amount))
+    effects.append({"kind":"impact","pos":target.pos,"life":.28,"max":.28,"color":Color(hit.color)})
+  pending_hits.remove_at(i)
+
 func damage(u:Dictionary,amount:float):
  if u.hp<=0:return
  if u==hero and invulnerable>0:return
  var dealt=minf(u.hp,amount);u.hp=maxf(0,u.hp-amount);u.flash=.16
+ if u.has("radius"):loot_from_damage(u,dealt)
  if combat_texts.size()<28:combat_texts.append({"pos":u.pos,"value":"-%d"%ceili(dealt),"heal":false,"life":.9,"max":.9})
  if u.get("team","")=="enemy":alarm=true
  if u.hp<=0:
@@ -218,46 +254,48 @@ func attack_effect(u:Dictionary,target:Dictionary,color:Color):
  effects.append({"kind":"arrow","pos":u.pos,"end":target.pos,"life":.3,"max":.3,"color":color})
 func strike():
  if not active() or result!="" or attack_cd>0:return
- var c=stats();attack_cd=c.attack_cd;hero.attack_time=.38;hero.anim="attack"
- var target=nearest(hero.pos,targets());var hit=false
- if target!=null and distance(hero,target)<float(c.range):
-  facing=(target.pos-hero.pos).normalized();hero.facing=facing;hit=true
-  if c.range>4:
-   damage(target,hero.damage);attack_effect(hero,target,Color(c.color))
-  else:
-   for t in targets():
-    if distance(hero,t)<c.range and (t.pos-hero.pos).normalized().dot(facing)>-.2:damage(t,hero.damage)
- if c.range<=4:effects.append({"kind":"slash","pos":hero.pos+facing*1.4,"life":.24,"max":.24,"color":Color(c.color)})
- notices="" if hit else "Näher an ein Ziel herangehen."
+ var cc=stats();var target=nearest(hero.pos,targets())
+ if target==null or distance(hero,target)>=float(cc.range):
+  notices="Näher an ein Ziel herangehen.";return
+ attack_cd=cc.attack_cd;hero.attack_time=.52;hero.anim="attack"
+ facing=(target.pos-hero.pos).normalized();hero.facing=facing;notices=""
+ if float(cc.range)>4:
+  pending_hits.append({"delay":.24,"kind":"projectile_release","target":target,"amount":hero.damage,"color":cc.color})
+ else:
+  pending_hits.append({"delay":.27,"kind":"impact","target":target,"amount":hero.damage,"color":cc.color})
+  effects.append({"kind":"windup","pos":hero.pos+facing*1.1,"life":.30,"max":.30,"color":Color(cc.color)})
+
 func skill():
  if not active() or result!="" or skill_cd>0:return
- var c=stats();skill_cd=maxf(2,c.skill_cd-.4*training("skill"));hero.attack_time=.65;hero.anim="attack"
- var skill_scale=1.0+.12*training("skill")
- var center:Vector2=hero.pos
- if hero_key()=="ninja":
+ var cc=stats();skill_cd=maxf(2,cc.skill_cd-.4*training("skill"));hero.attack_time=.72;hero.anim="attack"
+ var scale=1.0+.12*training("skill");var center:Vector2=hero.pos
+ var key=hero_key()
+ if key=="ninja":
   var target=nearest(hero.pos,targets())
   if target!=null and distance(hero,target)<11:
-   var dir=(target.pos-hero.pos).normalized()
+   var from=hero.pos;var dir=(target.pos-hero.pos).normalized()
    for i in range(16):
     if distance(hero,target)>1.3:move(hero,dir,9,.045)
-   damage(target,hero.damage*4.2*skill_scale);invulnerable=.7
-  center=hero.pos
- elif hero_key()=="shaman":
+   center=hero.pos;damage(target,hero.damage*4.2*scale);invulnerable=.7
+   effects.append({"kind":"afterimage","pos":from,"end":center,"life":.55,"max":.55,"color":Color(cc.color)})
+ elif key=="shaman":
   for u in [hero]+living(allies):
    if u.pos.distance_to(hero.pos)<9:
-    var amount=minf(u.max_hp-u.hp,(120+12*Catalog.level(profile,hero_key()))*skill_scale);u.hp+=amount
+    var amount=minf(u.max_hp-u.hp,(120+12*Catalog.level(profile,key))*scale);u.hp+=amount
     if amount>0:combat_texts.append({"pos":u.pos,"value":"+%d"%amount,"heal":true,"life":.9,"max":.9})
   for t in targets():
-   if distance(hero,t)<6:damage(t,hero.damage*1.3*skill_scale)
- elif hero_key()=="mage":
+   if distance(hero,t)<6:damage(t,hero.damage*1.3*scale)
+ elif key=="mage":
   var target=nearest(hero.pos,targets())
   if target!=null and distance(hero,target)<13:center=target.pos
   for t in targets():
-   if t.pos.distance_to(center)-float(t.get("radius",0))<4.2:damage(t,hero.damage*3.0*skill_scale)
+   if t.pos.distance_to(center)-float(t.get("radius",0))<4.2:damage(t,hero.damage*3.0*scale)
  else:
   for t in targets():
-   if distance(hero,t)<5:damage(t,hero.damage*2.6*skill_scale)
- effects.append({"kind":"skill","pos":center,"life":.75,"max":.75,"color":Color(c.color)})
+   if distance(hero,t)<5:damage(t,hero.damage*2.6*scale)
+ effects.append({"kind":"skill","pos":center,"life":.95,"max":.95,"color":Color(cc.color)})
+ effects.append({"kind":"burst","pos":center,"life":.65,"max":.65,"color":Color(cc.color)})
+ effects.append({"kind":"spark","pos":center,"life":.48,"max":.48,"color":Color(cc.color)})
 func roll(direction:Vector2):
  if not active() or result!="" or roll_cd>0:return
  roll_cd=2.0 if hero_key()=="ninja" else 2.5;invulnerable=.65
@@ -275,6 +313,7 @@ func step(dt:float,input:Vector2):
  effects=effects.filter(func(e):return e.life>0)
  for e in combat_texts:e.life-=dt
  combat_texts=combat_texts.filter(func(e):return e.life>0)
+ resolve_pending_hits(dt)
  if result!="":return
  time+=dt;attack_cd=maxf(0,attack_cd-dt);skill_cd=maxf(0,skill_cd-dt);roll_cd=maxf(0,roll_cd-dt);invulnerable=maxf(0,invulnerable-dt)
  for u in [hero]+allies+enemies:
@@ -364,12 +403,11 @@ func settle() -> Dictionary:
  if result=="" or settled:return {}
  settled=true
  var reward={"wood":0,"stone":0,"gold":0,"sword":false,"xp":0,"stars":0}
- if mode=="defense" or mode!="raid":return reward
+ if mode!="raid":return reward
  reward.stars=stars();reward.xp=20*int(village.level)+25*int(reward.stars)+int(destruction_percent()/5)
- var loot_factor=.55+.45*float(destruction_percent())/100.0
- for k in ["wood","stone","gold"]:
-  var available=int(round(float(village[k])*loot_factor))
-  reward[k]=mini(available,maxi(0,1200*int(profile.hall)-int(profile[k])));profile[k]+=reward[k]
+ for resource in ["wood","stone","gold"]:
+  var amount=mini(int(raid_loot[resource]),maxi(0,1200*int(profile.hall)-int(profile[resource])))
+  reward[resource]=amount;profile[resource]+=amount
  if int(reward.stars)>0:profile.wins+=1
  profile.xp[hero_key()]+=reward.xp
  return reward
