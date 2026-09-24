@@ -240,7 +240,6 @@ func update_hud():
    if sim.reserve.archers<=0 and deploying=="archers":select_deployment("")
    deployment_buttons.all.disabled=sim.reserve.melee+sim.reserve.archers==0
 func movement() -> Vector2:
-func movement() -> Vector2:
  if not stick or build_kind!="" or sim.mode=="scout":return Vector2.ZERO
  var v=stick.value
  v+=Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
@@ -386,7 +385,6 @@ func open_shop():
    else:toast("Nicht genug Juwelen oder bereits gekauft."),true)
   if it[0]=="builder" and int(progress.data.get("builder_bonus",0))>=1:buy.disabled=true
 func open_dialog(name:String,heading:String,sub:String) -> Control:
-func open_dialog(name:String,heading:String,sub:String) -> Control:
  close_dialog();dialog=name;paused=true;held=false;touches.clear()
  if stick:stick.release()
  modal=Control.new();modal.size=Vector2(1280,720);modal.z_index=100;ui.add_child(modal)
@@ -446,7 +444,6 @@ func open_catalog():
   label(p,"%d/%d"%[progress.count_kind(k),d.limit],Rect2(x+116,y+69,70,22),13,CREAM)
   var b=button(p,"BAUEN" if unlocked else "GESPERRT",Rect2(x+116,y+94,184,34),func():begin_build(k),unlocked)
   b.disabled=not unlocked or not progress.affordable(cost) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
-func begin_build(kind:String,uid:String=""):
 func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
@@ -532,7 +529,6 @@ func open_building(uid:String):
  elif bb.kind=="barracks" or bb.kind=="camp":icon_button(p,"sword","ARMEE",Rect2(24,338,178,56),func():open_army())
  elif bb.kind in ["smithy","hero_hall"]:icon_button(p,"skill","TRAINING",Rect2(24,338,178,56),func():open_training())
  if not Progress.TITLES.has(uid) and job.is_empty():icon_button(p,"move","",Rect2(214,338,70,56),func():begin_build(bb.kind,uid))
-func confirm_remove(uid:String):
 func confirm_remove(uid:String):
  var b=progress.find_building(uid)
  var p=open_dialog("remove",Catalog.BUILD[b.kind].name+" abbauen?","Dieser Bauplatz wird frei. Du erhältst keine Rohstoffe zurück.")
@@ -644,7 +640,6 @@ func open_result():
  else:
   label(p,"%d Gegner besiegt · Welle %d/3"%[sim.kills,sim.wave],Rect2(120,180,480,42),21,CREAM,true)
  icon_button(p,"hero","ZURÜCK INS DORF",Rect2(196,356,328,56),func():return_home(),true)
-func return_home():
 func return_home():
  close_dialog();build_kind="";selected_building="";deploying="";world.build_focus=false;sim.home();result_shown=false;world.setup(sim);build_hud();save()
 func open_menu():
