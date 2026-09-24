@@ -21,6 +21,8 @@ var actor_palette={}
 var outline_material:ShaderMaterial
 var workers:Array=[]
 var selected_uid=""
+var obstacles:Dictionary={}
+var selected_obstacle=""
 func health_bar(parent:Node3D,height:float,width:float,color:Color) -> Dictionary:
  var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height,0)
  var parts=[]
@@ -42,7 +44,7 @@ func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMa
  materials[key]=m;return m
 func mesh_node(mesh:Mesh,pos:Vector3,mat:Material,parent:Node) -> MeshInstance3D:
  var n=MeshInstance3D.new();n.mesh=mesh;n.position=pos;n.material_override=mat;parent.add_child(n);return n
-func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",rotation_y:float=0) -> Node3D:
+func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",rotation_y:float=0,roof_tint:Color=Color(0,0,0,0)) -> Node3D:
  var resource=load("res://assets3d/"+name)
  var holder=Node3D.new();holder.set_meta("asset",name);parent.add_child(holder);holder.position=pos;holder.rotation.y=rotation_y
  var model:Node3D
@@ -63,7 +65,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
    elif original is StandardMaterial3D:
     var mat=original.duplicate();mat.metallic=0;mat.roughness=.92
     var matname=mat.resource_name.to_lower()
-    if "roof" in matname:mat.albedo_color=Color("2686ac") if mode in ["home","defense"] else Color("d97443")
+    if "roof" in matname:mat.albedo_color=roof_tint if roof_tint.a>0 else (Color("2c7ea3") if mode in ["home","defense"] else Color("d97443"))
     elif "plaster" in matname or "beige" in matname:mat.albedo_color=Color("f1dfb0")
     elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("795030")
     elif "leaf" in matname:mat.albedo_color=Color("4c8735") if rng.randf()>.25 else Color("769841")
@@ -89,7 +91,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
 func setup(sim):
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
- actors.clear();forts.clear();labels.clear();workers.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid=""
+ actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
  landscape=Node3D.new();add_child(landscape)
  var env=WorldEnvironment.new();sky_env=Environment.new();env.environment=sky_env;add_child(env)
  sky_env.background_mode=Environment.BG_COLOR;sky_env.background_color=Color("9fdcfa")
@@ -100,9 +102,11 @@ func setup(sim):
  camera=Camera3D.new();add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.far=210;camera.current=true
  if mode=="scout":target_zoom=44;focus=Vector3(0,0,-2)
  elif sim.active():target_zoom=32;focus=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)
- else:target_zoom=42;focus=Vector3(0,0,2)
+ else:target_zoom=48;focus=Vector3(0,0,2)
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(24,34,36);camera.look_at(focus)
  terrain();scenery(sim)
+ if mode=="home":
+  for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
  if mode!="scout":
   for u in [sim.hero]+sim.allies:create_actor(u)
@@ -127,31 +131,50 @@ func terrain():
   var m=CylinderMesh.new();m.top_radius=0;m.bottom_radius=rng.randf_range(9,17);m.height=rng.randf_range(13,26);m.radial_segments=7
   mesh_node(m,Vector3(-60+i*14,m.height/2-2,-65),material(Color("637d89")),landscape)
 func scenery(sim):
- for i in range(110):
+ for i in range(95):
   var p=Vector3(rng.randf_range(-58,56),0,rng.randf_range(-52,46))
-  if absf(p.x)<33 and absf(p.z)<34:continue
+  if absf(p.x)<34 and absf(p.z)<35:continue
   if p.x>35 and p.x<44:continue
   var names=["tree_default.glb","tree_fat.glb","tree_tall.glb","tree_pineTallA_detailed.glb"]
   asset(names[i%4],landscape,p,rng.randf_range(6,11),"height",rng.randf()*TAU)
- for i in range(64):
-  var p=Vector2(rng.randf_range(-30,30),rng.randf_range(-30,30))
-  if absf(p.x)<3 or absf(p.y-3)<3:continue
-  var near=false
-  for b in sim.buildings:
-   if p.distance_to(b.pos)<b.radius+1.4:near=true
-  if near:continue
-  var plants=["grass.glb","grass_large.glb","plant_bushDetailed.glb","flower_yellowC.glb","flower_purpleA.glb"]
-  asset(plants[i%5],landscape,Vector3(p.x,.01,p.y),rng.randf_range(.3,.75),"height",rng.randf()*TAU)
+ for i in range(18):
+  var edge=26.0+rng.randf_range(0,4)
+  var p=Vector2(edge*(1 if i%2==0 else -1),rng.randf_range(-27,27)) if i%3 else Vector2(rng.randf_range(-27,27),edge*(1 if i%2==0 else -1))
+  var plants=["grass.glb","grass_large.glb","flower_yellowC.glb","flower_purpleA.glb"]
+  asset(plants[i%4],landscape,Vector3(p.x,.01,p.y),rng.randf_range(.35,.8),"height",rng.randf()*TAU)
  for i in range(14):asset("rock_largeA.glb",landscape,Vector3(rng.randf_range(43,49),-.1,rng.randf_range(-34,34)),rng.randf_range(1,3),"height",rng.randf()*TAU)
- # Peripheral homes make the expanded buildable settlement read as a village.
  for i in range(4):
   var p=Vector3(-20+i*13.5,0,-34)
   asset("House_4.obj" if i%2 else "House_1.obj",landscape,p,5.5,"width",PI)
- asset("Bonfire_Lit.obj",landscape,Vector3(-5,.05,16),1.6,"width")
- var fire=OmniLight3D.new();fire.position=Vector3(-5,1,16);fire.light_color=Color("ffad57");fire.light_energy=1.6;fire.omni_range=6;landscape.add_child(fire)
- # Boundary markers show where construction is possible; the rest is scenery.
+ # Kasernenhof: Feuer, Bänke und Vorräte geben der wartenden Armee einen klaren Platz.
+ if mode=="home":
+  var bp:Vector2=Catalog.CORE_POS.barracks
+  asset("Bonfire_Lit.obj",landscape,Vector3(bp.x+1.5,.03,bp.y+6.2),1.5,"width")
+  asset("Bench_1.obj",landscape,Vector3(bp.x-3.0,.02,bp.y+5.5),2.3,"width",PI/2)
+  asset("Barrel.obj",landscape,Vector3(bp.x+4.0,.02,bp.y+4.8),1.2,"height")
+  asset("Bags.obj",landscape,Vector3(bp.x+4.7,.02,bp.y+5.4),1.4,"width")
+ else:
+  asset("Bonfire_Lit.obj",landscape,Vector3(-5,.05,16),1.6,"width")
+ var fire=OmniLight3D.new();fire.position=Vector3(-10,1,8);fire.light_color=Color("ffad57");fire.light_energy=1.15;fire.omni_range=5;landscape.add_child(fire)
  for i in range(9):
   for z in [-32.5,32.5]:asset("rock_smallA.glb",landscape,Vector3(-30+i*7.5,.01,z),.4,"height")
+func create_obstacle(o:Dictionary,jobs:Array):
+ var uid=String(o.get("uid",""));if uid=="":return
+ var kind=String(o.get("kind","tree"));var root=Node3D.new();root.position=Vector3(float(o.x),.02,float(o.z));landscape.add_child(root)
+ var radius=1.6;var height=4.0
+ if kind=="tree":
+  asset("tree_fat.glb",root,Vector3.ZERO,6.6,"height");radius=1.8;height=6.5
+ elif kind=="rock":
+  asset("rock_largeA.glb",root,Vector3.ZERO,2.6,"height",.3);radius=1.5;height=2.7
+ else:
+  asset("plant_bushDetailed.glb",root,Vector3.ZERO,1.7,"height");radius=1.3;height=1.8
+ var job={}
+ for j in jobs:
+  if String(j.get("uid",""))==uid:job=j;break
+ if not job.is_empty():
+  var l=Label3D.new();root.add_child(l);l.text="WIRD ENTFERNT";l.position=Vector3(0,height+.6,0);l.font_size=28;l.pixel_size=.017;l.outline_size=7;l.billboard=BaseMaterial3D.BILLBOARD_ENABLED;l.no_depth_test=true
+  create_worker({"pos":Vector2(float(o.x),float(o.z)),"radius":radius},job)
+ obstacles[uid]={"root":root,"radius":radius,"height":height,"kind":kind,"job":job}
 func box(parent:Node,pos:Vector3,size:Vector3,color:Color):
  var mesh=BoxMesh.new();mesh.size=size;return mesh_node(mesh,pos,material(color),parent)
 func create_building(b:Dictionary):
@@ -171,7 +194,9 @@ func create_building(b:Dictionary):
    for x in [-1.06,1.06]:box(body,Vector3(x,height*.5,0),Vector3(.36,height+.3,1.2),Color("4d606c"))
   if level>=4:box(body,Vector3(0,height-.12,.53),Vector3(2.5,.16,.1),Color("ceae60"))
  else:
-  var model=asset(def.model,body,Vector3.ZERO,size*(1+.04*(level-1)),"width",PI if b.team=="enemy" else 0)
+  var roof_colors={"hall":Color("d99032"),"barracks":Color("9e4d3f"),"smithy":Color("4d5d67"),"lumber":Color("4e7f45"),"quarry":Color("727b7e"),"goldmine":Color("b58b32"),"tower":Color("4d607d"),"camp":Color("6d7541"),"hero_hall":Color("745b91")}
+  var roof_tint:Color=roof_colors.get(b.kind,Color("2c7ea3"))
+  var model=asset(def.model,body,Vector3.ZERO,size*(1+.04*(level-1)),"width",PI if b.team=="enemy" else 0,roof_tint)
   model_height=float(model.get_meta("height",5.0))
   if level>=2:
    box(body,Vector3(0,.16,0),Vector3(size*.92,.32,size*.73),Color("778382"))
@@ -195,8 +220,20 @@ func create_building(b:Dictionary):
      for surface in range(m.mesh.get_surface_count()):m.set_surface_override_material(surface,material(color))
    asset("Cart.obj",body,Vector3(size*.4,0,size*.35),1.7,"width",.3)
   if b.kind=="lumber":
-   asset("log_stackLarge.glb",body,Vector3(size*.35,0,size*.45),1.5,"height")
-   for i in range(3):asset("stump_roundDetailed.glb",body,Vector3(-2+i*1.5,0,4),.5,"height")
+   asset("log_stackLarge.glb",body,Vector3(size*.35,0,size*.45),1.8,"height")
+   for i in range(4):asset("stump_roundDetailed.glb",body,Vector3(-2.2+i*1.35,0,3.8),.55,"height")
+  elif b.kind=="barracks":
+   asset("Barrel.obj",body,Vector3(size*.42,0,size*.38),1.15,"height")
+   asset("Bench_1.obj",body,Vector3(-size*.40,0,size*.40),2.2,"width",PI/2)
+  elif b.kind=="smithy":
+   asset("Bonfire_Lit.obj",body,Vector3(size*.35,.02,size*.32),1.15,"width")
+   asset("Cart.obj",body,Vector3(-size*.42,0,size*.34),1.5,"width")
+  elif b.kind=="camp":
+   asset("Bonfire_Lit.obj",body,Vector3(0,.02,size*.43),1.3,"width")
+   asset("Bags.obj",body,Vector3(size*.38,0,size*.35),1.4,"width")
+  elif b.kind=="hero_hall":
+   var orb=SphereMesh.new();orb.radius=.34;orb.height=.68
+   mesh_node(orb,Vector3(0,3.8,size*.40),material(Color("b493e6"),.25,true),body)
  if level>=5 and b.kind!="wall":
   for i in range(mini(level-4,6)):
    var angle=TAU*float(i)/float(maxi(1,mini(level-4,6)))
@@ -353,7 +390,7 @@ func sync(sim,dt:float):
      box(ruin,Vector3(cos(a)*r,.12,sin(a)*r),Vector3(.55+.18*(i%2),.22,.42),Color("51483e"))
     if b.kind!="wall":
      var smoke=Label3D.new();smoke.text="✦";smoke.font_size=54;smoke.pixel_size=.02;smoke.position=Vector3(0,.65,0);smoke.billboard=BaseMaterial3D.BILLBOARD_ENABLED;smoke.modulate=Color(.32,.30,.28,.75);ruin.add_child(smoke)
-  f.label.visible=b.hp>0 and b.kind!="wall" and target_zoom<55
+  f.label.visible=b.hp>0 and b.kind!="wall" and target_zoom<55 and (sim.active() or mode=="scout" or b.uid==selected_uid or not f.job.is_empty())
   f.label.text=(f.text+"\n%d / %d"%[b.hp,b.max_hp]) if sim.active() else f.text
   set_health(f.hpbar,b.hp/b.max_hp,(sim.active() or mode=="scout") and b.hp>0)
   if not f.job.is_empty():
@@ -425,6 +462,18 @@ func building_at(screen:Vector2):
    var dist=origin.distance_to(hit)
    if dist<best:chosen=b;best=dist
  return chosen
+func obstacle_at(screen:Vector2):
+ var origin=camera.project_ray_origin(screen);var direction=camera.project_ray_normal(screen)
+ var chosen="";var best=INF
+ for uid in obstacles:
+  var o=obstacles[uid];var root:Node3D=o.root;var r=float(o.radius)
+  var bounds=AABB(root.position+Vector3(-r,0,-r),Vector3(r*2,float(o.height),r*2))
+  var hit=bounds.intersects_ray(origin,direction)
+  if hit!=null:
+   var dist=origin.distance_to(hit)
+   if dist<best:chosen=uid;best=dist
+ return chosen
+
 func show_ghost(kind:String,pos:Vector2,valid:bool,rotation:int=0):
  if ghost:ghost.queue_free()
  ghost=Node3D.new();add_child(ghost);ghost.position=Vector3(pos.x,.08,pos.y)
