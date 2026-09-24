@@ -126,9 +126,9 @@ func build_hud():
  update_hud()
  if is_instance_valid(modal):ui.move_child(modal,-1)
 func build_home_hud():
- button(hud,"⚔  ANGRIFF",Rect2(18,644,160,58),func():open_raid(),true)
- button(hud,"◆  SHOP",Rect2(1110,572,146,48),func():open_shop())
- button(hud,"⚒  BAUEN",Rect2(1110,630,146,64),func():open_catalog(),true)
+ button(hud,"⚔\nANGRIFF",Rect2(18,632,148,66),func():open_raid(),true)
+ button(hud,"◆\nSHOP",Rect2(1112,566,144,54),func():open_shop())
+ button(hud,"⚒\nBAUEN",Rect2(1112,628,144,68),func():open_catalog(),true)
  create_stick()
  if selected_obstacle!="":
   panel(hud,Rect2(424,616,432,78),Color("e9e1c9"))
@@ -400,7 +400,7 @@ func refresh_home():
  var pos:Vector2=sim.hero.pos;var zoom=world.target_zoom;var pan=world.pan
  sim.home();sim.hero.pos=pos;world.setup(sim);world.target_zoom=zoom;world.pan=pan;build_hud()
 func building_preview(parent:Control,kind:String,rect:Rect2,level:int=1):
- var viewport=SubViewport.new();viewport.size=Vector2i(int(rect.size.x),int(rect.size.y));viewport.own_world_3d=true;viewport.transparent_bg=true;viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS;viewport.msaa_3d=Viewport.MSAA_2X
+ var viewport=SubViewport.new();viewport.size=Vector2i(int(rect.size.x),int(rect.size.y));viewport.own_world_3d=true;viewport.transparent_bg=true;viewport.render_target_update_mode=SubViewport.UPDATE_ONCE;viewport.msaa_3d=Viewport.MSAA_2X
  var container=SubViewportContainer.new();container.position=rect.position;container.size=rect.size;container.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(container);container.add_child(viewport)
  var scene=Node3D.new();viewport.add_child(scene)
  var env=WorldEnvironment.new();env.environment=Environment.new();env.environment.background_mode=Environment.BG_COLOR;env.environment.background_color=Color(0,0,0,0);env.environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;env.environment.ambient_light_color=Color("e5eff5");env.environment.ambient_light_energy=.8;scene.add_child(env)
