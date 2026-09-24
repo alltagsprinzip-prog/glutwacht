@@ -242,6 +242,14 @@ func create_building(b:Dictionary):
    for z in [-r,r]:box(scaffold,Vector3(0,y,z),Vector3(r*2+.4,.16,.22),Color("e4c58b"))
    for x in [-r,r]:box(scaffold,Vector3(x,y,0),Vector3(.22,.16,r*2+.4),Color("e4c58b"))
   create_worker(b,job)
+ if mode=="home" and Catalog.RESOURCES.has(b.kind):
+  var stock=float(b.get("stock",0.0));var cap=140.0*level
+  if stock>=1:
+   var bubble=Label3D.new();root.add_child(bubble)
+   bubble.text=("🪵" if b.kind=="lumber" else ("◆" if b.kind=="quarry" else "●"))+("  VOLL" if stock>=cap*.95 else "  %d"%int(stock))
+   bubble.position=Vector3(0,model_height+1.75,0);bubble.font_size=32;bubble.pixel_size=.017;bubble.outline_size=8
+   bubble.billboard=BaseMaterial3D.BILLBOARD_ENABLED;bubble.no_depth_test=true
+   bubble.modulate=Color("fff1a6") if stock>=cap*.95 else Color("ffffff")
  forts[b.id]={"root":root,"body":body,"label":label,"text":text,"height":model_height,"hpbar":hpbar,"job":job,"ruin":null}
 func create_worker(b:Dictionary,job:Dictionary):
  var destination:Vector2=b.pos+Vector2(b.radius+.9,b.radius*.25)
