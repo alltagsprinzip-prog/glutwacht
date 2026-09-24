@@ -222,7 +222,6 @@ func update_hud():
     if sim.reserve[kind]<=0 and deploying==kind:deploying=""
    deployment_buttons.all.disabled=sim.reserve.melee+sim.reserve.archers==0
 func movement() -> Vector2:
-func movement() -> Vector2:
  if not stick or build_kind!="" or sim.mode=="scout":return Vector2.ZERO
  var v=stick.value
  v+=Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
@@ -324,7 +323,6 @@ func world_tap(pos:Vector2):
   if sim.deploy(deploying,world.ground_position(pos)):tone("equip")
   else:toast("Nur am freien Dorfrand platzieren.")
 func _notification(what):
-func _notification(what):
  if what==NOTIFICATION_APPLICATION_FOCUS_OUT and is_inside_tree() and sim:
   save()
   if not paused and build_kind=="":open_menu()
@@ -393,7 +391,6 @@ func open_catalog():
   label(p,"%d/%d"%[progress.count_kind(k),d.limit],Rect2(x+14,y+76,70,28),15,CREAM,true)
   var b=button(p,"BAUEN" if unlocked else "GESPERRT",Rect2(x+92,y+76,216,46),func():begin_build(k),unlocked)
   b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
-func begin_build(kind:String,uid:String=""):
 func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
@@ -476,7 +473,6 @@ func open_building(uid:String):
  elif b.kind in ["smithy","hero_hall"]:button(p,"★  TRAINING",Rect2(52,430,205,62),func():open_training())
  if not Progress.TITLES.has(uid) and job.is_empty():button(p,"↔",Rect2(273,430,90,62),func():begin_build(b.kind,uid))
 func confirm_remove(uid:String):
-func confirm_remove(uid:String):
  var b=progress.find_building(uid)
  var p=open_dialog("remove",Catalog.BUILD[b.kind].name+" abbauen?","Dieser Bauplatz wird frei. Du erhältst keine Rohstoffe zurück.")
  label(p,"Das Haupthaus und die anderen Kerngebäude\nkönnen nicht abgebaut werden.",Rect2(31,173,1003,101),24)
@@ -495,7 +491,6 @@ func open_army():
   label(p,str(progress.data[k]),Rect2(606,y+29,70,58),28,CREAM,true)
   var plus=button(p,"+",Rect2(684,y+29,90,58),func():progress.army(k,1);save();refresh_home();open_army());plus.disabled=count>=progress.capacity() or not troop_open
  button(p,"FERTIG",Rect2(548,432,258,58),func():close_dialog(),true)
-func open_training():
 func open_training():
  var key=sim.hero_key();var c=Catalog.hero(key)
  var p=open_dialog("training","Training · "+c.name,"Wähle eine Verbesserung.")
@@ -553,7 +548,6 @@ func open_heroes():
   label(p,cc.title,Rect2(x+10,397,230,52),15,CREAM,true)
   var choose=button(p,"WÄHLEN",Rect2(x+12,500,227,52),func():
    if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud(),true)
-func open_raid():
 func open_raid():
  close_dialog();build_kind="";selected_building="";world.build_focus=false;sim.scout(sim.selected_village);world.setup(sim);build_hud()
 func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
