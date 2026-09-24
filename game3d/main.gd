@@ -65,8 +65,17 @@ func _ready():
  sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
  if not progress.warning.is_empty():toast(progress.warning)
  if progress.data.hero=="":call_deferred("open_heroes")
-func style(bg:Color,border:Color=Color("756344"),width:int=1,radius:int=7) -> StyleBoxFlat:
- var s=StyleBoxFlat.new();s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius);s.content_margin_left=14;s.content_margin_right=14;s.content_margin_top=8;s.content_margin_bottom=8;return s
+func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
+ var s=StyleBoxFlat.new()
+ s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
+ s.content_margin_left=10;s.content_margin_right=10;s.content_margin_top=6;s.content_margin_bottom=6
+ s.shadow_color=Color(0,0,0,.22);s.shadow_size=3;s.shadow_offset=Vector2(0,2)
+ return s
+func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
+ if color.v<.35:color=Color("e9e1c9")
+ var p=Panel.new();p.position=rect.position;p.size=rect.size
+ p.add_theme_stylebox_override("panel",style(color,Color("8a7553"),2,12))
+ parent.add_child(p);return p
 func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
  if color.v<.35:color=Color("f0f7fc")
  var p=Panel.new();p.position=rect.position;p.size=rect.size;p.add_theme_stylebox_override("panel",style(color));parent.add_child(p);return p
@@ -75,39 +84,41 @@ func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CR
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);return l
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
- var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",23)
- b.add_theme_color_override("font_color",Color("342714") if primary else Color.WHITE)
- b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("637b87"))
- b.add_theme_stylebox_override("normal",style(Color("f4bd50") if primary else Color("28779e"),Color("c3862b") if primary else Color("185779"),2))
- b.add_theme_stylebox_override("hover",style(Color("3696bd"),Color("7adaf0"),2))
- b.add_theme_stylebox_override("pressed",style(Color("175373"),Color("9febfb"),2))
- b.add_theme_stylebox_override("disabled",style(Color("d9e3e7"),Color("adbec6")))
+ var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",20)
+ b.add_theme_color_override("font_color",Color("3c2c17") if primary else Color.WHITE)
+ b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("6f7b78"))
+ b.add_theme_stylebox_override("normal",style(Color("f2b84a") if primary else Color("3d7891"),Color("a56d25") if primary else Color("244f63"),3,12))
+ b.add_theme_stylebox_override("hover",style(Color("f6c863") if primary else Color("4b90aa"),Color("ffd58a") if primary else Color("78bfd4"),3,12))
+ b.add_theme_stylebox_override("pressed",style(Color("d99a31") if primary else Color("2c5d70"),Color("fff0b8") if primary else Color("a8dcea"),3,12))
+ b.add_theme_stylebox_override("disabled",style(Color("c9d0cd"),Color("9ca8a5"),2,12))
  b.pressed.connect(callback);parent.add_child(b);return b
+func clear_hud():
 func clear_hud():
  if hud:ui.remove_child(hud);hud.queue_free()
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
  stick=null;production_text=null;collect_button=null;objective=null;health=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear()
 func build_hud():
  clear_hud()
- panel(hud,Rect2(18,16,218,62),Color("f3f7f2"))
- label(hud,"GLUTWACHT",Rect2(32,18,190,29),22,GOLD)
- subtitle=label(hud,"Sonnenhain · Stufe %d"%progress.data.hall,Rect2(32,45,190,24),15)
+ var player_level=Catalog.level(progress.data,sim.hero_key())
+ panel(hud,Rect2(16,14,58,58),Color("e9e1c9"))
+ label(hud,str(player_level),Rect2(18,16,54,54),28,GOLD,true)
+ panel(hud,Rect2(78,14,190,58),Color("e9e1c9"))
+ label(hud,"SONNENHAIN",Rect2(90,17,166,27),18,GOLD)
+ subtitle=label(hud,"Haupthaus "+str(progress.data.hall),Rect2(90,43,166,23),14)
  stats=label(hud,"",Rect2(0,0,1,1),1);stats.hide()
- panel(hud,Rect2(248,16,126,50),Color("f3f7f2"))
- builder_text=label(hud,"⚒  %d/%d"%[progress.free_builders(),progress.builders()],Rect2(257,19,108,42),18,CREAM,true)
- panel(hud,Rect2(386,16,118,50),Color("f3f7f2"))
- resource_labels["gems"]=label(hud,"◆  %d"%int(progress.data.get("gems",0)),Rect2(394,19,102,42),18,Color("5c4682"),true)
+ panel(hud,Rect2(292,14,98,46),Color("e9e1c9"))
+ builder_text=label(hud,"⚒ %d/%d"%[progress.free_builders(),progress.builders()],Rect2(299,16,84,42),17,CREAM,true)
+ panel(hud,Rect2(398,14,96,46),Color("e9e1c9"))
+ resource_labels["gems"]=label(hud,"◆ %d"%int(progress.data.get("gems",0)),Rect2(405,16,82,42),17,Color("66518b"),true)
  var resource_names=["Holz","Stein","Gold"];var colors=[Color("b78140"),Color("778fa6"),Color("e4ac30")]
  for i in range(3):
-  var key=["wood","stone","gold"][i];var y=16+i*43
-  panel(hud,Rect2(1038,y,218,38),Color("f3f7f2"))
-  var bar=ProgressBar.new();bar.position=Vector2(1047,y+25);bar.size=Vector2(200,8);bar.show_percentage=false;bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
-  bar.add_theme_stylebox_override("background",style(Color("cedee5"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
-  resource_labels[key]=label(hud,resource_names[i],Rect2(1048,y+1,198,24),14,CREAM,true)
- button(hud,"☰",Rect2(18,88,56,48),func():open_menu())
- button(hud,"+",Rect2(1198,165,58,52),func():world.change_zoom(-4))
- button(hud,"−",Rect2(1198,222,58,52),func():world.change_zoom(4))
- toast_label=label(hud,"",Rect2(330,540,620,42),19,Color("ffffff"),true);toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
+  var key=["wood","stone","gold"][i];var y=14+i*38
+  panel(hud,Rect2(1070,y,186,34),Color("e9e1c9"))
+  var bar=ProgressBar.new();bar.position=Vector2(1080,y+22);bar.size=Vector2(166,7);bar.show_percentage=false;bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
+  bar.add_theme_stylebox_override("background",style(Color("d0d8d4"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
+  resource_labels[key]=label(hud,resource_names[i],Rect2(1080,y+1,166,21),13,CREAM,true)
+ button(hud,"☰",Rect2(16,82,50,44),func():open_menu())
+ toast_label=label(hud,"",Rect2(345,548,590,38),18,Color("ffffff"),true);toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
  if build_kind!="":build_placement_hud()
  elif sim.mode=="scout":build_scout_hud()
  elif sim.mode=="home":build_home_hud()
@@ -115,27 +126,32 @@ func build_hud():
  update_hud()
  if is_instance_valid(modal):ui.move_child(modal,-1)
 func build_home_hud():
- button(hud,"⚔  ANGRIFF",Rect2(22,632,178,62),func():open_raid(),true)
- button(hud,"◆  SHOP",Rect2(1090,560,166,52),func():open_shop())
- button(hud,"⚒  BAUEN",Rect2(1090,622,166,68),func():open_catalog(),true)
+ button(hud,"⚔  ANGRIFF",Rect2(18,644,160,58),func():open_raid(),true)
+ button(hud,"◆  SHOP",Rect2(1110,572,146,48),func():open_shop())
+ button(hud,"⚒  BAUEN",Rect2(1110,630,146,64),func():open_catalog(),true)
+ create_stick()
  if selected_obstacle!="":
-  panel(hud,Rect2(400,614,480,82),Color(.045,.075,.09,.93))
-  label(hud,"HINDERNIS",Rect2(418,620,150,24),16,GOLD)
-  label(hud,"⚒ 10 s   ● 20 Gold   ◆ 1–5",Rect2(418,645,250,38),17,Color.WHITE)
-  button(hud,"Entfernen",Rect2(690,628,170,54),func():remove_selected_obstacle(),true)
+  panel(hud,Rect2(424,616,432,78),Color("e9e1c9"))
+  label(hud,"Hindernis",Rect2(442,621,116,24),16,GOLD)
+  label(hud,"⚒ 10 s   ●20   ◆1–5",Rect2(442,647,220,32),15,CREAM)
+  button(hud,"ENTFERNEN",Rect2(676,629,162,48),func():remove_selected_obstacle(),true)
  elif selected_building!="":
   var b=progress.find_building(selected_building)
   if not b.is_empty():
-   panel(hud,Rect2(300,604,680,92),Color(.045,.075,.09,.94))
-   label(hud,Catalog.BUILD[b.kind].name+"  ·  LV "+str(b.level),Rect2(318,610,210,28),18,GOLD)
-   button(hud,"i\nInfo",Rect2(318,640,100,47),func():open_building(b.uid))
-   button(hud,"▲\nAusbau",Rect2(430,640,112,47),func():open_building(b.uid),true)
-   if not Progress.TITLES.has(b.uid) and progress.job_for(b.uid).is_empty():button(hud,"↔\nVersch.",Rect2(554,640,112,47),func():begin_build(b.kind,b.uid))
-   if Catalog.RESOURCES.has(b.kind) and float(b.get("stock",0))>=1:button(hud,"●\nSammeln",Rect2(678,640,126,47),func():collect_building_resource(b.uid),true)
-   elif b.kind=="barracks":button(hud,"⚔\nArmee",Rect2(678,640,126,47),func():open_army(),true)
-   elif b.kind in ["smithy","hero_hall"]:button(hud,"★\nTraining",Rect2(678,640,126,47),func():open_training(),true)
-   if b.kind=="hero_hall":button(hud,"♛\nHeld",Rect2(816,640,126,47),func():open_heroes())
-
+   panel(hud,Rect2(332,610,616,84),Color("e9e1c9"))
+   label(hud,Catalog.BUILD[b.kind].name+" · LV "+str(b.level),Rect2(350,614,202,24),16,GOLD)
+   button(hud,"i\nINFO",Rect2(350,641,92,44),func():open_building(b.uid))
+   button(hud,"▲\nAUSBAU",Rect2(452,641,102,44),func():open_building(b.uid),true)
+   var x=564
+   if not Progress.TITLES.has(b.uid) and progress.job_for(b.uid).is_empty():
+    button(hud,"↔\nVERS.",Rect2(x,641,92,44),func():begin_build(b.kind,b.uid));x+=102
+   if Catalog.RESOURCES.has(b.kind) and float(b.get("stock",0))>=1:
+    button(hud,"●\nSAMMELN",Rect2(x,641,114,44),func():collect_building_resource(b.uid),true)
+   elif b.kind=="barracks":
+    button(hud,"⚔\nARMEE",Rect2(x,641,104,44),func():open_army(),true)
+   elif b.kind in ["smithy","hero_hall"]:
+    button(hud,"★\nTRAINING",Rect2(x,641,116,44),func():open_training(),true)
+   if b.kind=="hero_hall":button(hud,"♛\nHELD",Rect2(822,641,100,44),func():open_heroes())
 func build_combat_hud():
  var c=sim.stats()
  subtitle.text=(sim.village.name if sim.mode=="raid" else "Sonnenhain")
@@ -191,7 +207,13 @@ func build_placement_hud():
  place_button=button(hud,"Hier bauen",Rect2(699,634,535,57),func():place_building(),true)
  update_ghost()
 func create_stick():
- stick=Stick.new();stick.position=Vector2(37,521);stick.size=Vector2(172,172);hud.add_child(stick)
+ stick=Stick.new()
+ if sim.mode=="home":
+  stick.position=Vector2(34,490);stick.size=Vector2(132,132)
+ else:
+  stick.position=Vector2(34,512);stick.size=Vector2(156,156)
+ hud.add_child(stick)
+func update_hud():
 func update_hud():
  if not stats:return
  stats.text="Holz %d Stein %d Gold %d"%[progress.data.wood,progress.data.stone,progress.data.gold]
