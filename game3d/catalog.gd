@@ -22,7 +22,7 @@ const CORE_POS={"hall":Vector2(0,-10),"barracks":Vector2(-12,2),"smithy":Vector2
 const RESOURCES={"lumber":"wood","quarry":"stone","goldmine":"gold"}
 const RATES={"lumber":18.0,"quarry":14.0,"goldmine":9.0}
 const BUILD_HALL={"lumber":1,"quarry":1,"wall":2,"tower":2,"goldmine":3,"camp":4,"hero_hall":5}
-const HALL_UNLOCKS={1:["Sägewerk","Steinbruch","Kaserne","Schwertkämpfer","2 Bauarbeiter"],2:["Bogenschützen","Mauern","Wachturm"],3:["Goldmine","Schmiede"],4:["Heerlager","Schildträger"],5:["Heldenhalle","Heldentraining","3. Bauarbeiter"],6:["Mörser","Mauerbrecher"],7:["Runeneinheit","Fallen"],8:["4. Bauarbeiter","Spezialverteidigung"],9:["Meistertraining"],10:["Festungszeitalter"]}
+const HALL_UNLOCKS={1:["Schwertkämpfer", "2 Bauarbeiter"],2:["Bogenschützen: Kaserne 2", "Mauern", "Wachturm"],3:["Goldmine"],4:["Heerlager"],5:["Heldenhalle", "3. Bauarbeiter"],6:["Gebäude bis Stufe 7"],7:["Gebäude bis Stufe 8"],8:["4. Bauarbeiter"],9:["Gebäude bis Stufe 10"],10:["Größtes Rohstofflager"]}
 const VILLAGES=[
  {"name":"Mooswacht","level":1,"theme":"Waldlager","seed":410,"tower_count":1,"wall_count":0,"guards":3,"captains":0,"wood":90,"stone":65,"gold":45},
  {"name":"Eisenfang","level":2,"theme":"Befestigtes Dorf","seed":621,"tower_count":2,"wall_count":5,"guards":5,"captains":1,"wood":145,"stone":110,"gold":75},
@@ -45,6 +45,9 @@ static func strength(profile:Dictionary) -> int:
  var hero_training=profile.get("training",{}).get("heroes",{}).get(String(profile.get("hero","warrior")),{})
  var power=int(profile.get("hall",1))*100+int(profile.get("barracks",1))*35+int(profile.get("smithy",1))*30+army*18
  power+=int(training.get("melee",0))*14+int(training.get("archers",0))*14
+ power+=level(profile,String(profile.get("hero","warrior")))*25
+ for b in profile.get("structures",[]):
+  if b is Dictionary:power+=int(b.get("level",1))*6
  power+=int(hero_training.get("power",0))*12+int(hero_training.get("vitality",0))*7+int(hero_training.get("skill",0))*10
  for b in profile.get("structures",[]):
   if not b is Dictionary:continue
@@ -55,6 +58,7 @@ static func strength(profile:Dictionary) -> int:
    "camp":power+=10*level
  return power
 static func village_strength(v:Dictionary) -> int:
+ if v.has("rating"):return int(v.rating)
  return int(v.get("level",1))*150+int(v.get("tower_count",0))*18+int(v.get("wall_count",0))*3+int(v.get("guards",0))*10+int(v.get("captains",0))*28
 static func strength_for_village_level(level:int) -> int:
  var preview={"level":level,"tower_count":clampi(1+int(level/2),1,5),"wall_count":maxi(0,(level-1)*4),"guards":3+level,"captains":int(level/4)}
@@ -78,5 +82,7 @@ static func matched_village(index:int,profile:Dictionary) -> Dictionary:
  base.captains=int(level/4)
  var loot_scale=.78+float(posmod(index*37+11,31))/100.0
  base.wood=int((70+level*55)*loot_scale);base.stone=int((55+level*46)*loot_scale);base.gold=int((35+level*31)*loot_scale)
+ base.rating=int(round(target_power))
+ base.combat_scale=target_power/maxf(1.0,float(strength_for_village_level(level)))
  base.theme="Gegner deiner Stärke"
  return base
