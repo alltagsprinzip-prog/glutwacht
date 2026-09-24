@@ -19,6 +19,7 @@ var subtitle:Label
 var objective:Label
 var health:ProgressBar
 var health_text:Label
+var loot_text:Label
 var production_text:Label
 var collect_button:Button
 var toast_label:Label
@@ -89,30 +90,38 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
  b.add_theme_stylebox_override("pressed",style(Color("d99a31") if primary else Color("2c5d70"),Color("fff0b8") if primary else Color("a8dcea"),3,12))
  b.add_theme_stylebox_override("disabled",style(Color("c9d0cd"),Color("9ca8a5"),2,12))
  b.pressed.connect(callback);parent.add_child(b);return b
+func icon_image(parent:Control,name:String,rect:Rect2) -> TextureRect:
+ var t=TextureRect.new();t.texture=load("res://game3d/icons/"+name+".svg");t.position=rect.position;t.size=rect.size
+ t.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;t.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;t.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ parent.add_child(t);return t
+func icon_button(parent:Control,icon_name:String,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
+ var b=button(parent,text,rect,callback,primary)
+ b.icon=load("res://game3d/icons/"+icon_name+".svg");b.expand_icon=true
+ return b
+
 func clear_hud():
  if hud:ui.remove_child(hud);hud.queue_free()
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
- stick=null;production_text=null;collect_button=null;objective=null;health=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear()
+ stick=null;production_text=null;collect_button=null;objective=null;health=null;health_text=null;loot_text=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear()
 func build_hud():
  clear_hud()
  stats=label(hud,"",Rect2(0,0,1,1),1);stats.hide()
- toast_label=label(hud,"",Rect2(345,548,590,38),18,Color("ffffff"),true)
+ toast_label=label(hud,"",Rect2(350,548,580,36),17,Color("ffffff"),true)
  toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
  if sim.mode=="home" or build_kind!="":
   var player_level=Catalog.level(progress.data,sim.hero_key())
-  panel(hud,Rect2(16,14,58,58),Color("e9e1c9"));label(hud,str(player_level),Rect2(18,16,54,54),28,GOLD,true)
-  panel(hud,Rect2(78,14,190,58),Color("e9e1c9"));label(hud,"SONNENHAIN",Rect2(90,17,166,27),18,GOLD)
-  subtitle=label(hud,"Haupthaus "+str(progress.data.hall),Rect2(90,43,166,23),14)
-  panel(hud,Rect2(292,14,98,46),Color("e9e1c9"));builder_text=label(hud,"⚒ %d/%d"%[progress.free_builders(),progress.builders()],Rect2(299,16,84,42),17,CREAM,true)
-  panel(hud,Rect2(398,14,96,46),Color("e9e1c9"));resource_labels["gems"]=label(hud,"◆ %d"%int(progress.data.get("gems",0)),Rect2(405,16,82,42),17,Color("66518b"),true)
-  var resource_names=["Holz","Stein","Gold"];var colors=[Color("b78140"),Color("778fa6"),Color("e4ac30")]
+  panel(hud,Rect2(14,12,54,54),Color("e9e1c9"));label(hud,str(player_level),Rect2(16,14,50,50),26,GOLD,true)
+  panel(hud,Rect2(72,12,168,54),Color("e9e1c9"));label(hud,"SONNENHAIN",Rect2(84,14,146,25),17,GOLD);subtitle=label(hud,"HH "+str(progress.data.hall),Rect2(84,39,146,21),13)
+  panel(hud,Rect2(254,12,92,42),Color("e9e1c9"));icon_image(hud,"builder",Rect2(260,18,28,28));builder_text=label(hud,"%d/%d"%[progress.free_builders(),progress.builders()],Rect2(288,14,52,36),16,CREAM,true)
+  panel(hud,Rect2(352,12,92,42),Color("e9e1c9"));icon_image(hud,"gem",Rect2(358,18,28,28));resource_labels["gems"]=label(hud,str(int(progress.data.get("gems",0))),Rect2(386,14,52,36),16,CREAM,true)
+  var keys=["wood","stone","gold"];var icons=["wood","stone","gold"];var colors=[Color("b78140"),Color("778fa6"),Color("e4ac30")]
   for i in range(3):
-   var key=["wood","stone","gold"][i];var y=14+i*38
-   panel(hud,Rect2(1070,y,186,34),Color("e9e1c9"))
-   var bar=ProgressBar.new();bar.position=Vector2(1080,y+22);bar.size=Vector2(166,7);bar.show_percentage=false;bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
-   bar.add_theme_stylebox_override("background",style(Color("d0d8d4"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
-   resource_labels[key]=label(hud,resource_names[i],Rect2(1080,y+1,166,21),13,CREAM,true)
-  button(hud,"☰",Rect2(16,82,50,44),func():open_menu())
+   var key=keys[i];var y=12+i*36
+   panel(hud,Rect2(1066,y,190,32),Color("e9e1c9"));icon_image(hud,icons[i],Rect2(1072,y+3,26,26))
+   var bar=ProgressBar.new();bar.position=Vector2(1102,y+21);bar.size=Vector2(144,6);bar.show_percentage=false;bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
+   bar.add_theme_stylebox_override("background",style(Color("d0d8d4"),Color.TRANSPARENT,0,3));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,3));hud.add_child(bar);resource_bars[key]=bar
+   resource_labels[key]=label(hud,"",Rect2(1100,y+1,146,20),13,CREAM,true)
+  button(hud,"☰",Rect2(14,76,48,42),func():open_menu())
   if build_kind!="":build_placement_hud()
   else:build_home_hud()
  elif sim.mode=="scout":
@@ -122,74 +131,68 @@ func build_hud():
  update_hud()
  if is_instance_valid(modal):ui.move_child(modal,-1)
 func build_home_hud():
- button(hud,"⚔\nANGRIFF",Rect2(18,632,148,66),func():open_raid(),true)
- button(hud,"◆\nSHOP",Rect2(1112,566,144,54),func():open_shop())
- button(hud,"⚒\nBAUEN",Rect2(1112,628,144,68),func():open_catalog(),true)
+ icon_button(hud,"attack","ANGRIFF",Rect2(18,638,150,58),func():open_raid(),true)
+ icon_button(hud,"shop","SHOP",Rect2(1120,575,136,46),func():open_shop())
+ icon_button(hud,"build","BAUEN",Rect2(1120,630,136,62),func():open_catalog(),true)
  create_stick()
  if selected_obstacle!="":
-  panel(hud,Rect2(424,616,432,78),Color("e9e1c9"))
-  label(hud,"Hindernis",Rect2(442,621,116,24),16,GOLD)
-  label(hud,"⚒ 10 s   ●20   ◆1–5",Rect2(442,647,220,32),15,CREAM)
-  button(hud,"ENTFERNEN",Rect2(676,629,162,48),func():remove_selected_obstacle(),true)
+  panel(hud,Rect2(432,620,416,72),Color("e9e1c9"))
+  icon_image(hud,"builder",Rect2(448,636,30,30));label(hud,"10 s · 20 Gold · 1–5 Juwelen",Rect2(484,629,190,42),14,CREAM)
+  icon_button(hud,"collect","ENTFERNEN",Rect2(682,632,148,48),func():remove_selected_obstacle(),true)
  elif selected_building!="":
-  var b=progress.find_building(selected_building)
-  if not b.is_empty():
-   panel(hud,Rect2(332,610,616,84),Color("e9e1c9"))
-   label(hud,Catalog.BUILD[b.kind].name+" · LV "+str(b.level),Rect2(350,614,202,24),16,GOLD)
-   button(hud,"i\nINFO",Rect2(350,641,92,44),func():open_building(b.uid))
-   button(hud,"▲\nAUSBAU",Rect2(452,641,102,44),func():open_building(b.uid),true)
-   var x=564
-   if not Progress.TITLES.has(b.uid) and progress.job_for(b.uid).is_empty():
-    button(hud,"↔\nVERS.",Rect2(x,641,92,44),func():begin_build(b.kind,b.uid));x+=102
-   if Catalog.RESOURCES.has(b.kind) and float(b.get("stock",0))>=1:
-    button(hud,"●\nSAMMELN",Rect2(x,641,114,44),func():collect_building_resource(b.uid),true)
-   elif b.kind=="barracks":
-    button(hud,"⚔\nARMEE",Rect2(x,641,104,44),func():open_army(),true)
-   elif b.kind in ["smithy","hero_hall"]:
-    button(hud,"★\nTRAINING",Rect2(x,641,116,44),func():open_training(),true)
-   if b.kind=="hero_hall":button(hud,"♛\nHELD",Rect2(822,641,100,44),func():open_heroes())
+  var bb=progress.find_building(selected_building)
+  if not bb.is_empty():
+   panel(hud,Rect2(360,616,560,76),Color("e9e1c9"))
+   label(hud,Catalog.BUILD[bb.kind].name+" · LV "+str(bb.level),Rect2(376,620,184,22),15,GOLD)
+   icon_button(hud,"info","INFO",Rect2(376,646,88,38),func():open_building(bb.uid))
+   icon_button(hud,"upgrade","AUSBAU",Rect2(472,646,104,38),func():open_building(bb.uid),true)
+   var x=584
+   if not Progress.TITLES.has(bb.uid) and progress.job_for(bb.uid).is_empty():
+    icon_button(hud,"move","VERS.",Rect2(x,646,92,38),func():begin_build(bb.kind,bb.uid));x+=100
+   if Catalog.RESOURCES.has(bb.kind) and float(bb.get("stock",0))>=1:
+    icon_button(hud,"collect","SAMMELN",Rect2(x,646,116,38),func():collect_building_resource(bb.uid),true)
+   elif bb.kind=="barracks" or bb.kind=="camp":
+    icon_button(hud,"sword","ARMEE",Rect2(x,646,104,38),func():open_army(),true)
+   elif bb.kind in ["smithy","hero_hall"]:
+    icon_button(hud,"skill","TRAINING",Rect2(x,646,118,38),func():open_training(),true)
+
 func build_combat_hud():
- var c=sim.stats()
- subtitle.text=(sim.village.name if sim.mode=="raid" else "Sonnenhain")
+ var cc=sim.stats()
  if sim.mode=="raid":
-  panel(hud,Rect2(18,148,235,120),Color(.045,.075,.09,.88))
-  label(hud,sim.village.name,Rect2(32,154,205,28),20,GOLD)
-  label(hud,"BEUTE",Rect2(32,184,90,20),14,Color.WHITE)
-  label(hud,"H %d   S %d\nG %d"%[sim.village.wood,sim.village.stone,sim.village.gold],Rect2(32,205,205,50),16,Color.WHITE)
- objective=label(hud,"",Rect2(470,92,340,48),24,Color.WHITE,true)
- health=ProgressBar.new();health.position=Vector2(440,565);health.size=Vector2(390,18);health.max_value=sim.hero.max_hp;health.show_percentage=false
- health.add_theme_stylebox_override("background",style(Color("26382e")));health.add_theme_stylebox_override("fill",style(Color("76a75f"),Color("76a75f"),0,3));hud.add_child(health)
- health_text=label(hud,"",Rect2(440,540,390,24),15,CREAM,true)
+  panel(hud,Rect2(16,112,220,132),Color("ded3b8"))
+  label(hud,sim.village.name,Rect2(28,118,196,26),19,GOLD)
+  label(hud,"ERBEUTET",Rect2(28,148,100,20),13,CREAM)
+  loot_text=label(hud,"",Rect2(28,170,192,60),15,CREAM)
+ objective=label(hud,"",Rect2(470,78,340,44),24,Color.WHITE,true)
+ health_text=label(hud,"",Rect2(934,86,304,32),15,Color.WHITE,true)
  create_stick()
- cooldowns.skill=button(hud,"✦",Rect2(1040,520,72,72),func():sim.skill();tone("skill"),true)
- cooldowns.roll=button(hud,"↝",Rect2(1120,535,62,62),func():sim.roll(movement()))
- cooldowns.heal=button(hud,"+",Rect2(1190,535,62,62),func():sim.heal())
- var attack=button(hud,"⚔",Rect2(1160,615,92,76),func():pass,true)
+ cooldowns.skill=icon_button(hud,"skill","",Rect2(1040,516,70,70),func():sim.skill();tone("skill"),true)
+ cooldowns.roll=icon_button(hud,"roll","",Rect2(1118,530,62,62),func():sim.roll(movement()))
+ cooldowns.heal=icon_button(hud,"heal","",Rect2(1188,530,62,62),func():sim.heal())
+ var attack=icon_button(hud,"attack","",Rect2(1162,614,88,76),func():pass,true)
  attack.button_down.connect(func():held=true);attack.button_up.connect(func():held=false)
  if sim.mode=="raid":
-  panel(hud,Rect2(252,602,690,96),Color(.045,.075,.09,.92))
-  deployment_buttons.melee=button(hud,"⚔\n×0",Rect2(270,615,128,70),func():deploying="melee";deploy_drag_last=Vector2(9999,9999))
-  deployment_buttons.archers=button(hud,"➶\n×0",Rect2(410,615,128,70),func():deploying="archers";deploy_drag_last=Vector2(9999,9999))
-  deployment_buttons.hero=button(hud,"♛\nHeld",Rect2(550,615,128,70),func():deploying="";toast("Held steuerst du direkt."),true)
-  deployment_buttons.all=button(hud,"ALLE",Rect2(690,615,110,70),func():sim.deploy_all();deploying="")
-  button(hud,"Beenden",Rect2(812,626,112,49),func():end_raid())
+  panel(hud,Rect2(300,610,640,84),Color("ded3b8"))
+  deployment_buttons.melee=icon_button(hud,"sword","×0",Rect2(318,620,116,62),func():select_deployment("melee"))
+  deployment_buttons.archers=icon_button(hud,"archer","×0",Rect2(444,620,116,62),func():select_deployment("archers"))
+  deployment_buttons.hero=icon_button(hud,"hero","HELD",Rect2(570,620,116,62),func():select_deployment(""))
+  deployment_buttons.all=button(hud,"ALLE",Rect2(696,620,92,62),func():sim.deploy_all();select_deployment(""))
+  button(hud,"Beenden",Rect2(798,628,126,46),func():end_raid())
  elif sim.mode=="defense":
   objective.text="VERTEIDIGUNG"
 
 func build_scout_hud():
- subtitle.text="Gegnersuche"
  var v=sim.village
- panel(hud,Rect2(18,148,248,154),Color(.045,.075,.09,.90))
- label(hud,v.name,Rect2(32,156,216,30),22,GOLD)
+ panel(hud,Rect2(16,112,224,138),Color("ded3b8"))
+ label(hud,v.name,Rect2(28,120,198,28),20,GOLD)
  var player_strength=Catalog.strength(progress.data);var enemy_strength=Catalog.village_strength(v);var ratio=float(enemy_strength)/maxf(1.0,float(player_strength))
  var difficulty="LEICHT" if ratio<.9 else ("PASSEND" if ratio<=1.12 else "STARK")
- label(hud,difficulty,Rect2(32,188,216,24),16,Color("e8b77b"))
- label(hud,"BEUTE",Rect2(32,218,216,22),14,Color.WHITE)
- label(hud,"H %d   S %d   G %d"%[v.wood,v.stone,v.gold],Rect2(32,240,216,38),16,Color.WHITE)
- button(hud,"Zurück",Rect2(22,630,130,58),func():return_home())
- button(hud,"Weiter  →",Rect2(490,630,220,58),func():scout_next(),true)
- var b=button(hud,"⚔  Angreifen",Rect2(1010,620,240,70),func():start_raid(),true)
- b.disabled=int(progress.data.melee)+int(progress.data.archers)==0
+ label(hud,difficulty,Rect2(28,150,198,22),14,Color("8d5730"))
+ label(hud,"Beute  H %d · S %d · G %d"%[v.wood,v.stone,v.gold],Rect2(28,180,198,48),14,CREAM)
+ button(hud,"Zurück",Rect2(18,638,126,52),func():return_home())
+ button(hud,"Weiter →",Rect2(520,638,200,52),func():scout_next(),true)
+ var go=icon_button(hud,"attack","ANGREIFEN",Rect2(1030,626,220,64),func():start_raid(),true)
+ go.disabled=int(progress.data.melee)+int(progress.data.archers)==0
 
 func build_placement_hud():
  subtitle.text="Bauplan · "+Catalog.BUILD[build_kind].name
@@ -211,33 +214,32 @@ func create_stick():
  hud.add_child(stick)
 func update_hud():
  if not stats:return
- stats.text="Holz %d Stein %d Gold %d"%[progress.data.wood,progress.data.stone,progress.data.gold]
  var names={"wood":"Holz","stone":"Stein","gold":"Gold"}
  for key in resource_bars:
   resource_bars[key].max_value=progress.storage();resource_bars[key].value=progress.data[key]
-  resource_labels[key].text="%s  %d/%d"%[names[key],progress.data[key],progress.storage()]
- if resource_labels.has("gems"):resource_labels.gems.text="◆  %d"%int(progress.data.get("gems",0))
- if builder_text:builder_text.text="⚒  %d/%d"%[progress.free_builders(),progress.builders()]
- if production_text:
-  var ready=progress.ready_resources();production_text.text="%d H · %d S · %d G"%[ready.wood,ready.stone,ready.gold]
-  if collect_button:collect_button.disabled=ready.wood+ready.stone+ready.gold==0
- if sim.active() and health:
-  health.value=sim.hero.hp;health_text.text="%s  %d/%d"%[sim.stats().name,sim.hero.hp,sim.hero.max_hp]
+  resource_labels[key].text="%d/%d"%[progress.data[key],progress.storage()]
+ if resource_labels.has("gems"):resource_labels.gems.text=str(int(progress.data.get("gems",0)))
+ if builder_text:builder_text.text="%d/%d"%[progress.free_builders(),progress.builders()]
+ if sim.active():
+  if health_text:health_text.text="%s  %d/%d HP"%[sim.stats().name,sim.hero.hp,sim.hero.max_hp]
   if sim.mode=="raid":
    var remain=maxi(0,180-int(sim.time));var mins=int(remain/60);var secs=remain%60
-   objective.text="★ %d/3   %d%%   %d:%02d"%[sim.stars(),sim.destruction_percent(),mins,secs]
-  else:objective.text="Welle %d/3"%sim.wave
-  cooldowns.skill.text="✦" if sim.skill_cd<=0 else "%.1f"%sim.skill_cd
-  cooldowns.roll.text="↝" if sim.roll_cd<=0 else "%.1f"%sim.roll_cd
-  cooldowns.heal.text="+×%d"%sim.potion
+   if objective:objective.text="★ %d/3   %d%%   %d:%02d"%[sim.stars(),sim.destruction_percent(),mins,secs]
+   if loot_text:loot_text.text="Holz %d\nStein %d\nGold %d"%[sim.raid_loot.wood,sim.raid_loot.stone,sim.raid_loot.gold]
+  elif objective:objective.text="Welle %d/3"%sim.wave
+  cooldowns.skill.text="" if sim.skill_cd<=0 else "%.1f"%sim.skill_cd
+  cooldowns.roll.text="" if sim.roll_cd<=0 else "%.1f"%sim.roll_cd
+  cooldowns.heal.text="×%d"%sim.potion
   cooldowns.skill.disabled=sim.skill_cd>0;cooldowns.roll.disabled=sim.roll_cd>0;cooldowns.heal.disabled=sim.potion==0
   if sim.mode=="raid" and not deployment_buttons.is_empty():
+   deployment_buttons.melee.text="×%d"%sim.reserve.melee;deployment_buttons.archers.text="×%d"%sim.reserve.archers
+   deployment_buttons.melee.disabled=sim.reserve.melee<=0;deployment_buttons.archers.disabled=sim.reserve.archers<=0
    for kind in ["melee","archers"]:
-    deployment_buttons[kind].text=(("⚔" if kind=="melee" else "➶")+"\n×%d"%sim.reserve[kind])
-    deployment_buttons[kind].disabled=sim.reserve[kind]<=0
-    deployment_buttons[kind].modulate=Color("ffe29a") if deploying==kind else Color.WHITE
-    if sim.reserve[kind]<=0 and deploying==kind:deploying=""
+    deployment_buttons[kind].modulate=Color("ffe38c") if deploying==kind else Color.WHITE
+   if sim.reserve.melee<=0 and deploying=="melee":select_deployment("")
+   if sim.reserve.archers<=0 and deploying=="archers":select_deployment("")
    deployment_buttons.all.disabled=sim.reserve.melee+sim.reserve.archers==0
+func movement() -> Vector2:
 func movement() -> Vector2:
  if not stick or build_kind!="" or sim.mode=="scout":return Vector2.ZERO
  var v=stick.value
@@ -314,7 +316,10 @@ func _unhandled_input(event):
     dragging=false
  elif event is InputEventMouseMotion and dragging:
   if event.position.distance_to(pointer_start)>8:pointer_dragged=true
-  if pointer_dragged and not sim.active():world.pan_camera(-event.relative)
+  if pointer_dragged and sim.mode=="raid" and deploying!="":
+   var gp=world.ground_position(event.position)
+   if deploy_drag_last.distance_to(gp)>=1.15 and sim.deploy(deploying,gp):deploy_drag_last=gp;tone("equip")
+  elif pointer_dragged and not sim.active():world.pan_camera(-event.relative)
  elif event is InputEventScreenTouch:
   if event.pressed:pointer_start=event.position;pointer_dragged=false;deploy_drag_last=Vector2(9999,9999)
   elif not pointer_dragged:world_tap(event.position)
@@ -326,6 +331,12 @@ func _unhandled_input(event):
     if sim.deploy(deploying,ground):deploy_drag_last=ground;tone("equip")
    get_viewport().set_input_as_handled()
   elif not sim.active():world.pan_camera(-event.relative)
+func select_deployment(kind:String):
+ if kind!="" and (not sim.reserve.has(kind) or int(sim.reserve[kind])<=0):return
+ deploying=kind;deploy_drag_last=Vector2(9999,9999)
+ for key in ["melee","archers"]:
+  if deployment_buttons.has(key):deployment_buttons[key].modulate=Color("ffe38c") if key==kind else Color.WHITE
+
 func world_tap(pos:Vector2):
  if paused or Time.get_ticks_msec()<modal_guard_until:return
  if build_kind!="":build_pos=world.ground_position(pos).snapped(Vector2(2.5,2.5));update_ghost()
@@ -337,8 +348,11 @@ func world_tap(pos:Vector2):
    var oid=world.obstacle_at(pos);selected_obstacle=oid;selected_building="";world.selected_uid="";world.selected_obstacle=oid
   build_hud()
  elif sim.mode=="raid" and deploying!="":
-  if sim.deploy(deploying,world.ground_position(pos)):tone("equip")
-  else:toast("Nur am freien Dorfrand platzieren.")
+  var gp=world.ground_position(pos)
+  if sim.deploy(deploying,gp):tone("equip")
+  else:
+   sim.effects.append({"kind":"invalid","pos":gp,"life":.35,"max":.35,"color":Color("ff4b3e")})
+   toast("Nur am freien Dorfrand platzieren.")
 func _notification(what):
  if what==NOTIFICATION_APPLICATION_FOCUS_OUT and is_inside_tree() and sim:
   save()
@@ -374,14 +388,18 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  close_dialog();dialog=name;paused=true;held=false;touches.clear()
  if stick:stick.release()
  modal=Control.new();modal.size=Vector2(1280,720);modal.z_index=100;ui.add_child(modal)
- var veil=ColorRect.new();veil.color=Color(.04,.10,.13,.32);veil.size=Vector2(1280,720);modal.add_child(veil)
- var compact=name in ["building","training","army","shop","remove","hero_profile"]
- var rect=Rect2(210,92,860,536) if compact else Rect2(106,65,1068,590)
- var p=panel(modal,rect,Color("f2f7f8"))
- label(p,heading,Rect2(24,10,rect.size.x-125,44),28,GOLD)
- if sub!="":label(p,sub,Rect2(25,54,rect.size.x-130,36),16)
+ var veil=ColorRect.new();veil.color=Color(.025,.04,.04,.56);veil.size=Vector2(1280,720);modal.add_child(veil)
+ var rect=Rect2(250,135,780,450)
+ if name=="building":rect=Rect2(285,145,710,430)
+ elif name in ["training","army","shop","hero_profile","remove"]:rect=Rect2(270,130,740,450)
+ elif name=="result":rect=Rect2(280,135,720,440)
+ elif name=="catalog":rect=Rect2(135,80,1010,555)
+ elif name=="heroes":rect=Rect2(90,65,1100,585)
+ var p=panel(modal,rect,Color("d8ccb0"))
+ label(p,heading,Rect2(22,8,rect.size.x-112,42),26,GOLD)
+ if sub!="":label(p,sub,Rect2(24,48,rect.size.x-120,30),15)
  if name!="result" and not (name=="heroes" and progress.data.hero==""):
-  var close=button(p,"×",Rect2(rect.size.x-82,7,68,60),func():close_dialog());close.name="CloseDialog";close.z_index=10
+  var close=button(p,"×",Rect2(rect.size.x-68,7,54,50),func():close_dialog());close.name="CloseDialog";close.z_index=10
  return p
 
 func close_dialog():
@@ -468,42 +486,45 @@ func upgrade_building(uid:String,from:String="detail"):
   if from=="list":open_upgrades()
   else:open_building(uid)
 func open_building(uid:String):
- var b=progress.find_building(uid);if b.is_empty():return
- selected_building=uid;var d:Dictionary=Catalog.BUILD[b.kind]
+ var bb=progress.find_building(uid);if bb.is_empty():return
+ selected_building=uid;var d:Dictionary=Catalog.BUILD[bb.kind]
  var p=open_dialog("building",d.name,"")
- building_preview(p,b.kind,Rect2(34,108,280,230),b.level)
- panel(p,Rect2(338,112,476,82),Color("e6dfc8"))
- label(p,"LV %d"%b.level,Rect2(354,124,130,48),30,GOLD,true)
- label(p,"→",Rect2(488,124,54,48),26,CREAM,true)
- label(p,("MAX" if b.level>=Progress.MAX_LEVEL else "LV %d"%(b.level+1)),Rect2(546,124,150,48),30,GOLD,true)
+ building_preview(p,bb.kind,Rect2(24,82,220,180),bb.level)
+ panel(p,Rect2(264,88,420,66),Color("e9dfc8"))
+ label(p,"LV %d"%bb.level,Rect2(278,96,110,46),26,GOLD,true);label(p,"→",Rect2(390,96,42,46),24,CREAM,true)
+ label(p,("MAX" if bb.level>=Progress.MAX_LEVEL else "LV %d"%(bb.level+1)),Rect2(436,96,120,46),26,GOLD,true)
  var benefit=""
- if b.kind=="hall":
-  var next_level=int(b.level)+1;var unlocks=Catalog.HALL_UNLOCKS.get(next_level,[])
+ if bb.kind=="hall":
+  var next_level=int(bb.level)+1;var unlocks=Catalog.HALL_UNLOCKS.get(next_level,[])
   benefit="Lager +1200 · Held +35 Leben"+((" · "+", ".join(unlocks)) if not unlocks.is_empty() else "")
- elif b.kind=="barracks":benefit="Truppen +30 Leben · +5 Schaden"
- elif b.kind=="smithy":benefit="Held +8 Angriff"
- elif Catalog.RATES.has(b.kind):benefit="Produktion %d → %d / Min"%[Catalog.RATES[b.kind]*b.level,Catalog.RATES[b.kind]*(b.level+1)]
- elif b.kind=="wall":benefit="Haltbarkeit steigt"
- elif b.kind=="tower":benefit="Schaden %d → %d"%[12+b.level*8,20+b.level*8]
- elif b.kind=="camp":benefit="Mehr Armeekapazität"
- elif b.kind=="hero_hall":benefit="Heldentraining"
- label(p,benefit,Rect2(342,205,468,40),18,CREAM,true)
- var cc=progress.cost(uid);var duration=progress.build_seconds(b.kind,b.level+1)
- if b.level<Progress.MAX_LEVEL:
-  panel(p,Rect2(338,258,476,74),Color("e6dfc8"))
-  label(p,"▥ %d     ◆ %d     ● %d     ⏱ %d s"%[cc.wood,cc.stone,cc.gold,duration],Rect2(350,269,452,50),18,CREAM,true)
+ elif bb.kind=="barracks":benefit="Truppen +30 Leben · +5 Schaden"
+ elif bb.kind=="smithy":benefit="Held +8 Angriff"
+ elif Catalog.RATES.has(bb.kind):benefit="Produktion %d → %d / Min"%[Catalog.RATES[bb.kind]*bb.level,Catalog.RATES[bb.kind]*(bb.level+1)]
+ elif bb.kind=="wall":benefit="Haltbarkeit steigt"
+ elif bb.kind=="tower":benefit="Schaden %d → %d"%[12+bb.level*8,20+bb.level*8]
+ elif bb.kind=="camp":benefit="Mehr Armeekapazität"
+ elif bb.kind=="hero_hall":benefit="Heldentraining"
+ label(p,benefit,Rect2(266,164,414,34),16,CREAM,true)
+ var cost=progress.cost(uid);var duration=progress.build_seconds(bb.kind,bb.level+1)
+ if bb.level<Progress.MAX_LEVEL:
+  panel(p,Rect2(264,210,420,62),Color("e9dfc8"))
+  icon_image(p,"wood",Rect2(276,225,24,24));label(p,str(cost.wood),Rect2(300,218,62,38),15,CREAM)
+  icon_image(p,"stone",Rect2(362,225,24,24));label(p,str(cost.stone),Rect2(386,218,62,38),15,CREAM)
+  icon_image(p,"gold",Rect2(448,225,24,24));label(p,str(cost.gold),Rect2(472,218,62,38),15,CREAM)
+  icon_image(p,"clock",Rect2(536,225,24,24));label(p,"%d s"%duration,Rect2(560,218,82,38),15,CREAM)
  var reason="";var job=progress.job_for(uid)
  if not job.is_empty():reason="Bau läuft · %d s"%ceili(maxf(0,float(job.finish)-Time.get_unix_time_from_system()))
- elif b.level>=Progress.MAX_LEVEL:reason="MAXIMALE STUFE"
- elif b.kind!="wall" and progress.free_builders()==0:reason="Kein Bauarbeiter frei"
- elif b.kind!="hall" and b.level>=progress.data.hall+1:reason="Haupthaus zuerst ausbauen"
- elif not progress.affordable(cc):reason="Nicht genug Rohstoffe"
- label(p,reason,Rect2(338,346,476,34),16,Color("9b4b42"),true)
- var up=button(p,"▲  AUSBAUEN",Rect2(514,420,300,64),func():upgrade_building(uid),true);up.disabled=reason!=""
- if Catalog.RESOURCES.has(b.kind):button(p,"●  SAMMELN",Rect2(34,420,210,64),func():collect_building_resource(uid))
- elif b.kind=="barracks":button(p,"⚔  ARMEE",Rect2(34,420,210,64),func():open_army())
- elif b.kind in ["smithy","hero_hall"]:button(p,"★  TRAINING",Rect2(34,420,210,64),func():open_training())
- if not Progress.TITLES.has(uid) and job.is_empty():button(p,"↔",Rect2(260,420,90,64),func():begin_build(b.kind,uid))
+ elif bb.level>=Progress.MAX_LEVEL:reason="MAXIMALE STUFE"
+ elif bb.kind!="wall" and progress.free_builders()==0:reason="Kein Bauarbeiter frei"
+ elif bb.kind!="hall" and bb.level>=progress.data.hall+1:reason="Haupthaus zuerst ausbauen"
+ elif not progress.affordable(cost):reason="Nicht genug Rohstoffe"
+ label(p,reason,Rect2(264,282,420,28),15,Color("9b4b42"),true)
+ var up=icon_button(p,"upgrade","AUSBAUEN",Rect2(414,338,270,56),func():upgrade_building(uid),true);up.disabled=reason!=""
+ if Catalog.RESOURCES.has(bb.kind):icon_button(p,"collect","SAMMELN",Rect2(24,338,178,56),func():collect_building_resource(uid))
+ elif bb.kind=="barracks" or bb.kind=="camp":icon_button(p,"sword","ARMEE",Rect2(24,338,178,56),func():open_army())
+ elif bb.kind in ["smithy","hero_hall"]:icon_button(p,"skill","TRAINING",Rect2(24,338,178,56),func():open_training())
+ if not Progress.TITLES.has(uid) and job.is_empty():icon_button(p,"move","",Rect2(214,338,70,56),func():begin_build(bb.kind,uid))
+func confirm_remove(uid:String):
 func confirm_remove(uid:String):
  var b=progress.find_building(uid)
  var p=open_dialog("remove",Catalog.BUILD[b.kind].name+" abbauen?","Dieser Bauplatz wird frei. Du erhältst keine Rohstoffe zurück.")
@@ -594,18 +615,24 @@ func end_raid():
  toast("Angriff beendet.")
 
 func open_result():
- var practice=sim.mode=="defense";var full=sim.result=="victory"
- var title=("Verteidigung bestanden" if full else "Verteidigung beendet") if practice else ("ANGRIFF BEENDET")
- var p=open_dialog("result",title,"" if not practice else "Dein Dorf bleibt unverändert.")
+ var practice=sim.mode=="defense"
+ var p=open_dialog("result","ANGRIFF BEENDET" if not practice else "VERTEIDIGUNG","")
  if not practice:
-  label(p,"★".repeat(int(reward.get("stars",0)))+"☆".repeat(3-int(reward.get("stars",0))),Rect2(120,130,828,58),38,GOLD,true)
-  label(p,"%d%%  ZERSTÖRUNG"%sim.destruction_percent(),Rect2(120,190,828,42),24,CREAM,true)
-  label(p,"▥ %d     ◆ %d     ● %d"%[reward.wood,reward.stone,reward.gold],Rect2(90,270,888,52),25,GOLD,true)
-  label(p,"+%d EP  ·  %d Gegner besiegt"%[reward.xp,sim.kills],Rect2(90,336,888,40),19,CREAM,true)
+  var star_count=int(reward.get("stars",0))
+  for i in range(3):
+   var s=label(p,"★",Rect2(224+i*88,78,80,80),50,GOLD if i<star_count else Color("887e6a"),true)
+   s.scale=Vector2(.65,.65);s.pivot_offset=s.size/2
+   var tw=create_tween();tw.tween_interval(.12*i);tw.tween_property(s,"scale",Vector2.ONE,.22).set_trans(Tween.TRANS_BACK)
+  label(p,"%d%% ZERSTÖRUNG"%sim.destruction_percent(),Rect2(120,166,480,42),24,CREAM,true)
+  panel(p,Rect2(106,220,508,82),Color("e9dfc8"))
+  icon_image(p,"wood",Rect2(130,240,30,30));label(p,str(reward.wood),Rect2(162,232,90,46),18,CREAM)
+  icon_image(p,"stone",Rect2(268,240,30,30));label(p,str(reward.stone),Rect2(300,232,90,46),18,CREAM)
+  icon_image(p,"gold",Rect2(406,240,30,30));label(p,str(reward.gold),Rect2(438,232,90,46),18,CREAM)
+  label(p,"+%d EP"%reward.xp,Rect2(120,310,480,30),17,CREAM,true)
  else:
-  label(p,"%d Gegner besiegt · Welle %d/3"%[sim.kills,sim.wave],Rect2(90,210,888,50),22,CREAM,true)
- button(p,"ZURÜCK INS DORF",Rect2(286,474,499,68),func():return_home(),true)
-
+  label(p,"%d Gegner besiegt · Welle %d/3"%[sim.kills,sim.wave],Rect2(120,180,480,42),21,CREAM,true)
+ icon_button(p,"hero","ZURÜCK INS DORF",Rect2(196,356,328,56),func():return_home(),true)
+func return_home():
 func return_home():
  close_dialog();build_kind="";selected_building="";deploying="";world.build_focus=false;sim.home();result_shown=false;world.setup(sim);build_hud();save()
 func open_menu():
