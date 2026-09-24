@@ -184,7 +184,7 @@ func production(now:float=-1.0) -> bool:
  for i in range(data.get("obstacle_jobs",[]).size()-1,-1,-1):
   var ojob=data.obstacle_jobs[i]
   if now<float(ojob.finish):continue
-  var reward=1+posmod(String(ojob.uid).hash(),5)
+  var reward=randi_range(1,5)
   data.gems=int(data.get("gems",0))+reward;recent_gems+=reward
   for j in range(data.get("obstacles",[]).size()-1,-1,-1):
    if String(data.obstacles[j].uid)==String(ojob.uid):data.obstacles.remove_at(j);break
