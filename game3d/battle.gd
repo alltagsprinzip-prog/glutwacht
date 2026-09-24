@@ -119,7 +119,7 @@ func layout(index:int):
   traps.append({"pos":Vector2(0,11),"used":false,"damage":20+level*7})
  if level>=4:traps.append({"pos":Vector2(16,8),"used":false,"damage":45})
  village_objectives=1+int(village.tower_count)
- raid_building_total=buildings.size()
+ raid_building_total=buildings.filter(func(b):return b.kind!="wall").size()
 func scout(index:int):
  mode="scout";reset_battle();layout(index);first_target="";make_hero(entry_position());allies.clear()
 func start(index:int=-1,manual:bool=false) -> bool:
@@ -148,7 +148,7 @@ func objectives_left() -> int:
  return buildings.filter(func(b):return b.hp>0 and b.objective).size()
 func destruction_percent() -> int:
  if raid_building_total<=0:return 0
- return clampi(int(round(100.0*float(buildings.filter(func(b):return b.hp<=0).size())/float(raid_building_total))),0,100)
+ return clampi(int(round(100.0*float(buildings.filter(func(b):return b.kind!="wall" and b.hp<=0).size())/float(raid_building_total))),0,100)
 func stars() -> int:
  if mode!="raid":return 0
  var hall_down=false
@@ -345,22 +345,24 @@ func step(dt:float,input:Vector2):
   var target=nearest(b.pos,([hero]+living(allies)) if b.team=="enemy" else living(enemies))
   if target!=null and distance(b,target)<13 and b.cd<=0:
    b.cd=2.0;damage(target,12+8*int(b.level));attack_effect(b,target,Color("ffce84"))
- if hero.hp<=0:result="defeat"
- elif mode=="raid" and objectives_left()==0:result="victory"
+ if mode=="raid":
+  if destruction_percent()>=100:result="victory"
+  elif hero.hp<=0 and living(allies).is_empty() and int(reserve.melee)+int(reserve.archers)==0:result="complete"
  elif mode=="defense":
+  if hero.hp<=0:result="defeat"
   for b in buildings:
    if b.kind=="hall" and b.hp<=0:result="defeat"
   if result=="" and living(enemies).is_empty():
    if wave>=3:result="victory"
    else:spawn_wave()
   elif wave<3 and time>=next_wave:spawn_wave()
- if time>=300 and result=="":result="timeout"
+ if time>=180 and result=="":result="timeout"
 func settle() -> Dictionary:
  if result=="" or settled:return {}
  settled=true
  var reward={"wood":0,"stone":0,"gold":0,"sword":false,"xp":0,"stars":0}
- if result!="victory" or mode=="defense":return reward
- reward.stars=stars();reward.xp=40*int(village.level)+20*int(reward.stars)
+ if mode=="defense" or mode!="raid":return reward
+ reward.stars=stars();reward.xp=20*int(village.level)+25*int(reward.stars)+int(destruction_percent()/5)
  var loot_factor=.55+.45*float(destruction_percent())/100.0
  for k in ["wood","stone","gold"]:
   var available=int(round(float(village[k])*loot_factor))
