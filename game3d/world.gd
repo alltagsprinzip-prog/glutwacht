@@ -117,9 +117,8 @@ func terrain():
  for x in range(-82,82,2):
   for z in range(-82,82,2):
    for v in [Vector2(x,z),Vector2(x+2,z),Vector2(x,z+2),Vector2(x+2,z),Vector2(x+2,z+2),Vector2(x,z+2)]:
-    var path=minf(absf(v.x),absf(v.y-3))
-    var blend=clampf((path-1.6)/1.6,0,1)
-    var c=Color("967e56").lerp(Color("4a7738"),blend)
+    var meadow=clampf((sin(v.x*.08)+cos(v.y*.09)+2.0)/4.0,0,1)
+    var c=Color("559847").lerp(Color("70aa55"),meadow*.35)
     var noise=sin(v.x*.4+v.y*.25)*.017+rng.randf_range(-.012,.012)
     surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise));surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
