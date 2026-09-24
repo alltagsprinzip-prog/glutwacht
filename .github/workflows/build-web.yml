@@ -43,11 +43,22 @@ jobs:
             exit 1
           fi
 
+      - name: Gameplay release gate
+        shell: bash
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests3d/release_gate.gd 2>&1 | tee release-gate.log
+          grep -q "RELEASE_GATE_OK" release-gate.log
+          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|RELEASE GATE:" release-gate.log; then
+            echo "Gameplay release gate failed"
+            exit 1
+          fi
+
       - name: Export Web
         shell: bash
         run: |
           set -o pipefail
-          BUILD_DIR="dist/v07fix2"
+          BUILD_DIR="dist/v08final"
           mkdir -p "$BUILD_DIR"
           godot --headless --path . --export-release "Web" "$BUILD_DIR/index.html" 2>&1 | tee godot-export.log
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" godot-export.log; then
@@ -60,13 +71,13 @@ jobs:
           touch dist/.nojekyll
           cat > dist/index.html <<'EOF'
           <!doctype html><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=./v07fix2/">
+          <meta http-equiv="refresh" content="0; url=./v08final/">
           <title>Glutwacht</title>
-          <a href="./v07fix2/">Glutwacht starten</a>
+          <a href="./v08final/">Glutwacht starten</a>
           EOF
           python - <<'PY'
           from pathlib import Path
-          p=Path("dist/v07fix2/index.html")
+          p=Path("dist/v08final/index.html")
           s=p.read_text()
           marker='</body>'
           overlay=r'''
