@@ -367,5 +367,6 @@ func settle() -> Dictionary:
  for k in ["wood","stone","gold"]:
   var available=int(round(float(village[k])*loot_factor))
   reward[k]=mini(available,maxi(0,1200*int(profile.hall)-int(profile[k])));profile[k]+=reward[k]
- profile.wins+=1;profile.xp[hero_key()]+=reward.xp
+ if int(reward.stars)>0:profile.wins+=1
+ profile.xp[hero_key()]+=reward.xp
  return reward
