@@ -102,8 +102,8 @@ func setup(sim):
  camera=Camera3D.new();add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.far=210;camera.current=true
  if mode=="scout":target_zoom=44;focus=Vector3(0,0,-2)
  elif sim.active():target_zoom=32;focus=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)
- else:target_zoom=48;focus=Vector3(0,0,2)
- zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(24,34,36);camera.look_at(focus)
+ else:target_zoom=38;focus=Vector3(0,0,1)
+ zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
  terrain();scenery(sim)
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
@@ -114,8 +114,8 @@ func setup(sim):
  fx=Node3D.new();add_child(fx)
 func terrain():
  var surf=SurfaceTool.new();surf.begin(Mesh.PRIMITIVE_TRIANGLES)
- for x in range(-66,66,2):
-  for z in range(-66,66,2):
+ for x in range(-82,82,2):
+  for z in range(-82,82,2):
    for v in [Vector2(x,z),Vector2(x+2,z),Vector2(x,z+2),Vector2(x+2,z),Vector2(x+2,z+2),Vector2(x,z+2)]:
     var path=minf(absf(v.x),absf(v.y-3))
     var blend=clampf((path-1.6)/1.6,0,1)
@@ -196,7 +196,8 @@ func create_building(b:Dictionary):
  else:
   var roof_colors={"hall":Color("d99032"),"barracks":Color("9e4d3f"),"smithy":Color("4d5d67"),"lumber":Color("4e7f45"),"quarry":Color("727b7e"),"goldmine":Color("b58b32"),"tower":Color("4d607d"),"camp":Color("6d7541"),"hero_hall":Color("745b91")}
   var roof_tint:Color=roof_colors.get(b.kind,Color("2c7ea3"))
-  var model=asset(def.model,body,Vector3.ZERO,size*(1+.04*(level-1)),"width",PI if b.team=="enemy" else 0,roof_tint)
+  var visual_scale=1.14 if b.kind in ["hall","barracks","smithy","camp","hero_hall"] else 1.08
+  var model=asset(def.model,body,Vector3.ZERO,size*(visual_scale+.04*(level-1)),"width",PI if b.team=="enemy" else 0,roof_tint)
   model_height=float(model.get_meta("height",5.0))
   if level>=2:
    box(body,Vector3(0,.16,0),Vector3(size*.92,.32,size*.73),Color("778382"))
@@ -212,6 +213,22 @@ func create_building(b:Dictionary):
     var globe=SphereMesh.new();globe.radius=.25;globe.height=.5
     mesh_node(globe,Vector3(x,3.5,size*.48),material(Color("ffd189"),.4,true),body)
    box(body,Vector3(0,.39,size*.39),Vector3(size*.9,.12,.14),Color("d7b86b"))
+  if b.kind=="hall":
+   for x in [-size*.44,size*.44]:banner(body,Vector3(x,0,size*.42),3.2,b.team=="enemy")
+   box(body,Vector3(0,.22,-size*.42),Vector3(size*.78,.44,.30),Color("6f695d"))
+  if b.kind=="barracks":
+   for x in [-2.0,0.0,2.0]:
+    var post=CylinderMesh.new();post.top_radius=.09;post.bottom_radius=.12;post.height=2.6
+    mesh_node(post,Vector3(x,1.3,size*.48),material(Color("7b5533")),body)
+  if b.kind=="smithy":
+   var chimney=BoxMesh.new();chimney.size=Vector3(.9,3.4,.9)
+   mesh_node(chimney,Vector3(size*.28,2.2,-size*.22),material(Color("4f5150")),body)
+  if b.kind=="camp":
+   disc(size*.48,Color(.35,.29,.18,.32),Vector3(0,.03,0),body)
+  if b.kind=="hero_hall":
+   for x in [-size*.35,size*.35]:
+    var pillar=CylinderMesh.new();pillar.top_radius=.14;pillar.bottom_radius=.18;pillar.height=3.4
+    mesh_node(pillar,Vector3(x,1.7,size*.36),material(Color("76608e")),body)
   if b.kind in ["quarry","goldmine"]:
    for i in range(5):
     var color=Color("d6ac52") if b.kind=="goldmine" else Color("8b9ba0")
@@ -448,7 +465,7 @@ func update_camera(sim,dt:float):
   var factor=clampf((60-target_zoom)/35.0,0,1)
   goal+=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)*factor
  focus=focus.lerp(goal,minf(1,dt*5));zoom=lerpf(zoom,target_zoom,minf(1,dt*9));camera.size=zoom
- camera.position=focus+Vector3(24,34,36);camera.look_at(focus)
+ camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
 func change_zoom(amount:float):target_zoom=clampf(target_zoom+amount,17,66)
 func screen_to_direction(v:Vector2) -> Vector2:
  var right=camera.global_basis.x;var forward=-camera.global_basis.z;forward.y=0;forward=forward.normalized()
