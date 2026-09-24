@@ -374,16 +374,18 @@ func remove_selected_obstacle():
   save();toast("Bauarbeiter räumt das Hindernis.");refresh_home()
  else:toast("Benötigt freien Bauarbeiter und 20 Gold.")
 func open_shop():
- var p=open_dialog("shop","Shop","◆ %d Juwelen"%int(progress.data.get("gems",0)))
- var items=[["wood","▥","500 Holz",25],["stone","◆","500 Stein",25],["gold","●","300 Gold",35],["builder","⚒","+1 Bauarbeiter",200]]
+ var p=open_dialog("shop","Shop","")
+ icon_image(p,"gem",Rect2(28,66,28,28));label(p,str(int(progress.data.get("gems",0))),Rect2(58,62,100,34),17,CREAM)
+ var items=[["wood","wood","500 Holz",25],["stone","stone","500 Stein",25],["gold","gold","300 Gold",35],["builder","builder","+1 Bauarbeiter",200]]
  for i in range(items.size()):
-  var it=items[i];var x=42+(i%2)*390;var y=128+int(i/2)*148
-  panel(p,Rect2(x,y,360,126),Color("e4eef1"));label(p,it[1],Rect2(x+14,y+22,70,70),38,GOLD,true);label(p,it[2],Rect2(x+96,y+14,242,34),21,GOLD)
-  label(p,"◆ %d"%it[3],Rect2(x+96,y+51,130,30),18,Color("5c4682"))
-  var buy=button(p,"KAUFEN",Rect2(x+210,y+70,128,42),func():
+  var it=items[i];var x=20+(i%2)*350;var y=106+int(i/2)*140
+  panel(p,Rect2(x,y,330,124),Color("e9dfc8"));icon_image(p,it[1],Rect2(x+18,y+23,62,62))
+  label(p,it[2],Rect2(x+92,y+12,210,28),19,GOLD);icon_image(p,"gem",Rect2(x+92,y+47,24,24));label(p,str(it[3]),Rect2(x+120,y+42,62,34),15,CREAM)
+  var buy=button(p,"KAUFEN",Rect2(x+192,y+72,118,38),func():
    if progress.shop_buy(it[0]):save();refresh_home();open_shop();tone("pickup")
    else:toast("Nicht genug Juwelen oder bereits gekauft."),true)
   if it[0]=="builder" and int(progress.data.get("builder_bonus",0))>=1:buy.disabled=true
+func open_dialog(name:String,heading:String,sub:String) -> Control:
 func open_dialog(name:String,heading:String,sub:String) -> Control:
  close_dialog();dialog=name;paused=true;held=false;touches.clear()
  if stick:stick.release()
@@ -427,18 +429,24 @@ func building_preview(parent:Control,kind:String,rect:Rect2,level:int=1):
  hero_views.append(viewport)
 
 func open_catalog():
- var p=open_dialog("catalog","Bauen","⚒ %d/%d frei"%[progress.free_builders(),progress.builders()])
+ var p=open_dialog("catalog","Bauen","")
+ icon_image(p,"builder",Rect2(20,60,26,26));label(p,"%d/%d frei"%[progress.free_builders(),progress.builders()],Rect2(50,56,150,34),15,CREAM)
  var kinds=["lumber","quarry","goldmine","wall","tower","camp","hero_hall"]
  for i in range(kinds.size()):
-  var k=kinds[i];var d=Catalog.BUILD[k];var x=20+(i%3)*345;var y=108+int(i/3)*150
-  panel(p,Rect2(x,y,330,140),Color("e6dfc8"))
-  building_preview(p,k,Rect2(x+8,y+8,108,92))
-  label(p,d.name,Rect2(x+122,y+10,194,29),20,GOLD)
-  var unlocked=Catalog.unlocked(k,int(progress.data.hall));var cc=d.cost
-  label(p,("▥ %d  ◆ %d  ● %d"%[cc.wood,cc.stone,cc.gold]) if unlocked else ("🔒 Haupthaus %d"%Catalog.required_hall(k)),Rect2(x+122,y+42,194,26),14)
-  label(p,"%d/%d"%[progress.count_kind(k),d.limit],Rect2(x+122,y+70,70,24),14,CREAM)
-  var b=button(p,"BAUEN" if unlocked else "GESPERRT",Rect2(x+122,y+96,190,36),func():begin_build(k),unlocked)
-  b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
+  var k=kinds[i];var d=Catalog.BUILD[k];var x=18+(i%3)*330;var y=94+int(i/3)*148
+  panel(p,Rect2(x,y,316,138),Color("e6dfc8"));building_preview(p,k,Rect2(x+8,y+8,102,88))
+  label(p,d.name,Rect2(x+116,y+8,184,27),19,GOLD)
+  var unlocked=Catalog.unlocked(k,int(progress.data.hall));var cost=d.cost
+  if unlocked:
+   icon_image(p,"wood",Rect2(x+116,y+42,20,20));label(p,str(cost.wood),Rect2(x+138,y+36,40,28),12,CREAM)
+   icon_image(p,"stone",Rect2(x+180,y+42,20,20));label(p,str(cost.stone),Rect2(x+202,y+36,40,28),12,CREAM)
+   icon_image(p,"gold",Rect2(x+244,y+42,20,20));label(p,str(cost.gold),Rect2(x+266,y+36,40,28),12,CREAM)
+  else:
+   icon_image(p,"lock",Rect2(x+116,y+42,22,22));label(p,"HH %d"%Catalog.required_hall(k),Rect2(x+142,y+36,130,28),13,CREAM)
+  label(p,"%d/%d"%[progress.count_kind(k),d.limit],Rect2(x+116,y+69,70,22),13,CREAM)
+  var b=button(p,"BAUEN" if unlocked else "GESPERRT",Rect2(x+116,y+94,184,34),func():begin_build(k),unlocked)
+  b.disabled=not unlocked or not progress.affordable(cost) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
+func begin_build(kind:String,uid:String=""):
 func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
@@ -532,32 +540,36 @@ func confirm_remove(uid:String):
  button(p,"Behalten",Rect2(32,488,468,68),func():open_building(uid),true)
  button(p,"Gebäude abbauen",Rect2(526,488,517,68),func():progress.demolish(uid);save();close_dialog();refresh_home())
 func open_army():
- var p=open_dialog("army","Armee","Plätze  %d/%d"%[int(progress.data.melee)+int(progress.data.archers),progress.capacity()])
+ var p=open_dialog("army","Armee","Plätze %d/%d"%[int(progress.data.melee)+int(progress.data.archers),progress.capacity()])
  var count=int(progress.data.melee)+int(progress.data.archers)
  for i in range(2):
-  var k=["melee","archers"][i];var y=126+i*142;var troop_open=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
-  panel(p,Rect2(42,y,776,122),Color("e4eef1"))
-  label(p,"⚔" if i==0 else "➶",Rect2(58,y+18,72,72),38,GOLD,true)
-  label(p,"Schwertkämpfer" if i==0 else "Bogenschützen",Rect2(145,y+12,310,32),22,GOLD)
-  label(p,("Nahkampf" if i==0 else "Fernkampf") if troop_open else "Freischaltung: HH2 + Kaserne2",Rect2(145,y+49,350,28),16)
-  var minus=button(p,"−",Rect2(540,y+29,58,58),func():progress.army(k,-1);save();refresh_home();open_army());minus.disabled=progress.data[k]==0 or not troop_open
-  label(p,str(progress.data[k]),Rect2(606,y+29,70,58),28,CREAM,true)
-  var plus=button(p,"+",Rect2(684,y+29,90,58),func():progress.army(k,1);save();refresh_home();open_army());plus.disabled=count>=progress.capacity() or not troop_open
- button(p,"FERTIG",Rect2(548,432,258,58),func():close_dialog(),true)
+  var k=["melee","archers"][i];var y=96+i*132;var troop_open=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
+  panel(p,Rect2(26,y,688,112),Color("e9dfc8"))
+  icon_image(p,"sword" if i==0 else "archer",Rect2(42,y+22,58,58))
+  label(p,"Schwertkämpfer" if i==0 else "Bogenschützen",Rect2(112,y+12,250,30),20,GOLD)
+  label(p,("Nahkampf" if i==0 else "Fernkampf") if troop_open else "HH2 + Kaserne2 nötig",Rect2(112,y+44,250,24),14)
+  var minus=button(p,"−",Rect2(444,y+27,54,54),func():progress.army(k,-1);save();refresh_home();open_army());minus.disabled=progress.data[k]==0 or not troop_open
+  label(p,str(progress.data[k]),Rect2(504,y+27,62,54),26,CREAM,true)
+  var plus=button(p,"+",Rect2(572,y+27,92,54),func():progress.army(k,1);save();refresh_home();open_army());plus.disabled=count>=progress.capacity() or not troop_open
+ icon_button(p,"hero","FERTIG",Rect2(468,366,220,52),func():close_dialog(),true)
 func open_training():
  var key=sim.hero_key();var cc=Catalog.hero(key)
  var p=open_dialog("training","Training · "+cc.name,"Rang erhöhen")
  var kinds=["power","vitality","skill","melee","archers"]
- var names=["⚔ Kraft","♥ Leben","✦ Fähigkeit","⚔ Schwerter","➶ Bogenschützen"]
+ var names=["Kraft","Leben","Fähigkeit","Schwertkämpfer","Bogenschützen"]
+ var icons=["sword","heal","skill","sword","archer"]
  var effects=["+6 Angriff","+25 Leben","+12 % / −0,4 s","+20 Leben / +4 Schaden","+20 Leben / +4 Schaden"]
  for i in range(5):
   var group="heroes" if i<3 else "troops";var who=key if i<3 else kinds[i];var attribute=kinds[i] if i<3 else ""
-  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=112+i*78
-  panel(p,Rect2(34,y,792,68),Color("e8f2f6"))
-  label(p,names[i],Rect2(48,y+7,230,27),20,GOLD)
-  label(p,"Rang %d/5 · %s"%[rank,effects[i]],Rect2(48,y+35,330,24),14)
-  label(p,("▥ %d  ◆ %d  ● %d"%[cost.wood,cost.stone,cost.gold]) if rank<5 else "MAX",Rect2(390,y+15,240,36),16,CREAM,true)
-  var b=button(p,"▲",Rect2(660,y+8,145,50),func():
+  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=82+i*66
+  panel(p,Rect2(22,y,696,58),Color("e9dfc8"));icon_image(p,icons[i],Rect2(34,y+10,38,38))
+  label(p,names[i],Rect2(80,y+4,180,24),18,GOLD);label(p,"Rang %d/5 · %s"%[rank,effects[i]],Rect2(80,y+29,250,22),13)
+  if rank<5:
+   icon_image(p,"wood",Rect2(344,y+14,24,24));label(p,str(cost.wood),Rect2(368,y+8,52,34),13,CREAM)
+   icon_image(p,"stone",Rect2(420,y+14,24,24));label(p,str(cost.stone),Rect2(444,y+8,52,34),13,CREAM)
+   icon_image(p,"gold",Rect2(496,y+14,24,24));label(p,str(cost.gold),Rect2(520,y+8,52,34),13,CREAM)
+  else:label(p,"MAX",Rect2(360,y+8,190,34),16,GOLD,true)
+  var b=icon_button(p,"upgrade","",Rect2(590,y+7,104,44),func():
    if progress.train(group,who,attribute):save();refresh_home();open_training();tone("equip"),true)
   b.disabled=rank>=5 or not progress.affordable(cost)
 
