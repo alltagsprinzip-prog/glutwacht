@@ -22,7 +22,7 @@ const CORE_POS={"hall":Vector2(0,-10),"barracks":Vector2(-12,2),"smithy":Vector2
 const RESOURCES={"lumber":"wood","quarry":"stone","goldmine":"gold"}
 const RATES={"lumber":18.0,"quarry":14.0,"goldmine":9.0}
 const BUILD_HALL={"lumber":1,"quarry":1,"wall":2,"tower":2,"goldmine":3,"camp":4,"hero_hall":5}
-const HALL_UNLOCKS={1:["Sägewerk","Steinbruch","Kaserne","Schwertkämpfer"],2:["Bogenschützen","Mauern","Wachturm"],3:["Goldmine","2. Bauarbeiter","Schmiede"],4:["Heerlager","Schildträger"],5:["Heldenhalle","Heldentraining"],6:["Mörser","Mauerbrecher"],7:["Runeneinheit","Fallen"],8:["größeres Heerlager","Spezialverteidigung"],9:["Meistertraining"],10:["Festungszeitalter"]}
+const HALL_UNLOCKS={1:["Sägewerk","Steinbruch","Kaserne","Schwertkämpfer","2 Bauarbeiter"],2:["Bogenschützen","Mauern","Wachturm"],3:["Goldmine","Schmiede"],4:["Heerlager","Schildträger"],5:["Heldenhalle","Heldentraining","3. Bauarbeiter"],6:["Mörser","Mauerbrecher"],7:["Runeneinheit","Fallen"],8:["4. Bauarbeiter","Spezialverteidigung"],9:["Meistertraining"],10:["Festungszeitalter"]}
 const VILLAGES=[
  {"name":"Mooswacht","level":1,"theme":"Waldlager","seed":410,"tower_count":1,"wall_count":0,"guards":3,"captains":0,"wood":90,"stone":65,"gold":45},
  {"name":"Eisenfang","level":2,"theme":"Befestigtes Dorf","seed":621,"tower_count":2,"wall_count":5,"guards":5,"captains":1,"wood":145,"stone":110,"gold":75},
