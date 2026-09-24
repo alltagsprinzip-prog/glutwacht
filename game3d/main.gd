@@ -490,20 +490,21 @@ func open_army():
  button(p,"Bereit",Rect2(720,509,323,57),func():close_dialog(),true)
 func open_training():
  var key=sim.hero_key();var c=Catalog.hero(key)
- var p=open_dialog("training","Training · "+c.name,"Sofort wirksam, keine Wartezeit. Jede Verbesserung kostet Rohstoffe. Maximal Rang 5.")
+ var p=open_dialog("training","Training · "+c.name,"Wähle eine Verbesserung.")
  var kinds=["power","vitality","skill","melee","archers"]
- var names=["Kraft","Ausdauer","Fertigkeit","Schwertkämpfer","Bogenschützen"]
- var effects=["+6 Angriff je Rang","+25 Leben je Rang","+12 % Wirkung, -0,4 s Abklingzeit je Rang","+20 Leben und +4 Schaden je Rang","+20 Leben und +4 Schaden je Rang"]
+ var names=["⚔  Kraft","♥  Leben","✦  Fähigkeit","⚔  Schwerter","➶  Bogenschützen"]
+ var effects=["+6 Angriff","+25 Leben","+12 % Wirkung / −0,4 s"," +20 Leben / +4 Schaden","+20 Leben / +4 Schaden"]
  for i in range(5):
   var group="heroes" if i<3 else "troops";var who=key if i<3 else kinds[i];var attribute=kinds[i] if i<3 else ""
-  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=123+i*86
-  panel(p,Rect2(22,y,1023,79),Color("dceef6"))
-  label(p,names[i]+" · Rang %d / 5"%rank,Rect2(35,y+4,470,34),22,GOLD)
-  label(p,effects[i],Rect2(35,y+39,566,33),16)
-  label(p,"%d H / %d S / %d G"%[cost.wood,cost.stone,cost.gold] if rank<5 else "Voll trainiert",Rect2(600,y+16,225,40),17,CREAM,true)
-  var b=button(p,"Trainieren",Rect2(835,y+13,193,53),func():
+  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=126+i*84
+  panel(p,Rect2(31,y,1000,74),Color("e8f2f6"))
+  label(p,names[i],Rect2(48,y+8,280,28),23,GOLD)
+  label(p,"Rang %d/5  ·  %s"%[rank,effects[i]],Rect2(48,y+38,420,25),16)
+  label(p,"🪵 %d   ◇ %d   ● %d"%[cost.wood,cost.stone,cost.gold] if rank<5 else "MAX",Rect2(500,y+17,270,38),18,CREAM,true)
+  var b=button(p,"⬆",Rect2(807,y+10,190,54),func():
    if progress.train(group,who,attribute):save();refresh_home();open_training();tone("equip"),true)
   b.disabled=rank>=5 or not progress.affordable(cost)
+
 func priority_name(key:String) -> String:return {"nearest":"Nächstes Ziel","defenses":"Verteidigung","hall":"Haupthaus","resources":"Rohstoffe"}.get(key,"Nächstes Ziel")
 func open_attack_plan():
  var p=open_dialog("plan","Dein Angriffsplan","Erst aufstellen, dann angreifen. Im Kampf setzt du Truppen am markierten Dorfrand ein.")
