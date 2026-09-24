@@ -176,7 +176,7 @@ func build_combat_hud():
   deployment_buttons.archers=button(hud,"➶\n×0",Rect2(410,615,128,70),func():deploying="archers";deploy_drag_last=Vector2(9999,9999))
   deployment_buttons.hero=button(hud,"♛\nHeld",Rect2(550,615,128,70),func():deploying="";toast("Held steuerst du direkt."),true)
   deployment_buttons.all=button(hud,"ALLE",Rect2(690,615,110,70),func():sim.deploy_all();deploying="")
-  button(hud,"Aufgeben",Rect2(812,626,112,49),func():return_home())
+  button(hud,"Beenden",Rect2(812,626,112,49),func():end_raid())
  elif sim.mode=="defense":
   objective.text="VERTEIDIGUNG"
 
@@ -476,38 +476,41 @@ func upgrade_building(uid:String,from:String="detail"):
 func open_building(uid:String):
  var b=progress.find_building(uid);if b.is_empty():return
  selected_building=uid;var d:Dictionary=Catalog.BUILD[b.kind]
- var p=open_dialog("building",d.name,"LV %d"%b.level)
- label(p,"LV %d"%b.level,Rect2(42,118,160,58),34,GOLD,true)
- label(p,"→",Rect2(204,118,70,58),30,CREAM,true)
- label(p,("MAX" if b.level>=Progress.MAX_LEVEL else "LV %d"%(b.level+1)),Rect2(276,118,160,58),34,GOLD,true)
+ var p=open_dialog("building",d.name,"")
+ building_preview(p,b.kind,Rect2(34,108,280,230),b.level)
+ panel(p,Rect2(338,112,476,82),Color("e6dfc8"))
+ label(p,"LV %d"%b.level,Rect2(354,124,130,48),30,GOLD,true)
+ label(p,"→",Rect2(488,124,54,48),26,CREAM,true)
+ label(p,("MAX" if b.level>=Progress.MAX_LEVEL else "LV %d"%(b.level+1)),Rect2(546,124,150,48),30,GOLD,true)
  var benefit=""
  if b.kind=="hall":
   var next_level=int(b.level)+1;var unlocks=Catalog.HALL_UNLOCKS.get(next_level,[])
-  benefit="Lager +1200   ·   Leben +35"+(("   ·   "+", ".join(unlocks)) if not unlocks.is_empty() else "")
- elif b.kind=="barracks":benefit="Truppen: +30 Leben · +5 Schaden"
- elif b.kind=="smithy":benefit="Held: +8 Angriff"
+  benefit="Lager +1200 · Held +35 Leben"+((" · "+", ".join(unlocks)) if not unlocks.is_empty() else "")
+ elif b.kind=="barracks":benefit="Truppen +30 Leben · +5 Schaden"
+ elif b.kind=="smithy":benefit="Held +8 Angriff"
  elif Catalog.RATES.has(b.kind):benefit="Produktion %d → %d / Min"%[Catalog.RATES[b.kind]*b.level,Catalog.RATES[b.kind]*(b.level+1)]
- elif b.kind=="wall":benefit="Mehr Haltbarkeit"
+ elif b.kind=="wall":benefit="Haltbarkeit steigt"
  elif b.kind=="tower":benefit="Schaden %d → %d"%[12+b.level*8,20+b.level*8]
  elif b.kind=="camp":benefit="Mehr Armeekapazität"
- elif b.kind=="hero_hall":benefit="Heldenfortschritt"
- label(p,benefit,Rect2(44,194,760,42),19,CREAM,true)
+ elif b.kind=="hero_hall":benefit="Heldentraining"
+ label(p,benefit,Rect2(342,205,468,40),18,CREAM,true)
  var cc=progress.cost(uid);var duration=progress.build_seconds(b.kind,b.level+1)
  if b.level<Progress.MAX_LEVEL:
-  panel(p,Rect2(76,260,700,84),Color("e4eef1"))
-  label(p,"H %d     S %d     G %d     ⏱ %d s"%[cc.wood,cc.stone,cc.gold,duration],Rect2(92,271,668,58),20,CREAM,true)
+  panel(p,Rect2(338,258,476,74),Color("e6dfc8"))
+  label(p,"▥ %d     ◆ %d     ● %d     ⏱ %d s"%[cc.wood,cc.stone,cc.gold,duration],Rect2(350,269,452,50),18,CREAM,true)
  var reason="";var job=progress.job_for(uid)
  if not job.is_empty():reason="Bau läuft · %d s"%ceili(maxf(0,float(job.finish)-Time.get_unix_time_from_system()))
  elif b.level>=Progress.MAX_LEVEL:reason="MAXIMALE STUFE"
  elif b.kind!="wall" and progress.free_builders()==0:reason="Kein Bauarbeiter frei"
  elif b.kind!="hall" and b.level>=progress.data.hall+1:reason="Haupthaus zuerst ausbauen"
  elif not progress.affordable(cc):reason="Nicht genug Rohstoffe"
- label(p,reason,Rect2(70,364,720,34),17,Color("9b4b42"),true)
- var up=button(p,"▲  AUSBAUEN",Rect2(506,430,300,62),func():upgrade_building(uid),true);up.disabled=reason!=""
- if Catalog.RESOURCES.has(b.kind):button(p,"●  SAMMELN",Rect2(52,430,205,62),func():collect_building_resource(uid))
- elif b.kind=="barracks":button(p,"⚔  ARMEE",Rect2(52,430,205,62),func():open_army())
- elif b.kind in ["smithy","hero_hall"]:button(p,"★  TRAINING",Rect2(52,430,205,62),func():open_training())
- if not Progress.TITLES.has(uid) and job.is_empty():button(p,"↔",Rect2(273,430,90,62),func():begin_build(b.kind,uid))
+ label(p,reason,Rect2(338,346,476,34),16,Color("9b4b42"),true)
+ var up=button(p,"▲  AUSBAUEN",Rect2(514,420,300,64),func():upgrade_building(uid),true);up.disabled=reason!=""
+ if Catalog.RESOURCES.has(b.kind):button(p,"●  SAMMELN",Rect2(34,420,210,64),func():collect_building_resource(uid))
+ elif b.kind=="barracks":button(p,"⚔  ARMEE",Rect2(34,420,210,64),func():open_army())
+ elif b.kind in ["smithy","hero_hall"]:button(p,"★  TRAINING",Rect2(34,420,210,64),func():open_training())
+ if not Progress.TITLES.has(uid) and job.is_empty():button(p,"↔",Rect2(260,420,90,64),func():begin_build(b.kind,uid))
+func confirm_remove(uid:String):
 func confirm_remove(uid:String):
  var b=progress.find_building(uid)
  var p=open_dialog("remove",Catalog.BUILD[b.kind].name+" abbauen?","Dieser Bauplatz wird frei. Du erhältst keine Rohstoffe zurück.")
@@ -591,6 +594,12 @@ func start_raid():
  if sim.start(-1,true):close_dialog();result_shown=false;deploying="";world.setup(sim);build_hud();tone("equip")
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
+func end_raid():
+ if sim.mode!="raid" or sim.result!="":return
+ sim.result="complete"
+ held=false;deploying=""
+ toast("Angriff beendet.")
+
 func open_result():
  var practice=sim.mode=="defense";var full=sim.result=="victory"
  var title=("Verteidigung bestanden" if full else "Verteidigung beendet") if practice else ("ANGRIFF BEENDET")
