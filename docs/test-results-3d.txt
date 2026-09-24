@@ -1,0 +1,34 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS initial army capacity
+PASS upgrade charges exact cost
+PASS hall increases capacity
+PASS unknown upgrade rejected
+PASS unaffordable upgrade atomic
+PASS level capped
+PASS army capacity enforced
+PASS no negative troops
+PASS save writes
+PASS save round trip
+PASS home formation
+PASS raid has opponents and objectives
+PASS hero attack damages target
+PASS attack cooldown enforced
+PASS hero skill cooldown
+PASS roll invulnerability
+PASS single potion
+PASS retreat command
+PASS invalid command rejected
+PASS world bounds
+PASS buildings block movement
+PASS death resolves defeat
+PASS defeat grants no loot
+PASS all three targets resolve victory
+PASS reward exactly once with equipment
+PASS earned sword applies after return
+PASS time limit resolves
+PLAYTHROUGH false result=victory time=22.6166666666667 hero=299.0 survivors=5 targets=0
+PASS full playable raid upgraded=false
+PLAYTHROUGH true result=victory time=19.6500000000002 hero=269.0 survivors=4 targets=0
+PASS full playable raid upgraded=true
+TESTS 29/29

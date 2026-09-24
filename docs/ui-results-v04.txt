@@ -1,0 +1,43 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+     at: set_use_vsync (platform/linuxbsd/x11/gl_manager_x11.cpp:372)
+OpenGL API 4.5 (Core Profile) Mesa 25.2.8-0ubuntu0.24.04.2 - Compatibility - Using Device: Mesa - llvmpipe (LLVM 20.1.2, 256 bits)
+
+UI_PASS four 3D hero choices preserved
+UI_PASS hero selection closes cleanly
+UI_PASS three top resource capacity bars
+UI_PASS zoom preserved
+UI_PASS reported insufficient-resources detail recreated
+UI_PASS detail closes on mixed touch and emulated mouse release
+UI_PASS delayed mobile release cannot click through closed modal
+UI_PASS HUD refresh cannot cover modal close button
+UI_PASS close catalog window by touch
+UI_PASS close upgrades window by touch
+UI_PASS close army window by touch
+UI_PASS close training window by touch
+UI_PASS close menu window by touch
+UI_PASS tower placement begins
+UI_PASS tower creates job and visible builder
+UI_PASS busy worker shown in HUD
+UI_PASS construction cannot be upgraded twice
+UI_PASS deadline completes and removes worker while modal open
+UI_PASS completion detail remains closable
+UI_PASS upgrade UI starts timer without early level
+UI_PASS instant hero training through UI
+UI_PASS training does not occupy another builder
+UI_PASS open scout with unchanged no-combat state
+UI_PASS choose side priority and hero in plan
+UI_PASS plan closes without starting attack
+UI_PASS tap enemy building shows inspection and range
+UI_PASS mark first target through UI
+UI_PASS next village clears stale first target
+UI_PASS attack uses planned side with troops in reserve
+UI_PASS tap legal edge deploys one soldier
+UI_PASS deploy remaining army through UI
+UI_PASS deployed troops attack without hero input
+UI_PASS 3D and HUD health bars visible
+UI_PASS menu freezes combat
+UI_PASS combat menu closes by touch
+UI_PASS expanded state survives reload
+UI_PASS small landscape detail closes
+V04_UI_TESTS 37/37

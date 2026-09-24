@@ -1,0 +1,56 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS first start offers four classes
+PASS valid hero selection
+PASS selected class controls combat stats
+PASS upgrade atomic cost and capacity
+PASS no partial spending
+PASS wall construction
+PASS overlap rejected without spending
+PASS outside boundary rejected
+PASS army staging area protected
+PASS wall relocation and rotation
+PASS wall upgrade persists
+PASS defensive tower constructed
+PASS building count
+PASS one minute exact production
+PASS production capped by building stock
+PASS collection transfers once
+PASS no duplicate collection
+PASS clock rollback cannot duplicate production
+PASS save roundtrip with buildings hero resources
+PASS migrate played v2 without losing progress
+PASS scouting never starts combat
+PASS attack uses the previewed village
+PASS army autonomous by default
+PASS army advances without hero or commands
+PASS village level changes defenses and rewards
+PASS next village cycles
+PASS basic attack warrior
+PASS class skill warrior
+PASS class skill cooldown warrior
+RAID warrior victory t=11.3833333333335 HP=434.0 allies=5
+PASS complete starter raid warrior
+PASS loot and experience exactly once warrior
+PASS basic attack ninja
+PASS class skill ninja
+PASS class skill cooldown ninja
+RAID ninja victory t=10.7833333333334 HP=274.0 allies=5
+PASS complete starter raid ninja
+PASS loot and experience exactly once ninja
+PASS basic attack shaman
+PASS shaman heals hero and troop
+PASS class skill cooldown shaman
+RAID shaman victory t=12.7666666666669 HP=370.0 allies=5
+PASS complete starter raid shaman
+PASS loot and experience exactly once shaman
+PASS basic attack mage
+PASS class skill mage
+PASS class skill cooldown mage
+RAID mage victory t=11.8000000000002 HP=317.0 allies=5
+PASS complete starter raid mage
+PASS loot and experience exactly once mage
+PASS own tower fires at invading AI
+PASS defense protects actual home layout
+PASS defense practice cannot grant farmed loot or damage saved home
+EXPANSION_TESTS 49/49

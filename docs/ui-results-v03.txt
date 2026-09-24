@@ -1,0 +1,33 @@
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+UI_PASS first launch four live 3D hero previews
+UI_PASS choose shaman through UI
+UI_PASS zoom plus
+UI_PASS zoom minus
+UI_PASS mouse wheel zoom
+UI_PASS two finger pinch zoom without opening menus
+UI_PASS touch movement and release
+UI_PASS collect production button
+UI_PASS open construction catalog
+UI_PASS choose wall placement
+UI_PASS place wall pays once
+UI_PASS continuous adjacent wall construction
+UI_PASS finish construction
+UI_PASS choose defensive tower
+UI_PASS ground tap chooses a valid site
+UI_PASS tower built on chosen site
+UI_PASS open building upgrade list
+UI_PASS building details from list
+UI_PASS upgrade home through UI
+UI_PASS open army composition
+UI_PASS add automatic melee troop
+UI_PASS scout a village without combat
+UI_PASS next village changes level and layout
+UI_PASS attack chosen village with autonomous army
+UI_PASS army moves without hero input
+UI_PASS menu pauses battle
+UI_PASS abort returns to intact built village
+UI_PASS start defense test from catalog
+UI_PASS save reload preserves infrastructure and hero
+UI_PASS tap on building roof selects the building
+UI_PASS small landscape retains all controls
+EXPANSION_UI_TESTS 31/31

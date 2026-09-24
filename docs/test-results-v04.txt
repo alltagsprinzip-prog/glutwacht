@@ -1,0 +1,53 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS new builds take 8 to 20 seconds
+PASS upgrade times 25 60 120 seconds
+PASS builder occupied without early bonus
+PASS duplicate construction cannot double charge
+PASS busy builder blocks other project without spending
+PASS walls remain instant while builder busy
+PASS building remains old level until finish
+PASS exact deadline grants level and releases builder
+PASS completion is idempotent
+PASS hall three unlocks second builder
+PASS two independent projects with two builders
+PASS two simultaneous completions
+PASS new building has persisted construction state
+PASS construction cannot be moved or demolished
+PASS unfinished mine produces nothing
+PASS offline construction yields only post-completion production
+PASS upgraded production pauses while building then resumes at new rate
+PASS completed construction can be moved and demolished
+PASS save reload preserves pending deadline within 10 ms
+PASS offline timer completes after reload
+PASS v3 migration preserves village without invented jobs
+PASS hero training has no timer
+PASS health and skill training
+PASS trained hero receives advertised stats
+PASS skill training reduces ability cooldown
+PASS troop training is immediate
+PASS trained troops receive damage bonus
+PASS hero training belongs to selected class
+PASS training rank cap rejects cost
+PASS unaffordable training is atomic
+PASS invalid training requests rejected
+PASS training survives save reload
+PASS planned side and scouted layout used in attack
+PASS troops wait in reserve before deployment
+PASS cannot deploy inside defended village
+PASS legal deployment consumes exactly one reserve
+PASS first target overrides default nearest preference
+PASS resource priority targets actual resource buildings
+PASS deploy all exhausts reserve once
+PASS deployment cannot duplicate army
+PASS deployed army advances autonomously
+PASS melee clears a wall even when a nearby defender is behind it
+PASS strong village includes traps and defending captains
+PASS garrison stays on guard before attackers approach
+PASS nearby attack activates village defenders
+PASS damage creates numeric combat feedback
+PASS trap triggers once against entering attacker
+PASS tower under construction cannot shoot
+PASS finished tower autonomously defends
+PASS raid reward respects visible storage capacity
+V04_TESTS 50/50

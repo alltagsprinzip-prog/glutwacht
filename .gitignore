@@ -1,0 +1,6 @@
+.godot/
+.sites-runtime/
+node_modules/
+*.tmp
+*.keystore
+.env*

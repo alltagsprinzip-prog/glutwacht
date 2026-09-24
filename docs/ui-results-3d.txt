@@ -1,0 +1,19 @@
+WARNING: Could not set V-Sync mode, as changing V-Sync mode is not supported by the graphics driver.
+UI_PASS open build with actual pointer input
+UI_PASS upgrade button spends resources
+UI_PASS open army panel
+UI_PASS army plus button
+UI_PASS touch stick moves hero
+UI_PASS touch release resets stick
+UI_PASS raid briefing button
+UI_PASS raid starts from actual UI
+UI_PASS retreat button
+UI_PASS gather button
+UI_PASS attack command button
+UI_PASS pause freezes combat
+UI_PASS resume button
+UI_PASS complete battle opens victory panel
+UI_PASS return to village with loot
+UI_PASS UI progress persisted to disk
+UI_PASS logical UI remains within landscape viewport
+UI_TESTS 17/17

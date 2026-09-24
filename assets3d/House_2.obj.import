@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://itho8qsju1ee"
+path="res://.godot/imported/House_2.obj-08e8e46f2b32ea902f3c0f06c1e76263.mesh"
+
+[deps]
+
+files=["res://.godot/imported/House_2.obj-08e8e46f2b32ea902f3c0f06c1e76263.mesh"]
+
+source_file="res://assets3d/House_2.obj"
+dest_files=["res://.godot/imported/House_2.obj-08e8e46f2b32ea902f3c0f06c1e76263.mesh", "res://.godot/imported/House_2.obj-08e8e46f2b32ea902f3c0f06c1e76263.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false

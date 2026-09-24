@@ -1,0 +1,43 @@
+name: Build Glutwacht Web
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Godot 4.7.2
+        uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: true
+
+      - name: Import project
+        run: godot --headless --editor --path . --quit-after 15
+
+      - name: Headless startup check
+        run: godot --headless --path . --quit-after 5
+
+      - name: Export Web
+        run: |
+          mkdir -p dist
+          godot --headless --path . --export-release "Web" dist/index.html
+          test -f dist/index.html
+          test -f dist/index.wasm
+          test -f dist/index.pck
+
+      - name: Upload Web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: glutwacht-web
+          path: dist/
+          if-no-files-found: error

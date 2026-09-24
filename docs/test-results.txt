@@ -1,0 +1,37 @@
+Godot Engine v4.7.2.stable.official.ed1daf0bf - https://godotengine.org
+
+PASS start camp and health
+PASS start expedition spawns first wave
+PASS movement
+PASS melee hit and ember burn
+PASS attack cooldown cannot be bypassed
+PASS incoming damage
+PASS dodge invulnerability
+PASS skill triggers cooldown
+PASS third storm attack creates piercing wave
+PASS death
+PASS fast restart
+PASS reject reward outside actual choice
+PASS loot and equip damage bonus
+PASS reward cannot be claimed twice
+PASS armor changes max health
+PASS unowned item cannot be equipped
+PASS atomic save
+PASS reload equipment
+PASS invalid save values sanitized
+PASS unknown schema version safe fallback
+BOT ember elapsed=195.7 hp=53.0 kills=85 room=4 victory=true
+PASS full command-driven run: ember
+PASS exactly one boss reward: ember
+PASS no repeated victory reward: ember
+PASS return and replay retain reward: ember
+BOT storm elapsed=162.8 hp=34.0 kills=85 room=4 victory=true
+PASS full command-driven run: storm
+PASS exactly one boss reward: storm
+PASS no repeated victory reward: storm
+PASS return and replay retain reward: storm
+GLUTWACHT_READY version=0.1.0 engine=4.7.2-stable (official)
+PASS two simultaneous touches: movement + attack
+PASS releasing joystick preserves attack finger
+PASS pause clears held touches
+TEST_RESULT checks=31 failures=0

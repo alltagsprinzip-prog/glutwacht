@@ -1,0 +1,25 @@
+[remap]
+
+importer="wavefront_obj"
+importer_version=1
+type="Mesh"
+uid="uid://dlqxwt04am0cl"
+path="res://.godot/imported/Sawmill.obj-961f8ec6c5e1975da002e9294d851daa.mesh"
+
+[deps]
+
+files=["res://.godot/imported/Sawmill.obj-961f8ec6c5e1975da002e9294d851daa.mesh"]
+
+source_file="res://assets3d/Sawmill.obj"
+dest_files=["res://.godot/imported/Sawmill.obj-961f8ec6c5e1975da002e9294d851daa.mesh", "res://.godot/imported/Sawmill.obj-961f8ec6c5e1975da002e9294d851daa.mesh"]
+
+[params]
+
+generate_tangents=true
+generate_lods=true
+generate_shadow_mesh=true
+generate_lightmap_uv2=false
+generate_lightmap_uv2_texel_size=0.2
+scale_mesh=Vector3(1, 1, 1)
+offset_mesh=Vector3(0, 0, 0)
+force_disable_mesh_compression=false
