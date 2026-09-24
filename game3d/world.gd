@@ -452,6 +452,9 @@ func sync(sim,dt:float):
   for b in sim.buildings:
    if b.uid==selected_uid and b.hp>0:
     disc(13 if b.kind=="tower" else b.radius+.5,Color(.1,.65,1,.16),Vector3(b.pos.x,.06,b.pos.y),fx)
+ if selected_obstacle!="" and obstacles.has(selected_obstacle):
+  var o=obstacles[selected_obstacle];var root:Node3D=o.root
+  disc(float(o.radius)+.45,Color(.95,.72,.18,.25),Vector3(root.position.x,.07,root.position.z),fx)
  if mode=="scout" or (mode=="raid" and sim.manual_deployment and sim.reserve.melee+sim.reserve.archers>0):
   for axis in range(4):
    var p=Vector3(0,.055,27) if axis==0 else (Vector3(0,.055,-27) if axis==1 else (Vector3(27,.055,0) if axis==2 else Vector3(-27,.055,0)))
