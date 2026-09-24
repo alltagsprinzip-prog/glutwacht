@@ -99,30 +99,30 @@ func clear_hud():
  stick=null;production_text=null;collect_button=null;objective=null;health=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear()
 func build_hud():
  clear_hud()
- var player_level=Catalog.level(progress.data,sim.hero_key())
- panel(hud,Rect2(16,14,58,58),Color("e9e1c9"))
- label(hud,str(player_level),Rect2(18,16,54,54),28,GOLD,true)
- panel(hud,Rect2(78,14,190,58),Color("e9e1c9"))
- label(hud,"SONNENHAIN",Rect2(90,17,166,27),18,GOLD)
- subtitle=label(hud,"Haupthaus "+str(progress.data.hall),Rect2(90,43,166,23),14)
  stats=label(hud,"",Rect2(0,0,1,1),1);stats.hide()
- panel(hud,Rect2(292,14,98,46),Color("e9e1c9"))
- builder_text=label(hud,"⚒ %d/%d"%[progress.free_builders(),progress.builders()],Rect2(299,16,84,42),17,CREAM,true)
- panel(hud,Rect2(398,14,96,46),Color("e9e1c9"))
- resource_labels["gems"]=label(hud,"◆ %d"%int(progress.data.get("gems",0)),Rect2(405,16,82,42),17,Color("66518b"),true)
- var resource_names=["Holz","Stein","Gold"];var colors=[Color("b78140"),Color("778fa6"),Color("e4ac30")]
- for i in range(3):
-  var key=["wood","stone","gold"][i];var y=14+i*38
-  panel(hud,Rect2(1070,y,186,34),Color("e9e1c9"))
-  var bar=ProgressBar.new();bar.position=Vector2(1080,y+22);bar.size=Vector2(166,7);bar.show_percentage=false;bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
-  bar.add_theme_stylebox_override("background",style(Color("d0d8d4"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
-  resource_labels[key]=label(hud,resource_names[i],Rect2(1080,y+1,166,21),13,CREAM,true)
- button(hud,"☰",Rect2(16,82,50,44),func():open_menu())
- toast_label=label(hud,"",Rect2(345,548,590,38),18,Color("ffffff"),true);toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
- if build_kind!="":build_placement_hud()
- elif sim.mode=="scout":build_scout_hud()
- elif sim.mode=="home":build_home_hud()
- else:build_combat_hud()
+ toast_label=label(hud,"",Rect2(345,548,590,38),18,Color("ffffff"),true)
+ toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
+ if sim.mode=="home" or build_kind!="":
+  var player_level=Catalog.level(progress.data,sim.hero_key())
+  panel(hud,Rect2(16,14,58,58),Color("e9e1c9"));label(hud,str(player_level),Rect2(18,16,54,54),28,GOLD,true)
+  panel(hud,Rect2(78,14,190,58),Color("e9e1c9"));label(hud,"SONNENHAIN",Rect2(90,17,166,27),18,GOLD)
+  subtitle=label(hud,"Haupthaus "+str(progress.data.hall),Rect2(90,43,166,23),14)
+  panel(hud,Rect2(292,14,98,46),Color("e9e1c9"));builder_text=label(hud,"⚒ %d/%d"%[progress.free_builders(),progress.builders()],Rect2(299,16,84,42),17,CREAM,true)
+  panel(hud,Rect2(398,14,96,46),Color("e9e1c9"));resource_labels["gems"]=label(hud,"◆ %d"%int(progress.data.get("gems",0)),Rect2(405,16,82,42),17,Color("66518b"),true)
+  var resource_names=["Holz","Stein","Gold"];var colors=[Color("b78140"),Color("778fa6"),Color("e4ac30")]
+  for i in range(3):
+   var key=["wood","stone","gold"][i];var y=14+i*38
+   panel(hud,Rect2(1070,y,186,34),Color("e9e1c9"))
+   var bar=ProgressBar.new();bar.position=Vector2(1080,y+22);bar.size=Vector2(166,7);bar.show_percentage=false;bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
+   bar.add_theme_stylebox_override("background",style(Color("d0d8d4"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
+   resource_labels[key]=label(hud,resource_names[i],Rect2(1080,y+1,166,21),13,CREAM,true)
+  button(hud,"☰",Rect2(16,82,50,44),func():open_menu())
+  if build_kind!="":build_placement_hud()
+  else:build_home_hud()
+ elif sim.mode=="scout":
+  subtitle=label(hud,"",Rect2(0,0,1,1),1);subtitle.hide();build_scout_hud()
+ else:
+  subtitle=label(hud,"",Rect2(0,0,1,1),1);subtitle.hide();build_combat_hud()
  update_hud()
  if is_instance_valid(modal):ui.move_child(modal,-1)
 func build_home_hud():
@@ -399,20 +399,34 @@ func close_dialog():
 func refresh_home():
  var pos:Vector2=sim.hero.pos;var zoom=world.target_zoom;var pan=world.pan
  sim.home();sim.hero.pos=pos;world.setup(sim);world.target_zoom=zoom;world.pan=pan;build_hud()
+func building_preview(parent:Control,kind:String,rect:Rect2,level:int=1):
+ var viewport=SubViewport.new();viewport.size=Vector2i(int(rect.size.x),int(rect.size.y));viewport.own_world_3d=true;viewport.transparent_bg=true;viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS;viewport.msaa_3d=Viewport.MSAA_2X
+ var container=SubViewportContainer.new();container.position=rect.position;container.size=rect.size;container.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(container);container.add_child(viewport)
+ var scene=Node3D.new();viewport.add_child(scene)
+ var env=WorldEnvironment.new();env.environment=Environment.new();env.environment.background_mode=Environment.BG_COLOR;env.environment.background_color=Color(0,0,0,0);env.environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;env.environment.ambient_light_color=Color("e5eff5");env.environment.ambient_light_energy=.8;scene.add_child(env)
+ var sun=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-40,-32,0);sun.light_color=Color("ffe4bd");sun.light_energy=1.3;scene.add_child(sun)
+ if kind=="wall":
+  var root=Node3D.new();scene.add_child(root);world.box(root,Vector3(0,.65,0),Vector3(2.6,1.3,.8),Color("718389"));world.box(root,Vector3(-.9,1.45,0),Vector3(.45,.5,1.0),Color("819292"));world.box(root,Vector3(.9,1.45,0),Vector3(.45,.5,1.0),Color("819292"))
+ else:
+  var d=Catalog.BUILD[kind];var roof_colors={"hall":Color("d99032"),"barracks":Color("9e4d3f"),"smithy":Color("4d5d67"),"lumber":Color("4e7f45"),"quarry":Color("727b7e"),"goldmine":Color("b58b32"),"tower":Color("4d607d"),"camp":Color("6d7541"),"hero_hall":Color("745b91")}
+  var model=world.asset(d.model,scene,Vector3.ZERO,3.6 if kind!="tower" else 3.0,"width",-.35,roof_colors.get(kind,Color("2c7ea3")));model.rotation.y=-.2
+ var camera=Camera3D.new();scene.add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.size=5.4;camera.position=Vector3(3.5,3.1,6.2);camera.look_at(Vector3(0,1.1,0));camera.current=true
+ hero_views.append(viewport)
+
 func open_catalog():
- var p=open_dialog("catalog","Bauen","⚒ %d/%d frei   ·   Wähle ein Gebäude"%[progress.free_builders(),progress.builders()])
+ var p=open_dialog("catalog","Bauen","⚒ %d/%d frei"%[progress.free_builders(),progress.builders()])
  var kinds=["lumber","quarry","goldmine","wall","tower","camp","hero_hall"]
- var icons={"lumber":"▥","quarry":"◆","goldmine":"●","wall":"▦","tower":"▲","camp":"⚑","hero_hall":"♛"}
  for i in range(kinds.size()):
-  var k=kinds[i];var d=Catalog.BUILD[k];var x=24+(i%3)*342;var y=116+int(i/3)*146
-  panel(p,Rect2(x,y,326,136),Color("e6f0f3"))
-  label(p,icons[k],Rect2(x+12,y+8,54,54),34,GOLD,true)
-  label(p,d.name,Rect2(x+72,y+9,236,30),21,GOLD)
+  var k=kinds[i];var d=Catalog.BUILD[k];var x=20+(i%3)*345;var y=108+int(i/3)*150
+  panel(p,Rect2(x,y,330,140),Color("e6dfc8"))
+  building_preview(p,k,Rect2(x+8,y+8,108,92))
+  label(p,d.name,Rect2(x+122,y+10,194,29),20,GOLD)
   var unlocked=Catalog.unlocked(k,int(progress.data.hall));var cc=d.cost
-  label(p,("H %d  S %d  G %d"%[cc.wood,cc.stone,cc.gold]) if unlocked else ("Haupthaus %d"%Catalog.required_hall(k)),Rect2(x+72,y+42,230,26),15)
-  label(p,"%d/%d"%[progress.count_kind(k),d.limit],Rect2(x+14,y+76,70,28),15,CREAM,true)
-  var b=button(p,"BAUEN" if unlocked else "GESPERRT",Rect2(x+92,y+76,216,46),func():begin_build(k),unlocked)
+  label(p,("▥ %d  ◆ %d  ● %d"%[cc.wood,cc.stone,cc.gold]) if unlocked else ("🔒 Haupthaus %d"%Catalog.required_hall(k)),Rect2(x+122,y+42,194,26),14)
+  label(p,"%d/%d"%[progress.count_kind(k),d.limit],Rect2(x+122,y+70,70,24),14,CREAM)
+  var b=button(p,"BAUEN" if unlocked else "GESPERRT",Rect2(x+122,y+96,190,36),func():begin_build(k),unlocked)
   b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
+func begin_build(kind:String,uid:String=""):
 func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
