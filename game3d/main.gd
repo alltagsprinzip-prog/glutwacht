@@ -207,7 +207,7 @@ func update_hud():
  if sim.active() and health:
   health.value=sim.hero.hp;health_text.text="%s  %d/%d"%[sim.stats().name,sim.hero.hp,sim.hero.max_hp]
   if sim.mode=="raid":
-   var remain=maxi(0,300-int(sim.time));var mins=int(remain/60);var secs=remain%60
+   var remain=maxi(0,180-int(sim.time));var mins=int(remain/60);var secs=remain%60
    objective.text="★ %d/3   %d%%   %d:%02d"%[sim.stars(),sim.destruction_percent(),mins,secs]
   else:objective.text="Welle %d/3"%sim.wave
   cooldowns.skill.text="✦" if sim.skill_cd<=0 else "%.1f"%sim.skill_cd
@@ -492,19 +492,19 @@ func open_army():
   var plus=button(p,"+",Rect2(684,y+29,90,58),func():progress.army(k,1);save();refresh_home();open_army());plus.disabled=count>=progress.capacity() or not troop_open
  button(p,"FERTIG",Rect2(548,432,258,58),func():close_dialog(),true)
 func open_training():
- var key=sim.hero_key();var c=Catalog.hero(key)
- var p=open_dialog("training","Training · "+c.name,"Wähle eine Verbesserung.")
+ var key=sim.hero_key();var cc=Catalog.hero(key)
+ var p=open_dialog("training","Training · "+cc.name,"Rang erhöhen")
  var kinds=["power","vitality","skill","melee","archers"]
- var names=["⚔  Kraft","♥  Leben","✦  Fähigkeit","⚔  Schwerter","➶  Bogenschützen"]
- var effects=["+6 Angriff","+25 Leben","+12 % Wirkung / −0,4 s"," +20 Leben / +4 Schaden","+20 Leben / +4 Schaden"]
+ var names=["⚔ Kraft","♥ Leben","✦ Fähigkeit","⚔ Schwerter","➶ Bogenschützen"]
+ var effects=["+6 Angriff","+25 Leben","+12 % / −0,4 s","+20 Leben / +4 Schaden","+20 Leben / +4 Schaden"]
  for i in range(5):
   var group="heroes" if i<3 else "troops";var who=key if i<3 else kinds[i];var attribute=kinds[i] if i<3 else ""
-  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=126+i*84
-  panel(p,Rect2(31,y,1000,74),Color("e8f2f6"))
-  label(p,names[i],Rect2(48,y+8,280,28),23,GOLD)
-  label(p,"Rang %d/5  ·  %s"%[rank,effects[i]],Rect2(48,y+38,420,25),16)
-  label(p,"🪵 %d   ◇ %d   ● %d"%[cost.wood,cost.stone,cost.gold] if rank<5 else "MAX",Rect2(500,y+17,270,38),18,CREAM,true)
-  var b=button(p,"⬆",Rect2(807,y+10,190,54),func():
+  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=112+i*78
+  panel(p,Rect2(34,y,792,68),Color("e8f2f6"))
+  label(p,names[i],Rect2(48,y+7,230,27),20,GOLD)
+  label(p,"Rang %d/5 · %s"%[rank,effects[i]],Rect2(48,y+35,330,24),14)
+  label(p,("▥ %d  ◆ %d  ● %d"%[cost.wood,cost.stone,cost.gold]) if rank<5 else "MAX",Rect2(390,y+15,240,36),16,CREAM,true)
+  var b=button(p,"▲",Rect2(660,y+8,145,50),func():
    if progress.train(group,who,attribute):save();refresh_home();open_training();tone("equip"),true)
   b.disabled=rank>=5 or not progress.affordable(cost)
 
@@ -556,16 +556,18 @@ func start_raid():
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
 func open_result():
- var win=sim.result=="victory";var practice=sim.mode=="defense"
- var title=("Verteidigung bestanden" if win else "Verteidigung durchbrochen") if practice else ("Sieg über "+sim.village.name if win else "Deine Armee zieht sich zurück")
- var p=open_dialog("result",title,"Dein gespeichertes Dorf bleibt unverändert. Dies war eine Übung." if practice else ("Beute und Helden-Erfahrung sind gespeichert." if win else "Baue aus oder wähle ein leichteres Dorf. Deine Armee wird neu aufgestellt."))
- if win and not practice:
-  label(p,"%d HOLZ    %d STEIN    %d GOLD"%[reward.wood,reward.stone,reward.gold],Rect2(31,162,1004,57),32,GOLD,true)
-  label(p,"★".repeat(int(reward.get("stars",0)))+"☆".repeat(3-int(reward.get("stars",0)))+"   %d%% Zerstörung"%sim.destruction_percent(),Rect2(31,236,1004,48),28,GOLD,true)
-  label(p,"+%d Erfahrung für deinen %s"%[reward.xp,sim.stats().name],Rect2(31,300,1004,46),25,Color(sim.stats().color),true)
- else:label(p,"Drei Wellen sichern dein Dorf – Mauern halten auf, Türme schießen." if practice else ("Zeitlimit erreicht." if sim.result=="timeout" else "Nutze deine Klassenfähigkeit, den Heiltrank und die Armeebefehle."),Rect2(38,173,983,139),23,CREAM,true)
- label(p,("%d%% zerstört · %d Gegner besiegt · %d Truppen überlebt · %d Sekunden"%[sim.destruction_percent(),sim.kills,sim.living(sim.allies).size(),sim.time]) if not practice else ("%d Gegner besiegt · %d Truppen überlebt · %d Sekunden"%[sim.kills,sim.living(sim.allies).size(),sim.time]),Rect2(31,402,1004,36),20,CREAM,true)
- button(p,"Zurück ins Dorf",Rect2(286,496,499,67),func():return_home(),true)
+ var practice=sim.mode=="defense";var full=sim.result=="victory"
+ var title=("Verteidigung bestanden" if full else "Verteidigung beendet") if practice else ("ANGRIFF BEENDET")
+ var p=open_dialog("result",title,"" if not practice else "Dein Dorf bleibt unverändert.")
+ if not practice:
+  label(p,"★".repeat(int(reward.get("stars",0)))+"☆".repeat(3-int(reward.get("stars",0))),Rect2(120,130,828,58),38,GOLD,true)
+  label(p,"%d%%  ZERSTÖRUNG"%sim.destruction_percent(),Rect2(120,190,828,42),24,CREAM,true)
+  label(p,"▥ %d     ◆ %d     ● %d"%[reward.wood,reward.stone,reward.gold],Rect2(90,270,888,52),25,GOLD,true)
+  label(p,"+%d EP  ·  %d Gegner besiegt"%[reward.xp,sim.kills],Rect2(90,336,888,40),19,CREAM,true)
+ else:
+  label(p,"%d Gegner besiegt · Welle %d/3"%[sim.kills,sim.wave],Rect2(90,210,888,50),22,CREAM,true)
+ button(p,"ZURÜCK INS DORF",Rect2(286,474,499,68),func():return_home(),true)
+
 func return_home():
  close_dialog();build_kind="";selected_building="";deploying="";world.build_focus=false;sim.home();result_shown=false;world.setup(sim);build_hud();save()
 func open_menu():
