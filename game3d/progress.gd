@@ -13,7 +13,7 @@ func new_training() -> Dictionary:
  return {"heroes":heroes,"troops":{"melee":0,"archers":0}}
 func fresh() -> Dictionary:
  return {"version":5,"wood":300,"stone":240,"gold":160,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
-func builders() -> int:return 2 if int(data.hall)>=3 else 1
+func builders() -> int:return 4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
 func free_builders() -> int:return maxi(0,builders()-data.jobs.size())
 func job_for(uid:String) -> Dictionary:
  for job in data.jobs:
@@ -22,8 +22,8 @@ func job_for(uid:String) -> Dictionary:
 func build_seconds(kind:String,target:int) -> int:
  if kind=="wall":return 0
  if target==1:return {"lumber":8,"quarry":12,"goldmine":20,"tower":15}.get(kind,15)
- if target<=4:return [0,0,25,60,120][target]
- return 120+90*(target-4)
+ if target<=4:return [0,0,12,25,45][target]
+ return 45+30*(target-4)
 func training_level(group:String,key:String,attribute:String="") -> int:
  return int(data.training.heroes[key][attribute]) if group=="heroes" else int(data.training.troops[key])
 func training_cost(group:String,key:String,attribute:String="") -> Dictionary:
@@ -97,7 +97,7 @@ func army(kind:String,change:int) -> bool:
  var amount=int(data[kind])+change
  if amount<0 or int(data.melee)+int(data.archers)+change>capacity():return false
  data[kind]=amount;return true
-func can_change_hero() -> bool:return data.hero=="" or count_kind("hero_hall")>0
+func can_change_hero() -> bool:return data.hero==""
 func choose_hero(key:String) -> bool:
  if not Catalog.HEROES.has(key) or not can_change_hero():return false
  data.hero=key;return true
