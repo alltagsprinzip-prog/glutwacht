@@ -15,14 +15,14 @@ const BUILD={
  "goldmine":{"name":"Goldmine","description":"Fördert Gold für bessere\nAusrüstung und hohe Stufen.","radius":3.0,"model":"House_2.obj","size":5.6,"cost":{"wood":90,"stone":70,"gold":20},"limit":2},
  "tower":{"name":"Wachturm","description":"Schützt dein Dorf automatisch.\nMehr Stufen: stärkerer Beschuss.","radius":1.6,"model":"Bell_Tower.obj","size":3.7,"cost":{"wood":65,"stone":65,"gold":20},"limit":6},
  "camp":{"name":"Heerlager","description":"Erhöht die Armeekapazität.\nJede Stufe schafft weitere Plätze.","radius":3.4,"model":"House_3.obj","size":7.0,"cost":{"wood":120,"stone":90,"gold":35},"limit":4},
- "hero_hall":{"name":"Heldenhalle","description":"Heimat deiner Helden. Ab hier\nkannst du zwischen Helden wechseln.","radius":3.6,"model":"House_4.obj","size":7.2,"cost":{"wood":180,"stone":160,"gold":100},"limit":1},
+ "hero_hall":{"name":"Heldenhalle","description":"Trainiert und stärkt deinen\neinmal gewählten Helden.","radius":3.6,"model":"House_4.obj","size":7.2,"cost":{"wood":180,"stone":160,"gold":100},"limit":1},
  "wall":{"name":"Mauer","description":"Blockiert Angreifer.\nJede Stufe erhöht Haltbarkeit.","radius":1.25,"model":"","size":2.5,"cost":{"wood":10,"stone":15,"gold":0},"limit":40}
 }
 const CORE_POS={"hall":Vector2(0,-10),"barracks":Vector2(-12,2),"smithy":Vector2(12,2)}
 const RESOURCES={"lumber":"wood","quarry":"stone","goldmine":"gold"}
 const RATES={"lumber":18.0,"quarry":14.0,"goldmine":9.0}
 const BUILD_HALL={"lumber":1,"quarry":1,"wall":2,"tower":2,"goldmine":3,"camp":4,"hero_hall":5}
-const HALL_UNLOCKS={1:["Sägewerk","Steinbruch","Kaserne","Schwertkämpfer"],2:["Bogenschützen","Mauern","Wachturm"],3:["Goldmine","2. Bauarbeiter","Schmiede"],4:["Heerlager","Schildträger"],5:["Heldenhalle","weiterer Held"],6:["Mörser","Mauerbrecher"],7:["Runeneinheit","Fallen"],8:["größeres Heerlager","Spezialverteidigung"],9:["Meistertraining"],10:["Festungszeitalter"]}
+const HALL_UNLOCKS={1:["Sägewerk","Steinbruch","Kaserne","Schwertkämpfer"],2:["Bogenschützen","Mauern","Wachturm"],3:["Goldmine","2. Bauarbeiter","Schmiede"],4:["Heerlager","Schildträger"],5:["Heldenhalle","Heldentraining"],6:["Mörser","Mauerbrecher"],7:["Runeneinheit","Fallen"],8:["größeres Heerlager","Spezialverteidigung"],9:["Meistertraining"],10:["Festungszeitalter"]}
 const VILLAGES=[
  {"name":"Mooswacht","level":1,"theme":"Waldlager","seed":410,"tower_count":1,"wall_count":0,"guards":3,"captains":0,"wood":90,"stone":65,"gold":45},
  {"name":"Eisenfang","level":2,"theme":"Befestigtes Dorf","seed":621,"tower_count":2,"wall_count":5,"guards":5,"captains":1,"wood":145,"stone":110,"gold":75},
