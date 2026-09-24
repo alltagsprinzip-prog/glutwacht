@@ -47,16 +47,43 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          mkdir -p dist
-          godot --headless --path . --export-release "Web" dist/index.html 2>&1 | tee godot-export.log
+          BUILD_DIR="dist/v07fix2"
+          mkdir -p "$BUILD_DIR"
+          godot --headless --path . --export-release "Web" "$BUILD_DIR/index.html" 2>&1 | tee godot-export.log
           if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" godot-export.log; then
             echo "Godot script error detected during export"
             exit 1
           fi
-          test -f dist/index.html
-          test -f dist/index.wasm
-          test -f dist/index.pck
+          test -f "$BUILD_DIR/index.html"
+          test -f "$BUILD_DIR/index.wasm"
+          test -f "$BUILD_DIR/index.pck"
           touch dist/.nojekyll
+          cat > dist/index.html <<'EOF'
+          <!doctype html><meta charset="utf-8">
+          <meta http-equiv="refresh" content="0; url=./v07fix2/">
+          <title>Glutwacht</title>
+          <a href="./v07fix2/">Glutwacht starten</a>
+          EOF
+          python - <<'PY'
+          from pathlib import Path
+          p=Path("dist/v07fix2/index.html")
+          s=p.read_text()
+          marker='</body>'
+          overlay=r'''
+          <div id="gw-start-watch" style="position:fixed;left:12px;bottom:12px;z-index:99999;background:#12212a;color:#fff;padding:9px 12px;border-radius:8px;font:14px sans-serif">Glutwacht lädt…</div>
+          <script>
+          (() => {
+            const box=document.getElementById('gw-start-watch');
+            const fail=(m)=>{ if(box){ box.textContent='Startfehler: '+m; box.style.background='#7a2828'; } };
+            window.addEventListener('error',e=>fail(e.message||'JavaScript-Fehler'));
+            window.addEventListener('unhandledrejection',e=>fail(String(e.reason||'Unbekannter Fehler')));
+            const timer=setInterval(()=>{ if(window.__glutwacht){ clearInterval(timer); if(box) box.remove(); } },500);
+            setTimeout(()=>{ if(!window.__glutwacht && box && !box.textContent.startsWith('Startfehler')) box.textContent='Spielstart dauert länger als erwartet…'; },12000);
+          })();
+          </script>
+          '''
+          p.write_text(s.replace(marker,overlay+marker))
+          PY
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
