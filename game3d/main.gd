@@ -76,9 +76,6 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  var p=Panel.new();p.position=rect.position;p.size=rect.size
  p.add_theme_stylebox_override("panel",style(color,Color("8a7553"),2,12))
  parent.add_child(p);return p
-func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
- if color.v<.35:color=Color("f0f7fc")
- var p=Panel.new();p.position=rect.position;p.size=rect.size;p.add_theme_stylebox_override("panel",style(color));parent.add_child(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
  var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
@@ -92,7 +89,6 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
  b.add_theme_stylebox_override("pressed",style(Color("d99a31") if primary else Color("2c5d70"),Color("fff0b8") if primary else Color("a8dcea"),3,12))
  b.add_theme_stylebox_override("disabled",style(Color("c9d0cd"),Color("9ca8a5"),2,12))
  b.pressed.connect(callback);parent.add_child(b);return b
-func clear_hud():
 func clear_hud():
  if hud:ui.remove_child(hud);hud.queue_free()
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
@@ -213,7 +209,6 @@ func create_stick():
  else:
   stick.position=Vector2(34,512);stick.size=Vector2(156,156)
  hud.add_child(stick)
-func update_hud():
 func update_hud():
  if not stats:return
  stats.text="Holz %d Stein %d Gold %d"%[progress.data.wood,progress.data.stone,progress.data.gold]
@@ -427,7 +422,6 @@ func open_catalog():
   var b=button(p,"BAUEN" if unlocked else "GESPERRT",Rect2(x+122,y+96,190,36),func():begin_build(k),unlocked)
   b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
 func begin_build(kind:String,uid:String=""):
-func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
   var b=progress.find_building(uid);build_pos=Vector2(b.x,b.z);build_rotation=b.rotation
@@ -510,7 +504,6 @@ func open_building(uid:String):
  elif b.kind=="barracks":button(p,"⚔  ARMEE",Rect2(34,420,210,64),func():open_army())
  elif b.kind in ["smithy","hero_hall"]:button(p,"★  TRAINING",Rect2(34,420,210,64),func():open_training())
  if not Progress.TITLES.has(uid) and job.is_empty():button(p,"↔",Rect2(260,420,90,64),func():begin_build(b.kind,uid))
-func confirm_remove(uid:String):
 func confirm_remove(uid:String):
  var b=progress.find_building(uid)
  var p=open_dialog("remove",Catalog.BUILD[b.kind].name+" abbauen?","Dieser Bauplatz wird frei. Du erhältst keine Rohstoffe zurück.")
