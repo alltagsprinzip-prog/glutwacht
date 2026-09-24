@@ -55,10 +55,13 @@ func soldier(kind:String,pos:Vector2) -> Dictionary:
  return unit(kind,pos,(205 if kind=="melee" else 135)+int(profile.barracks)*30+20*rank,18+int(profile.barracks)*5+4*rank,"ally")
 func form_army():
  allies.clear()
- for i in range(int(profile.melee)+int(profile.archers)):
+ var total=int(profile.melee)+int(profile.archers)
+ for i in range(total):
   var kind="melee" if i<int(profile.melee) else "archer"
   var barracks_pos:Vector2=Catalog.CORE_POS.barracks
-  var pos=barracks_pos+Vector2((i%4-1.5)*1.55,5.2+floor(i/4.0)*1.35)
+  var angle=-2.75+float(i)/maxf(1.0,float(total-1))*2.25
+  var ring=3.1+float(i%2)*.7
+  var pos=barracks_pos+Vector2(cos(angle)*ring,5.4+sin(angle)*2.0)
   allies.append(soldier(kind,pos.clamp(Vector2(-29,-29),Vector2(29,29))))
 func deployment_valid(pos:Vector2) -> bool:
  if maxf(absf(pos.x),absf(pos.y))<24 or maxf(absf(pos.x),absf(pos.y))>30:return false
