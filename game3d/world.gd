@@ -202,16 +202,50 @@ func create_building(b:Dictionary):
    box(body,Vector3(0,.16,0),Vector3(size*.92,.32,size*.73),Color("778382"))
    for x in [-size*.42,size*.42]:banner(body,Vector3(x,0,size*.36),2.8,b.team=="enemy")
   if level>=3:
-   if b.kind=="tower":
-    for x in [-1.25,1.25]:box(body,Vector3(x,4.3,0),Vector3(.4,.4,2.8),Color("d2bb80"))
-   else:asset("House_1.obj",body,Vector3(-size*.4,0,-size*.3),size*.42,"width",PI/2)
+   match String(b.kind):
+    "tower":
+     for x in [-1.25,1.25]:box(body,Vector3(x,4.3,0),Vector3(.4,.4,2.8),Color("d2bb80"))
+    "hall":
+     asset("Bell_Tower.obj",body,Vector3(-size*.30,0,-size*.28),size*.28,"width",PI/2,Color("d99032"))
+    "barracks":
+     asset("MarketStand_1.obj",body,Vector3(-size*.42,0,-size*.30),size*.32,"width",PI/2,Color("9e4d3f"))
+    "smithy":
+     asset("Cart.obj",body,Vector3(-size*.40,0,-size*.32),1.8,"width",.3)
+    "lumber":
+     asset("log_stackLarge.glb",body,Vector3(-size*.38,0,-size*.34),1.55,"height")
+    "quarry":
+     asset("rock_largeA.glb",body,Vector3(-size*.36,0,-size*.32),2.0,"height",.2)
+    "goldmine":
+     asset("Cart.obj",body,Vector3(-size*.38,0,-size*.30),1.9,"width",.2)
+    "camp":
+     asset("Bench_1.obj",body,Vector3(-size*.38,0,-size*.28),2.5,"width",PI/2)
+    "hero_hall":
+     asset("Bonfire_Lit.obj",body,Vector3(0,.02,-size*.38),1.25,"width")
   if level>=4:
-   for x in [-size*.36,size*.36]:
-    var post=CylinderMesh.new();post.top_radius=.1;post.bottom_radius=.15;post.height=3.4
-    mesh_node(post,Vector3(x,1.7,size*.48),material(Color("a38754")),body)
-    var globe=SphereMesh.new();globe.radius=.25;globe.height=.5
-    mesh_node(globe,Vector3(x,3.5,size*.48),material(Color("ffd189"),.4,true),body)
-   box(body,Vector3(0,.39,size*.39),Vector3(size*.9,.12,.14),Color("d7b86b"))
+   match String(b.kind):
+    "hall":
+     for x in [-size*.36,size*.36]:
+      var post=CylinderMesh.new();post.top_radius=.1;post.bottom_radius=.15;post.height=3.8
+      mesh_node(post,Vector3(x,1.9,size*.48),material(Color("9b7947")),body)
+     box(body,Vector3(0,.40,size*.40),Vector3(size*.92,.16,.16),Color("d7b86b"))
+    "barracks":
+     for x in [-size*.34,size*.34]:banner(body,Vector3(x,0,size*.44),3.4,b.team=="enemy")
+    "smithy":
+     box(body,Vector3(size*.30,2.2,-size*.22),Vector3(1.0,4.0,1.0),Color("464b4d"))
+    "lumber":
+     for x in [-size*.35,size*.35]:asset("log_stackLarge.glb",body,Vector3(x,0,size*.42),1.35,"height")
+    "quarry":
+     for x in [-size*.36,size*.36]:asset("rock_largeD.glb",body,Vector3(x,0,size*.42),1.8,"height",x)
+    "goldmine":
+     for x in [-size*.34,size*.34]:
+      var gem=SphereMesh.new();gem.radius=.24;gem.height=.48
+      mesh_node(gem,Vector3(x,1.2,size*.42),material(Color("f3c54b"),.25,true),body)
+    "camp":
+     for x in [-size*.32,size*.32]:asset("Barrel.obj",body,Vector3(x,0,size*.36),1.15,"height")
+    "hero_hall":
+     for x in [-size*.35,size*.35]:
+      var globe=SphereMesh.new();globe.radius=.28;globe.height=.56
+      mesh_node(globe,Vector3(x,3.4,size*.38),material(Color("b493e6"),.25,true),body)
   if b.kind=="hall":
    for x in [-size*.44,size*.44]:banner(body,Vector3(x,0,size*.42),3.2,b.team=="enemy")
    box(body,Vector3(0,.22,-size*.42),Vector3(size*.78,.44,.30),Color("6f695d"))
