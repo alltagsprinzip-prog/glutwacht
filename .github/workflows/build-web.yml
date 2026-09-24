@@ -31,7 +31,7 @@ jobs:
           export-templates: true
 
       - name: Import project
-        run: godot --headless --editor --path . --quit-after 15
+        run: godot --headless --editor --path . --import
 
       - name: Headless startup check
         shell: bash
