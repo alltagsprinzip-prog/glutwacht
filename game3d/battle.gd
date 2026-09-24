@@ -85,7 +85,7 @@ func home_buildings():
  for b in p.all_buildings():
   var hp=(300 if b.kind=="wall" else (850 if b.kind=="hall" else 450))*int(b.level)
   var item=building(b.kind,Vector2(b.x,b.z),Catalog.BUILD[b.kind].radius,hp,b.level,b.uid,"ally",b.rotation)
-  item.construction=b.construction;buildings.append(item)
+  item.construction=b.construction;item.stock=float(b.get("stock",0.0));buildings.append(item)
 func reset_battle():
  time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0}
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
