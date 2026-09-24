@@ -14,7 +14,7 @@ const BUILD={
  "quarry":{"name":"Steinbruch","description":"Gewinnt Stein für Gebäude\nund deine Verteidigung.","radius":3.0,"model":"Mill.obj","size":5.4,"cost":{"wood":70,"stone":20,"gold":15},"limit":3},
  "goldmine":{"name":"Goldmine","description":"Fördert Gold für bessere\nAusrüstung und hohe Stufen.","radius":3.0,"model":"House_2.obj","size":5.6,"cost":{"wood":90,"stone":70,"gold":20},"limit":2},
  "tower":{"name":"Wachturm","description":"Schützt dein Dorf automatisch.\nMehr Stufen: stärkerer Beschuss.","radius":1.6,"model":"Bell_Tower.obj","size":3.7,"cost":{"wood":65,"stone":65,"gold":20},"limit":6},
- "camp":{"name":"Heerlager","description":"Erhöht die Armeekapazität.\nJede Stufe schafft weitere Plätze.","radius":3.4,"model":"House_3.obj","size":7.0,"cost":{"wood":120,"stone":90,"gold":35},"limit":4},
+ "camp":{"name":"Heerlager","description":"Erhöht die Armeekapazität.\nJede Stufe schafft weitere Plätze.","radius":3.4,"model":"MarketStand_1.obj","size":7.0,"cost":{"wood":120,"stone":90,"gold":35},"limit":4},
  "hero_hall":{"name":"Heldenhalle","description":"Trainiert und stärkt deinen\neinmal gewählten Helden.","radius":3.6,"model":"House_4.obj","size":7.2,"cost":{"wood":180,"stone":160,"gold":100},"limit":1},
  "wall":{"name":"Mauer","description":"Blockiert Angreifer.\nJede Stufe erhöht Haltbarkeit.","radius":1.25,"model":"","size":2.5,"cost":{"wood":10,"stone":15,"gold":0},"limit":40}
 }
