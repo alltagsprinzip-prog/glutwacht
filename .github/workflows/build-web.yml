@@ -26,10 +26,16 @@ jobs:
         run: python3 tools/check_godot.py logs/start.log godot --headless --audio-driver Dummy --path . --quit-after 120
       - name: Gameplay and save regression tests
         run: python3 tools/check_godot.py logs/rules.log godot --headless --path . --script tests3d/release_suite.gd
+      - name: Existing upstream regression gate
+        run: python3 tools/check_godot.py logs/upstream.log godot --headless --path . --script tests3d/release_gate.gd
       - name: Touch interface regression tests
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: python3 tools/check_godot.py logs/input.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/input_suite.gd
+      - name: Rendered scene regression tests
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: python3 tools/check_godot.py logs/visual.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/visual_release.gd
       - name: Export validated web build
         run: |
           mkdir -p dist/v08
@@ -46,6 +52,11 @@ jobs:
         with:
           name: validation-logs
           path: logs
+      - name: Downloadable web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: glutwacht-web-review
+          path: dist
       - name: Upload tested site
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3

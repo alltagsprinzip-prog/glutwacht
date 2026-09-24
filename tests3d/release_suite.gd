@@ -53,7 +53,7 @@ func _initialize():
  b.start(0,true);var t=b.unit("guard",b.hero.pos+Vector2(0,-1),10000,0,"enemy");b.enemies=[t];b.buildings=[]
  b.strike();check(t.hp==10000,"melee windup has no immediate damage")
  ticks(b,.10);check(t.hp==10000,"melee remains harmless before hit frame")
- ticks(b,.12);check(t.hp<10000,"melee damage after hit frame")
+ ticks(b,.16);check(t.hp<10000,"melee damage after hit frame")
  p.data.hero="mage";p.data.hero_id="mage";b=B.new(p.data);b.start(0,true);t=b.unit("guard",b.hero.pos+Vector2(0,-8),10000,0,"enemy");b.enemies=[t];b.buildings=[]
  b.strike();ticks(b,.37);check(t.hp==10000,"ranged projectile release deals no damage")
  ticks(b,.5);check(t.hp<10000,"ranged damage arrives at impact")

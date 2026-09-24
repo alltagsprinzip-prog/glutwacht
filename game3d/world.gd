@@ -8,6 +8,8 @@ var labels: Array = []
 var rng = RandomNumberGenerator.new()
 var mode="home"
 var materials: Dictionary = {}
+var asset_cache: Dictionary = {}
+var asset_materials: Dictionary = {}
 var sky_env: Environment
 const Architecture=preload("res://game3d/architecture.gd")
 const Catalog=preload("res://game3d/catalog.gd")
@@ -51,10 +53,13 @@ func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMa
 func mesh_node(mesh:Mesh,pos:Vector3,mat:Material,parent:Node) -> MeshInstance3D:
  var n=MeshInstance3D.new();n.mesh=mesh;n.position=pos;n.material_override=mat;parent.add_child(n);return n
 func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",rotation_y:float=0,roof_tint:Color=Color(0,0,0,0)) -> Node3D:
- var resource=load("res://assets3d/"+name)
+ if not asset_cache.has(name):asset_cache[name]=load("res://assets3d/"+name)
+ var resource=asset_cache[name]
  var holder=Node3D.new();holder.set_meta("asset",name);parent.add_child(holder);holder.position=pos;holder.rotation.y=rotation_y
  var model:Node3D
- if resource is Mesh:
+ if resource==null:
+  var fallback=MeshInstance3D.new();var cube=BoxMesh.new();cube.size=Vector3(1.4,1.8,1.4);fallback.mesh=cube;fallback.material_override=material(Color("7f8d88"));model=fallback
+ elif resource is Mesh:
   model=MeshInstance3D.new();model.mesh=resource
  else:model=resource.instantiate()
  holder.add_child(model)
@@ -63,11 +68,13 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  for n in meshes:
   for surface in range(n.mesh.get_surface_count()):
    var original=n.get_active_material(surface)
+   var palette_key=name+":"+str(surface)+":"+str(roof_tint)+":"+str(original.get_instance_id() if original else 0)
+   if asset_materials.has(palette_key):n.set_surface_override_material(surface,asset_materials[palette_key]);continue
    if original is StandardMaterial3D and name.ends_with("gltf"):
     if outline_material==null:
      outline_material=ShaderMaterial.new();outline_material.shader=load("res://game3d/character_outline.gdshader")
-    var character=original.duplicate();character.metallic=.02;character.roughness=.8;character.rim_enabled=true;character.rim=.22;character.rim_tint=.6;character.next_pass=outline_material
-    n.set_surface_override_material(surface,character)
+    var character=original.duplicate();character.metallic=.02;character.roughness=.8;character.rim_enabled=true;character.rim=.38;character.rim_tint=.25;character.next_pass=outline_material
+    n.set_surface_override_material(surface,character);asset_materials[palette_key]=character
    elif original is StandardMaterial3D:
     var mat=original.duplicate();mat.metallic=0;mat.roughness=.92
     var matname=mat.resource_name.to_lower()
@@ -76,7 +83,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
     elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("795030")
     elif "leaf" in matname:mat.albedo_color=Color("4c8735") if rng.randf()>.25 else Color("769841")
     elif "grass" in matname:mat.albedo_color=Color("649447")
-    n.set_surface_override_material(surface,mat)
+    n.set_surface_override_material(surface,mat);asset_materials[palette_key]=mat
   var box:AABB=holder.global_transform.affine_inverse()*n.global_transform*n.get_aabb()
   if first:bounds=box;first=false
   else:bounds=bounds.merge(box)
@@ -133,7 +140,7 @@ func terrain():
     var noise=sin(v.x*.4+v.y*.25)*.017+rng.randf_range(-.012,.012)
     surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise).srgb_to_linear());surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
- var mat=StandardMaterial3D.new();mat.vertex_color_use_as_albedo=true;mat.vertex_color_is_srgb=false;mat.albedo_color=Color("79936b");mat.roughness=1;ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+ var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
  var water=PlaneMesh.new();water.size=Vector2(6,132)
  mesh_node(water,Vector3(39,.025,0),material(Color("218ba1"),.18),landscape)
  asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),7.2,"width",PI/2)
@@ -307,8 +314,9 @@ func sync(sim,dt:float):
    if a.state!=state or (attacking and sequence!=int(a.get("attack_seq",-1))) or not a.anim.is_playing():
     a.anim.play(state,.025 if attacking else .12);a.state=state;a.attack_seq=sequence
    a.anim.speed_scale=a.anim.get_animation(state).length/maxf(.15,float(u.get("attack_total",.6))) if attacking else 1.0
-  for part in a.node.find_children("*","GeometryInstance3D",true,false):
-   part.material_overlay=material(Color(1,.94,.68,.6),.5,true) if u.flash>0 else null
+  if bool(a.get("flash_on",false))!=(u.flash>0):
+   a.flash_on=u.flash>0
+   for part in a.node.find_children("*","GeometryInstance3D",true,false):part.material_overlay=material(Color(1,.94,.68,.6),.5,true) if u.flash>0 else null
   a.bar.position.y=a.size+.55
   a.bar.text=""
   set_health(a.hpbar,u.hp/u.max_hp,sim.active() or mode=="scout")
@@ -328,7 +336,9 @@ func sync(sim,dt:float):
      box(ruin,Vector3(cos(a)*r,.12,sin(a)*r),Vector3(.55+.18*(i%2),.22,.42),Color("51483e"))
     if b.kind!="wall":
      var smoke=Label3D.new();smoke.text="";smoke.font_size=54;smoke.pixel_size=.02;smoke.position=Vector3(0,.65,0);smoke.billboard=BaseMaterial3D.BILLBOARD_ENABLED;smoke.modulate=Color(.32,.30,.28,.75);ruin.add_child(smoke)
-  for part in f.body.find_children("*","GeometryInstance3D",true,false):part.material_overlay=material(Color(1,.8,.52,.5),.8,true) if float(b.get("flash",0))>0 else null
+  if bool(f.get("flash_on",false))!=(float(b.get("flash",0))>0):
+   f.flash_on=float(b.get("flash",0))>0
+   for part in f.body.find_children("*","GeometryInstance3D",true,false):part.material_overlay=material(Color(1,.8,.52,.5),.8,true) if f.flash_on else null
   if b.hp<b.max_hp*.35 and f.smoke==null:
    var smoke_root=Node3D.new();f.root.add_child(smoke_root);f.smoke=smoke_root
    for i in range(3):

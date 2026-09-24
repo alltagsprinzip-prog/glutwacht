@@ -136,7 +136,7 @@ func build_hud():
   for i in range(3):
    var key=["wood","stone","gold"][i];var y=14+i*49
    panel(hud,Rect2(1000,y,260,43),Color(.08,.15,.17,.92))
-   var bar=ProgressBar.new();bar.show_percentage=false;bar.position=Vector2(1039,y+26);bar.size=Vector2(210,9);bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
+   var bar=ProgressBar.new();bar.show_percentage=false;bar.position=Vector2(1039,y+26);bar.size=Vector2(210,9);bar.max_value=progress.storage();bar.value=progress.data[key];bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
    bar.add_theme_stylebox_override("background",style(Color("152d34"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
    resource_labels[key]=label(hud,"",Rect2(1044,y+1,200,25),16,CREAM,true);icon(hud,key,Rect2(992,y-1,48,48))
   icon_button(hud,"menu","",Rect2(18,95,62,60),func():open_menu())
@@ -525,7 +525,7 @@ func open_building(uid:String):
   label(p,"NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(next,[])),Rect2(342,238,470,58),15,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  elif b.kind=="barracks":
   stat_row(p,"melee","Angriff",str(18+5*level),str(18+5*next),195)
-  label(p,"NEU: Bogenschützen" if level==1 else "Alle Soldaten: +30 Leben",Rect2(344,239,450,42),19,GOLD)
+  label(p,"NEU: Bogenschützen · Haupthaus 2" if level==1 else "Alle Soldaten: +30 Leben",Rect2(344,239,450,42),19,GOLD)
  elif b.kind=="smithy":stat_row(p,"melee","Heldenangriff","+%d"%(8*(level-1)),"+%d"%(8*(next-1)),195)
  elif b.kind=="tower":stat_row(p,"attack","Schaden",str(12+8*level),str(12+8*next),195)
  elif b.kind=="camp":stat_row(p,"army","Plätze",str(2+2*level),str(2+2*next),195)
@@ -578,14 +578,25 @@ func open_training():
 func priority_name(key:String) -> String:return {"nearest":"Nächstes Ziel","defenses":"Verteidigung","hall":"Haupthaus","resources":"Rohstoffe"}.get(key,"Nächstes Ziel")
 func open_attack_plan():
  close_dialog()
+func hero_preview(parent:Control,key:String,rect:Rect2):
+ var viewport=SubViewport.new();viewport.size=Vector2i(rect.size);viewport.own_world_3d=true;viewport.transparent_bg=true;viewport.msaa_3d=Viewport.MSAA_2X
+ var container=SubViewportContainer.new();container.position=rect.position;container.size=rect.size;container.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(container);container.add_child(viewport)
+ var scene=Node3D.new();viewport.add_child(scene);var env=WorldEnvironment.new();env.environment=Environment.new();env.environment.background_mode=Environment.BG_COLOR;env.environment.background_color=Color(0,0,0,0);env.environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;env.environment.ambient_light_color=Color("e0edfa");env.environment.ambient_light_energy=.75;scene.add_child(env)
+ var sun=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-35,-30,0);sun.light_color=Color("ffdfb0");sun.light_energy=1.0;scene.add_child(sun)
+ var model=world.hero_showcase(key,scene);model.rotation.y=-.28
+ var camera=Camera3D.new();scene.add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.size=4.6;camera.position=Vector3(2.2,2.7,6);camera.look_at(Vector3(0,1.7,0));camera.current=true;hero_views.append(viewport)
 func open_heroes():
  if progress.data.hero!="":
   var key=progress.data.hero;var cc=Catalog.hero(key)
   var p=open_dialog("hero_profile",cc.name,"Dein dauerhafter Held")
-  icon(p,key,Rect2(60,130,120,120))
-  label(p,"Stufe %d"%Catalog.level(progress.data,key),Rect2(205,130,250,42),28,GOLD)
-  label(p,"%d EP"%progress.data.xp[key],Rect2(205,176,250,34),20)
-  label(p,cc.skill,Rect2(205,220,420,34),21,Color(cc.color))
+  hero_preview(p,key,Rect2(33,116,300,334))
+  var lv=Catalog.level(progress.data,key)
+  label(p,"Stufe %d"%lv,Rect2(368,122,420,42),30,GOLD)
+  label(p,"%d EP"%progress.data.xp[key],Rect2(368,170,420,32),20)
+  icon(p,"hp",Rect2(367,223,34,34));label(p,str(int(sim.hero.max_hp)),Rect2(412,222,136,36),24)
+  icon(p,"melee",Rect2(569,223,34,34));label(p,str(int(sim.hero.damage)),Rect2(612,222,160,36),24)
+  icon(p,"skill",Rect2(367,280,40,40));label(p,cc.skill,Rect2(418,277,383,43),22,Color(cc.color))
+  label(p,"Training ohne Wartezeit",Rect2(368,340,420,34),18,CREAM)
   icon_button(p,"training","TRAINING",Rect2(500,425,300,82),func():open_training(),true)
   return
  var p=open_dialog("heroes","Wähle deinen Helden","Diese Wahl ist dauerhaft.")

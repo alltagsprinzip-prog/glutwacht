@@ -1,17 +1,40 @@
-# Glutwacht · Sonnenhain 0.5
+# Glutwacht 0.8 — Entwicklungsübergabe
 
-Stand 24.09.2026. Nutzerfreigabe: Bauzeiten maximal 120 Sekunden für Stufe 4, sichtbare Bauarbeiter/Gerüste, drei Rohstoffbalken, hellere Welt/UI, sofortiges Helden-/Truppentraining, Startseite/Priorität/Erstziel, Truppen einsetzen, KI-Alarmierung, Fallen und Lebensbalken. Modal-Schließen gegen Touch-Durchklicken und HUD-Überdeckung abgesichert.
+## Quelle und Freigabe
 
-Godot 4.7.2, GDScript, Compatibility. Hauptszene `game3d/main.tscn`.
+Repository: `alltagsprinzip-prog/glutwacht`; Arbeitsbranch `update/mobile-v08`. Ausgangspunkt `744e1fd12dc9c000e479758132fac29a2b9cf50b`. Zwischenzeitliche Änderungen von `main` bis `85cbae9ed46a166ca4691864306a4578a747dc18` wurden integriert, einschließlich der robusteren Ressourcenbehandlung und des bisherigen `release_gate.gd`.
 
-- `catalog.gd`: vier Klassen, Gebäude, fünf Dorfdefinitionen und Produktionsraten.
-- `progress.gd`: Schema 5, Migration 2/3 in derselben Datei, Bauaufträge/Endzeiten, Offlineproduktion nach Fertigstellung, 1–2 Arbeiter, sofortiges Training bis Rang 5.
-- `battle.gd`: autonome Truppen, Klassenfähigkeiten, Erkundung/Überfall, drei Verteidigungswellen, einmalige Belohnung.
-- `world.gd`: größere 3D-Landschaft, echte Modelle, Stufenvarianten, Kamera/Zoom, Bauvorschau, Auswahl über Gebäudevolumen, Figurenanimationen, Klassenfarben und Konturen.
-- `main.gd`: vier Live-3D-Vorschauen bei Heldenwahl, Bau-/Upgrade-/Armeemenüs, Gegnerwahl, Eingaben und HUD.
+Auftrag: vollständige 25-Phasen-Spezifikation aus „Eingefügter Text.txt“. Godot 4.7.2/GDScript, Compatibility, WebGL2. Keine Erweiterung auf echtes PvP oder Monetarisierung. Der Stand ist ein geprüfter Entwicklungskandidat; Browserabnahme in der Prüf-Cloud ist durch fehlendes WebGL2 blockiert. Native Prüfungen und Webexport sind davon getrennt dokumentiert.
 
-Quellcodeöffnung dieses Bearbeitungslaufs bei Commit aae0835116dd2d5037e98791a1996663a466cf56. Projekt appgprj_6ab46e47fad0819196c0714bcbd94f1f. Owner-only erneut bestätigt und beibehalten. Vorschau https://glutwacht-rpg-m1.mg-automobile24.chatgpt.site . Keine Zugangsdaten in Dateien. GitHub war ursprünglich angemeldet, aber ohne zugängliches Ziel-Repository; Sicherung im bestehenden privaten Projekt-Repository.
+## Architektur
 
-Prüfungen: `tests3d/suite.gd` (50 neue Regeltests), `tests3d/expansion_suite.gd` (50 Regressionen), `tests3d/visual.gd` (37 Bedienprüfungen), `tests3d/balance_expansion.gd`, `tests3d/defense_play.gd`, `tests/web_package.mjs`. Bericht `docs/TEST_REPORT.md`.
+- `game3d/main.gd`: Laufzeit-UI, vollständige Pointer-Zuordnung, Kamera/Platzierung/Joystick voneinander getrennt, Vorschauen, Dialoge, Ergebnisanimation und Webdiagnose.
+- `game3d/battle.gd`: eigenständige Simulation; Reserve, autonome Truppen, Garnison, drei Minuten, Sterne, Trefferwarteschlange und Beute je Gebäude. `raid_loot` ist kompatibler Lesezugriff auf `looted`.
+- `game3d/progress.gd`: Daten und Migrationen; Bauaufträge, Offlineproduktion, Hindernisse, Juwelen, Soforttraining, Lager, Armee, verschiebbare Kerngebäude.
+- `game3d/catalog.gd`: vier Klassen, Gebäudedaten, tatsächliche Freischaltungen und Gegnerbudget innerhalb ca. ±15% der Spielerstärke.
+- `game3d/world.gd`: Kamera, animierte Modelle, Gerüste/Arbeiter, anklickbare Sammler, Schadensanzeige, wiederverwendete Effekte und dauerhaft referenzierte Assetmaterialien.
+- `game3d/architecture.gd`: gemeinsame Modellfabrik für Dorf, Baukatalog, Ausbau und Bauvorschau. Unterschiedliche Silhouetten und Ausbauteile.
+- `game3d/terrain.gdshader`: ruhige, räumlich variierende Grasfläche.
+- `game3d/stick.gd`: Touch-/Maus-Joystick; `scripts/audio.gd`: synthetisierte Effekte.
+- `assets3d/icons`: eigenes SVG-Iconset; `assets3d/ui`: skalierbare Oberflächen. Vorhandene Modelle und Lizenzdateien bleiben erhalten. `game3d/icons` aus dem parallel aktualisierten Hauptbranch bleibt erhalten.
 
-Die neue Infrastruktur funktioniert lokal, nicht als Online-PvP. Frühere Web-Spielstände werden migriert. Browserpersistenz und reale Mobil-FPS bleiben Zielgeräteprüfungen. Konturen/Animationen/Modelldarstellung verbessert; keine behauptete WoW-/LoL-Produktionsqualität. Benutzer soll jetzt auf seinem Gerät den erweiterten Ablauf testen, bevor Backend oder weitere Systeme hinzukommen.
+Root-`main.gd`, Root-`main.tscn` und die übrigen `scripts` gehören zum früheren 2D-Prototyp. Aktiver Einstieg ist `game3d/main.tscn`.
+
+## Persistenz und Regeln
+
+Save weiterhin `user://glutwacht_dorf_v2.json`, Schema **7**, Migration **2–7**. Unlesbare Daten werden gesichert. Wichtige Felder: `hero` + `hero_id`, `wood/stone/gold/gems`, `hall/barracks/smithy`, `core_positions`, `structures`, `jobs`, `obstacles/obstacle_jobs`, `builder_bonus`, `melee/archers`, `training`, `xp`, `last_production`, `next_uid`.
+
+- Heldenwahl einmalig. Migration erhält den gewählten Helden und eine bestehende Armee mit Heerlagerkapazität.
+- Erstbau 8–20 s, Ausbau auf Stufe 2/3/4: 12/25/45 s; bis Stufe 10 maximal 225 s. Mauern sofort. 2–4 reguläre Arbeiter nach Haupthausstufe, ein zusätzlich kaufbarer Arbeiter, insgesamt höchstens 5.
+- Lager: 1200 × Haupthausstufe. Produktion: 18 Holz, 14 Stein, 9 Gold pro Minute × Gebäudestufe. Gebäudestock: 140 × Stufe. Offlineproduktion höchstens vier Stunden; Bauzeit wird abgezogen.
+- Training sofort, höchstens Rang 5. Kraft +6 Angriff, Leben +25, Fähigkeit +12% und −0,4 s; Truppenrang +20 HP/+4 Angriff.
+- Hindernis: ein Arbeiter, 20 Gold, 10 s, einmalig 1–5 Juwelen. Juwelen für Rohstoffe, einen Arbeiter oder gezielte Beschleunigung.
+- Angriff: 180 s; je ein Stern für 50%, Haupthaus und 100%. Beute liegt in echten Produktionsgebäuden und im Haupthaus; Schaden schreibt anteilig gut. Verlust, Abbruch und Timeout behalten diese Beute; Lagerlimit gilt bei Gutschrift. Kein Geld für 0% ohne Schaden.
+- Einzelplatzierung an freiem Rand, genau eine Einheit pro Tap, Auswahl bleibt bis Reserve 0. Halten nach 0,30 s, danach alle 0,16 s. Pinch und UI-Eingaben platzieren nichts.
+- Treffer erst nach Ausholen, Fernkampf nach Projektilflug. Effekte maximal 48 gleichzeitig dargestellt, Schadenszahlen maximal 28.
+
+## Freigabe
+
+`tools/check_godot.py` kontrolliert Exitcode, Fehlermeldungen und Abschlussmarker der Tests. Workflow importiert vollständig, startet headless, prüft Regeln und gerenderte Touch-/Szenentests, exportiert Web und lädt Prüfprotokolle/Review-Build hoch. PRs deployen nicht. Ein Merge auf main würde den bestehenden Pages-Deploy auslösen; deshalb bleibt der Kandidat bis zur Browserabnahme auf dem Arbeitsbranch.
+
+Nächste konkrete Arbeit: Web-Build in einem WebGL2-fähigen Browser bzw. auf dem Zieltelefon starten; Erstwahl/Persistenz, Bewegungen, drei Truppenfolgen, Schließen aller Fenster und einen echten Angriff prüfen. Erst nach dieser Abnahme den Kandidaten veröffentlichen. Keine Behauptung einer bereits erreichten WoW-/LoL-Produktionsqualität oder gemessener Mobil-FPS.

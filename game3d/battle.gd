@@ -38,6 +38,8 @@ var combat_texts:Array=[]
 var pending_hits:Array=[]
 var audio_events:Array=[]
 var looted={"wood":0,"stone":0,"gold":0}
+var raid_loot:Dictionary:
+ get:return looted
 func training(attribute:String) -> int:return int(profile.get("training",{}).get("heroes",{}).get(hero_key(),{}).get(attribute,0))
 func entry_position() -> Vector2:
  return {"south":Vector2(0,27),"west":Vector2(-27,0),"east":Vector2(27,0),"north":Vector2(0,-27)}.get(attack_side,Vector2(0,27))
@@ -152,7 +154,7 @@ func accrue_loot(b:Dictionary):
 func animate_attack(u:Dictionary,duration:float):
  u.attack_time=duration;u.attack_total=duration;u.attack_seq+=1;u.anim="attack"
 func queue_hit(u:Dictionary,target:Dictionary,amount:float,reach:float,ranged:bool=false,color:Color=Color("ffd98c"),delay:float=-1):
- var windup=delay if delay>=0 else float(u.get("attack_total",.6))*.42
+ var windup=delay if delay>=0 else float(u.get("attack_total",.6))*.52
  pending_hits.append({"source":u,"target":target,"damage":amount,"reach":reach,"ranged":ranged,"color":color,"wait":windup,"stage":"windup"})
 func update_hits(dt:float):
  for i in range(pending_hits.size()-1,-1,-1):
@@ -211,14 +213,17 @@ func targets() -> Array:
  return living(enemies)+(living(buildings) if mode=="raid" else [])
 func army_target(u:Dictionary):
  var close_enemy=nearest(u.pos,living(enemies))
- if close_enemy!=null and distance(u,close_enemy)<(9 if u.kind=="archer" else 4):return close_enemy
- if mode!="raid":return nearest(u.pos,targets())
- var goal=nearest(u.pos,living(buildings))
- if goal!=null and u.kind!="archer":
+ var goal=null
+ if close_enemy!=null and distance(u,close_enemy)<(9 if u.kind=="archer" else 4):goal=close_enemy
+ elif mode=="raid":goal=nearest(u.pos,living(buildings))
+ else:goal=nearest(u.pos,targets())
+ if mode=="raid" and goal!=null and u.kind!="archer":
+  var first_wall=null;var first_t=INF
   for b in living(buildings):
    if b.kind!="wall" or b.id==goal.id:continue
    var line:Vector2=goal.pos-u.pos;var t=clampf((b.pos-u.pos).dot(line)/maxf(.01,line.length_squared()),0,1)
-   if t>0 and t<1 and b.pos.distance_to(u.pos+line*t)<b.radius+.55:return b
+   if t>0 and t<1 and t<first_t and b.pos.distance_to(u.pos+line*t)<b.radius+.55:first_wall=b;first_t=t
+  if first_wall!=null:return first_wall
  return goal
 func nearest(pos:Vector2,list:Array):
  var best=null;var dmin=INF

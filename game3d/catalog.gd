@@ -43,7 +43,11 @@ static func strength(profile:Dictionary) -> int:
  var army=int(profile.get("melee",0))+int(profile.get("archers",0))
  var training=profile.get("training",{}).get("troops",{})
  var hero_training=profile.get("training",{}).get("heroes",{}).get(String(profile.get("hero","warrior")),{})
- var power=int(profile.get("hall",1))*100+int(profile.get("barracks",1))*35+int(profile.get("smithy",1))*30+army*18
+ var capacity=mini(10,4+int(profile.get("hall",1))*2)
+ for b in profile.get("structures",[]):
+  if b is Dictionary and b.get("kind","")=="camp":capacity+=2+int(b.get("level",1))*2
+ var class_data=hero(String(profile.get("hero","warrior")))
+ var power=capacity*4+int(class_data.hp)/20+int(class_data.damage)+int(profile.get("hall",1))*100+int(profile.get("barracks",1))*35+int(profile.get("smithy",1))*30+army*18
  power+=int(training.get("melee",0))*14+int(training.get("archers",0))*14
  power+=level(profile,String(profile.get("hero","warrior")))*25
  for b in profile.get("structures",[]):
