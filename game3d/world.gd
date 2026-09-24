@@ -176,6 +176,25 @@ func create_obstacle(o:Dictionary,jobs:Array):
  obstacles[uid]={"root":root,"radius":radius,"height":height,"kind":kind,"job":job}
 func box(parent:Node,pos:Vector3,size:Vector3,color:Color):
  var mesh=BoxMesh.new();mesh.size=size;return mesh_node(mesh,pos,material(color),parent)
+func create_resource_marker(parent:Node3D,kind:String,height:float,stock:float,cap:float) -> Dictionary:
+ var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height+1.8,0)
+ var color=Color("9a622e") if kind=="lumber" else (Color("7f8e96") if kind=="quarry" else Color("e6b72f"))
+ if kind=="lumber":
+  for i in range(3):
+   var log=CylinderMesh.new();log.top_radius=.14;log.bottom_radius=.14;log.height=.85;log.radial_segments=10
+   var m=mesh_node(log,Vector3((i-1)*.28,0,0),material(color,.8),root);m.rotation.z=PI/2
+ elif kind=="quarry":
+  var rock=SphereMesh.new();rock.radius=.38;rock.height=.60;rock.radial_segments=8;rock.rings=5
+  mesh_node(rock,Vector3.ZERO,material(color,.9),root)
+ else:
+  var coin=CylinderMesh.new();coin.top_radius=.38;coin.bottom_radius=.38;coin.height=.12;coin.radial_segments=24
+  var m=mesh_node(coin,Vector3.ZERO,material(color,.35,true),root);m.rotation.x=PI/2
+ var text=Label3D.new();root.add_child(text);text.position=Vector3(0,.72,0);text.font_size=40;text.pixel_size=.017;text.outline_size=10
+ text.billboard=BaseMaterial3D.BILLBOARD_ENABLED;text.no_depth_test=true;text.modulate=Color("fff5c2")
+ text.text="MAX" if stock>=cap*.95 else str(int(stock))
+ root.visible=stock>=1
+ return {"root":root,"label":text,"kind":kind}
+
 func create_building(b:Dictionary):
  var def:Dictionary=Catalog.BUILD[b.kind]
  var level=int(b.level);var root=Node3D.new();root.position=Vector3(b.pos.x,.03,b.pos.y);landscape.add_child(root)
@@ -329,15 +348,11 @@ func create_building(b:Dictionary):
    for z in [-r,r]:box(scaffold,Vector3(0,y,z),Vector3(r*2+.4,.16,.22),Color("e4c58b"))
    for x in [-r,r]:box(scaffold,Vector3(x,y,0),Vector3(.22,.16,r*2+.4),Color("e4c58b"))
   create_worker(b,job)
- var bubble=null
+ var marker=null
  if mode=="home" and Catalog.RESOURCES.has(b.kind):
-  bubble=Label3D.new();root.add_child(bubble)
   var stock=float(b.get("stock",0.0));var cap=140.0*level
-  bubble.text=("▥" if b.kind=="lumber" else ("◆" if b.kind=="quarry" else "●"))+("  VOLL" if stock>=cap*.95 else "  %d"%int(stock))
-  bubble.position=Vector3(0,model_height+1.75,0);bubble.font_size=32;bubble.pixel_size=.017;bubble.outline_size=8
-  bubble.billboard=BaseMaterial3D.BILLBOARD_ENABLED;bubble.no_depth_test=true;bubble.visible=stock>=1
-  bubble.modulate=Color("fff1a6") if stock>=cap*.95 else Color("ffffff")
- forts[b.id]={"root":root,"body":body,"label":label,"text":text,"height":model_height,"hpbar":hpbar,"job":job,"ruin":null,"bubble":bubble}
+  marker=create_resource_marker(root,b.kind,model_height,stock,cap)
+ forts[b.id]={"root":root,"body":body,"label":label,"text":text,"height":model_height,"hpbar":hpbar,"job":job,"ruin":null,"marker":marker}
 func create_worker(b:Dictionary,job:Dictionary):
  var destination:Vector2=b.pos+Vector2(b.radius+.9,b.radius*.25)
  var holder=asset("Warrior.gltf",self,Vector3.ZERO,2.35)
@@ -443,17 +458,26 @@ func sync(sim,dt:float):
   f.label.visible=b.hp>0 and b.kind!="wall" and target_zoom<55 and (sim.active() or mode=="scout" or b.uid==selected_uid or not f.job.is_empty())
   f.label.text=(f.text+"\n%d / %d"%[b.hp,b.max_hp]) if sim.active() else f.text
   set_health(f.hpbar,b.hp/b.max_hp,(sim.active() or mode=="scout") and b.hp>0)
-  if mode=="home" and f.get("bubble")!=null:
+  if mode=="home" and f.get("marker")!=null:
    var stock=0.0
    for sb in sim.profile.get("structures",[]):
     if String(sb.get("uid",""))==String(b.uid):stock=float(sb.get("stock",0.0));break
-   var cap=140.0*int(b.level);f.bubble.visible=stock>=1
-   f.bubble.text=("▥" if b.kind=="lumber" else ("◆" if b.kind=="quarry" else "●"))+("  VOLL" if stock>=cap*.95 else "  %d"%int(stock))
-   f.bubble.modulate=Color("fff1a6") if stock>=cap*.95 else Color("ffffff")
+   var cap=140.0*int(b.level);f.marker.root.visible=stock>=1
+   f.marker.label.text="MAX" if stock>=cap*.95 else str(int(stock))
+   var pulse=1.0+(.10*sin(Time.get_ticks_msec()/160.0) if stock>=cap*.95 else 0.0);f.marker.root.scale=Vector3.ONE*pulse
   if not f.job.is_empty():
    var remaining=maxf(0,float(f.job.finish)-Time.get_unix_time_from_system())
    f.label.text="BAUSTELLE · %d s"%ceili(remaining)
    f.label.visible=true;set_health(f.hpbar,1-remaining/maxf(1,float(f.job.finish)-float(f.job.start)),true)
+ for b in sim.buildings:
+  if b.hp<=0 or b.hp>=b.max_hp*.35:continue
+  var smoke=SphereMesh.new();smoke.radius=.22;smoke.height=.44;smoke.radial_segments=10;smoke.rings=6
+  var y=2.2+fmod(Time.get_ticks_msec()/500.0+float(b.id),1.8)
+  var sm=mesh_node(smoke,Vector3(b.pos.x,y,b.pos.y),material(Color(.25,.24,.22,.42)),fx)
+  sm.scale=Vector3.ONE*(.8+y*.08)
+  if b.hp<b.max_hp*.15:
+   var ember=SphereMesh.new();ember.radius=.10;ember.height=.20
+   mesh_node(ember,Vector3(b.pos.x+.3,1.1,b.pos.y-.2),material(Color("ff8a3c"),.25,true),fx)
  for w in workers:
   var elapsed=Time.get_unix_time_from_system()-float(w.job.start);var ratio=clampf(elapsed/3,0,1)
   var p:Vector2=Vector2(0,-5).lerp(w.goal,ratio);w.node.position=Vector3(p.x,.05,p.y)
@@ -465,17 +489,43 @@ func sync(sim,dt:float):
  for u in sim.enemies:
   if u.hp>0 and u.wind>0:disc(3.2 if u.kind=="captain" else 1.7,Color(1,.21,.08,.45),Vector3(u.aim.x,.08,u.aim.y),fx)
  for e in sim.effects:
-  var t=1-e.life/e.max
+  var t=1-e.life/e.max;var col:Color=e.color
   if e.kind=="arrow":
    var p:Vector2=e.pos.lerp(e.end,t);var sphere=SphereMesh.new();sphere.radius=.13;sphere.height=.26
-   mesh_node(sphere,Vector3(p.x,1.5+sin(t*PI)*1.6,p.y),material(e.color,.3,true),fx)
+   mesh_node(sphere,Vector3(p.x,1.5+sin(t*PI)*1.6,p.y),material(col,.25,true),fx)
+  elif e.kind=="afterimage":
+   for i in range(6):
+    var r=float(i)/5.0;var p:Vector2=e.pos.lerp(e.end,r)
+    var ghost=SphereMesh.new();ghost.radius=.23;ghost.height=.46
+    var gc=col;gc.a=(1.0-r)*(1.0-t)*.45
+    mesh_node(ghost,Vector3(p.x,.8,p.y),material(gc,.3,true),fx)
+  elif e.kind=="spark":
+   for i in range(10):
+    var a=TAU*float(i)/10.0+t*.8;var r=.4+t*3.0
+    var sp=SphereMesh.new();sp.radius=.09;sp.height=.18
+    mesh_node(sp,Vector3(e.pos.x+cos(a)*r,.5+sin(t*PI)*1.2,e.pos.y+sin(a)*r),material(col,.2,true),fx)
+  elif e.kind=="burst":
+   var radius=.5+t*4.0;var bc=col;bc.a=(1-t)*.42
+   disc(radius,bc,Vector3(e.pos.x,.10,e.pos.y),fx)
+   var ring=TorusMesh.new();ring.inner_radius=maxf(.1,radius-.18);ring.outer_radius=radius;ring.rings=36;ring.ring_segments=7
+   mesh_node(ring,Vector3(e.pos.x,.22,e.pos.y),material(col,.2,true),fx)
+  elif e.kind=="windup":
+   var radius=.7+t*.8;var ring=TorusMesh.new();ring.inner_radius=radius-.12;ring.outer_radius=radius;ring.rings=32;ring.ring_segments=6
+   mesh_node(ring,Vector3(e.pos.x,.35,e.pos.y),material(col,.25,true),fx)
+  elif e.kind=="invalid":
+   var radius=.5+t*1.4;var rc=col;rc.a=(1-t)*.55
+   var ring=TorusMesh.new();ring.inner_radius=radius-.10;ring.outer_radius=radius;ring.rings=28;ring.ring_segments=6
+   mesh_node(ring,Vector3(e.pos.x,.12,e.pos.y),material(rc,.25,true),fx)
+  elif e.kind=="impact":
+   var radius=.25+t*1.25;var ic=col;ic.a=(1-t)*.6
+   disc(radius,ic,Vector3(e.pos.x,.14,e.pos.y),fx)
   else:
-   var radius=1.2 if e.kind=="slash" else t*4.5+.3
-   var color:Color=e.color;color.a=(1-t)*.5
-   disc(radius,color,Vector3(e.pos.x,.1,e.pos.y),fx)
+   var radius=.4+t*4.8;var sc=col;sc.a=(1-t)*.42
+   disc(radius,sc,Vector3(e.pos.x,.10,e.pos.y),fx)
    if e.kind=="skill":
-    var ring=TorusMesh.new();ring.inner_radius=maxf(.1,radius-.13);ring.outer_radius=radius;ring.rings=40;ring.ring_segments=6
-    mesh_node(ring,Vector3(e.pos.x,.25,e.pos.y),material(e.color,.3,true),fx)
+    for mul in [1.0,.72]:
+     var rr=radius*mul;var ring=TorusMesh.new();ring.inner_radius=maxf(.1,rr-.15);ring.outer_radius=rr;ring.rings=40;ring.ring_segments=6
+     mesh_node(ring,Vector3(e.pos.x,.25+(1.0-mul)*.3,e.pos.y),material(col,.25,true),fx)
  for text in sim.combat_texts:
   var l=Label3D.new();l.text=text.value;l.font_size=40;l.pixel_size=.018;l.outline_size=8;l.no_depth_test=true;l.billboard=BaseMaterial3D.BILLBOARD_ENABLED
   l.modulate=Color("8dffb3") if text.heal else Color("fff4d1");l.position=Vector3(text.pos.x,4+(1-text.life/text.max)*1.7,text.pos.y);fx.add_child(l)
