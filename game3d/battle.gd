@@ -57,7 +57,8 @@ func form_army():
  allies.clear()
  for i in range(int(profile.melee)+int(profile.archers)):
   var kind="melee" if i<int(profile.melee) else "archer"
-  var pos=hero.pos+Vector2((i%4-1.5)*1.7,2.6+floor(i/4.0)*1.6)
+  var barracks_pos:Vector2=Catalog.CORE_POS.barracks
+  var pos=barracks_pos+Vector2((i%4-1.5)*1.55,5.2+floor(i/4.0)*1.35)
   allies.append(soldier(kind,pos.clamp(Vector2(-29,-29),Vector2(29,29))))
 func deployment_valid(pos:Vector2) -> bool:
  if maxf(absf(pos.x),absf(pos.y))<24 or maxf(absf(pos.x),absf(pos.y))>30:return false
@@ -279,6 +280,7 @@ func step(dt:float,input:Vector2):
   u.anim="attack" if u.attack_time>0 else "Idle"
  if input.length()>.1:facing=input.normalized();move(hero,input,stats().speed,dt)
  hero.facing=facing
+ if mode=="home":return
  for i in range(allies.size()):
   var u:Dictionary=allies[i]
   if u.hp<=0:continue
