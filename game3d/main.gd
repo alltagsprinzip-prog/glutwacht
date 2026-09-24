@@ -522,7 +522,7 @@ func open_attack_plan():
  label(p,"%d Schwerter · %d Bogenschützen · %d / %d Plätze\nZusammenstellung unter Armee im eigenen Dorf ändern."%[progress.data.melee,progress.data.archers,progress.data.melee+progress.data.archers,progress.capacity()],Rect2(29,463,651,74),18)
  button(p,"Plan übernehmen",Rect2(735,492,299,60),func():close_dialog();build_hud(),true)
 func open_heroes():
- var p=open_dialog("heroes","Wähle deinen Helden" if progress.data.hero=="" else "Vier Wege. Ein Dorf.","Erste Wahl ist dauerhaft. Später erlaubt die Heldenhalle den Wechsel.")
+ var p=open_dialog("heroes","Wähle deinen Helden" if progress.data.hero=="" else Catalog.hero(progress.data.hero).name,"Diese Wahl ist dauerhaft." if progress.data.hero=="" else "Dein Held · trainieren und weiterentwickeln.")
  for i in range(4):
   var key=Catalog.HERO_ORDER[i];var c=Catalog.hero(key);var x=20+i*263
   panel(p,Rect2(x,126,251,440),Color("20323d"))
