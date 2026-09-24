@@ -6,15 +6,33 @@ const MAX_LEVEL=10
 const TITLES={"hall":"Haupthaus","barracks":"Kaserne","smithy":"Schmiede"}
 var data:Dictionary
 var warning=""
+var recent_gems=0
 func _init():data=fresh()
 func new_training() -> Dictionary:
  var heroes={}
  for key in Catalog.HERO_ORDER:heroes[key]={"power":0,"vitality":0,"skill":0}
  return {"heroes":heroes,"troops":{"melee":0,"archers":0}}
+func fresh_obstacles() -> Array:
+ return [
+  {"uid":"o1","kind":"tree","x":-27.0,"z":-24.0},
+  {"uid":"o2","kind":"tree","x":27.0,"z":20.0},
+  {"uid":"o3","kind":"bush","x":-25.0,"z":27.0},
+  {"uid":"o4","kind":"rock","x":26.0,"z":-26.0},
+  {"uid":"o5","kind":"tree","x":5.0,"z":28.0},
+  {"uid":"o6","kind":"bush","x":-28.0,"z":4.0},
+  {"uid":"o7","kind":"rock","x":28.0,"z":-4.0},
+  {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
+ ]
 func fresh() -> Dictionary:
- return {"version":5,"wood":300,"stone":240,"gold":160,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
-func builders() -> int:return 4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
-func free_builders() -> int:return maxi(0,builders()-data.jobs.size())
+ return {"version":6,"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+func builders() -> int:
+ var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
+ return mini(5,base+int(data.get("builder_bonus",0)))
+func free_builders() -> int:return maxi(0,builders()-data.jobs.size()-data.get("obstacle_jobs",[]).size())
+func obstacle_job_for(uid:String) -> Dictionary:
+ for job in data.get("obstacle_jobs",[]):
+  if String(job.uid)==uid:return job
+ return {}
 func job_for(uid:String) -> Dictionary:
  for job in data.jobs:
   if job.uid==uid:return job
@@ -148,6 +166,7 @@ func demolish(uid:String) -> bool:
    data.structures.remove_at(i);return true
  return false
 func production(now:float=-1.0) -> bool:
+ recent_gems=0
  if now<0:now=Time.get_unix_time_from_system()
  now=maxf(now,float(data.last_production))
  var since=maxf(float(data.last_production),now-14400)
@@ -162,6 +181,14 @@ func production(now:float=-1.0) -> bool:
  for i in range(data.jobs.size()-1,-1,-1):
   var job=data.jobs[i]
   if now>=float(job.finish):finish_upgrade(job.uid,int(job.target));data.jobs.remove_at(i);completed=true
+ for i in range(data.get("obstacle_jobs",[]).size()-1,-1,-1):
+  var ojob=data.obstacle_jobs[i]
+  if now<float(ojob.finish):continue
+  var reward=1+posmod(String(ojob.uid).hash(),5)
+  data.gems=int(data.get("gems",0))+reward;recent_gems+=reward
+  for j in range(data.get("obstacles",[]).size()-1,-1,-1):
+   if String(data.obstacles[j].uid)==String(ojob.uid):data.obstacles.remove_at(j);break
+  data.obstacle_jobs.remove_at(i);completed=true
  data.last_production=now
  return completed
 func ready_resources() -> Dictionary:
@@ -169,6 +196,15 @@ func ready_resources() -> Dictionary:
  for b in data.structures:
   if Catalog.RESOURCES.has(b.kind):result[Catalog.RESOURCES[b.kind]]+=int(b.stock)
  return result
+func collect_building(uid:String) -> Dictionary:
+ var gained={"wood":0,"stone":0,"gold":0}
+ for b in data.structures:
+  if String(b.uid)!=uid or not Catalog.RESOURCES.has(b.kind):continue
+  var resource=Catalog.RESOURCES[b.kind]
+  var amount=mini(int(b.stock),maxi(0,storage()-int(data[resource])))
+  b.stock-=amount;data[resource]+=amount;gained[resource]+=amount
+  break
+ return gained
 func collect() -> Dictionary:
  var gained={"wood":0,"stone":0,"gold":0}
  for b in data.structures:
@@ -177,6 +213,28 @@ func collect() -> Dictionary:
   var amount=mini(int(b.stock),maxi(0,storage()-int(data[resource])))
   b.stock-=amount;data[resource]+=amount;gained[resource]+=amount
  return gained
+func remove_obstacle(uid:String,now:float=-1.0) -> bool:
+ if now<0:now=Time.get_unix_time_from_system()
+ if free_builders()<=0 or not obstacle_job_for(uid).is_empty():return false
+ var exists=false
+ for o in data.get("obstacles",[]):
+  if String(o.uid)==uid:exists=true;break
+ if not exists:return false
+ var cost={"gold":20}
+ if not affordable(cost):return false
+ pay(cost)
+ data.obstacle_jobs.append({"uid":uid,"start":now,"finish":now+10.0})
+ return true
+func shop_buy(key:String) -> bool:
+ var prices={"wood":25,"stone":25,"gold":35,"builder":200}
+ if not prices.has(key) or int(data.get("gems",0))<int(prices[key]):return false
+ if key=="builder" and int(data.get("builder_bonus",0))>=1:return false
+ data.gems-=int(prices[key])
+ if key=="builder":data.builder_bonus=int(data.get("builder_bonus",0))+1
+ elif key=="wood":data.wood=mini(storage(),int(data.wood)+500)
+ elif key=="stone":data.stone=mini(storage(),int(data.stone)+500)
+ elif key=="gold":data.gold=mini(storage(),int(data.gold)+300)
+ return true
 func store_file(path:String=SAVE) -> bool:
  var f=FileAccess.open(path+".tmp",FileAccess.WRITE)
  if f==null:warning="Speichern fehlgeschlagen.";return false
@@ -187,13 +245,15 @@ func store_file(path:String=SAVE) -> bool:
 func load_file(path:String=SAVE) -> bool:
  if not FileAccess.file_exists(path):return false
  var parsed=JSON.parse_string(FileAccess.get_file_as_string(path))
- if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5]:
+ if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5,6]:
   var backup=FileAccess.open(path+".unreadable",FileAccess.WRITE)
   if backup:backup.store_string(FileAccess.get_file_as_string(path));backup.close()
   warning="Spielstand unlesbar. Die Originaldatei wurde als Sicherung erhalten."
   return false
  var clean=fresh()
  for k in ["wood","stone","gold","wins"]:clean[k]=clampi(int(parsed.get(k,clean[k])),0,999999)
+ clean.gems=clampi(int(parsed.get("gems",clean.gems)),0,999999)
+ clean.builder_bonus=clampi(int(parsed.get("builder_bonus",0)),0,1)
  for k in TITLES:clean[k]=clampi(int(parsed.get(k,1)),1,MAX_LEVEL)
  for k in ["sword","sound"]:clean[k]=bool(parsed.get(k,clean[k]))
  var legacy_capacity=4+int(clean.hall)*2
@@ -216,6 +276,22 @@ func load_file(path:String=SAVE) -> bool:
     clean.structures.append({"uid":uid,"kind":kind,"level":clampi(int(b.get("level",1)),1,MAX_LEVEL),"x":clampf(float(b.get("x",0)),-29,29),"z":clampf(float(b.get("z",0)),-29,29),"rotation":posmod(int(b.get("rotation",0)),2),"stock":clampf(float(b.get("stock",0)),0,560)})
   clean.next_uid=maxi(3,int(parsed.get("next_uid",3)))
   while seen.has("s"+str(clean.next_uid)):clean.next_uid+=1
+ if int(parsed.get("version",0))>=6:
+  var obstacles=parsed.get("obstacles",[])
+  if obstacles is Array:
+   clean.obstacles=[]
+   for o in obstacles:
+    if not o is Dictionary:continue
+    var uid=String(o.get("uid",""));var kind=String(o.get("kind",""))
+    if uid=="" or kind not in ["tree","bush","rock"]:continue
+    clean.obstacles.append({"uid":uid,"kind":kind,"x":clampf(float(o.get("x",0)),-30,30),"z":clampf(float(o.get("z",0)),-30,30)})
+  clean.obstacle_jobs=[]
+  var ojobs=parsed.get("obstacle_jobs",[])
+  if ojobs is Array:
+   for job in ojobs:
+    if not job is Dictionary:continue
+    var uid=String(job.get("uid",""));var start_time=float(job.get("start",0));var finish_time=float(job.get("finish",0))
+    if uid!="" and finish_time>start_time and finish_time-start_time<=15.0:clean.obstacle_jobs.append({"uid":uid,"start":start_time,"finish":finish_time})
  data=clean
  if int(parsed.version)>=4:
   var training=parsed.get("training",{})
