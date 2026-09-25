@@ -27,44 +27,33 @@ jobs:
       source_sha: ${{ steps.source.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
-      - name: Apply verified local patch and save regular source files
-        id: source
-        shell: bash
-        run: |
-          set -euo pipefail
-          if test -f .review/hud-ready.json; then
-            python3 - <<'PY'
-          import base64, hashlib, json, lzma, pathlib, subprocess
-          manifest=json.loads(pathlib.Path('.review/hud-ready.json').read_text())
-          encoded=''.join(pathlib.Path(p).read_text().strip() for p in manifest['parts'])
-          packed=base64.b64decode(encoded,validate=True)
-          assert hashlib.sha256(packed).hexdigest()==manifest['compressed_sha256']
-          patch=lzma.decompress(packed)
-          assert len(patch)==manifest['patch_bytes'] and hashlib.sha256(patch).hexdigest()==manifest['patch_sha256']
-          pathlib.Path('/tmp/hud.patch').write_bytes(patch)
-          subprocess.run(['git','apply','--check','/tmp/hud.patch'],check=True)
-          subprocess.run(['git','apply','/tmp/hud.patch'],check=True)
-          for p in manifest['parts']:pathlib.Path(p).unlink()
-          pathlib.Path('.review/hud-ready.json').unlink()
-          PY
-            git config user.name 'github-actions[bot]'
-            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-            git add PROJECT_STATE.md assets3d game3d tests3d tools docs/HUD_REVIEW_2026-09-25.md .review
-            git commit -m 'Implement HUD review: readable controls, protected saves and distinct abilities'
-            git push origin HEAD:refs/heads/update/hud-review-20260925
-          fi
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+        with:
+          fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
           name: hud-workspace
           run-id: 36121811351
           github-token: ${{ github.token }}
           path: /tmp/hud-toolchain
-      - name: Install exact verified engine and templates
+      - name: Reconcile reviewed source and preserve newer fixes
+        id: source
         shell: bash
         run: |
           set -euo pipefail
           (cd /tmp/hud-toolchain && sha256sum -c SHA256SUMS.txt)
+          if test -f .review/hud-ready.json; then
+            python3 .review/apply_hud_reconciled.py
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add PROJECT_STATE.md assets3d game3d tests3d tools docs/HUD_REVIEW_2026-09-25.md docs/HUD_CONTINUATION_ARCHIVE.md .review
+            git commit -m 'Implement HUD review: readable controls, protected saves and distinct abilities'
+            git push origin HEAD:refs/heads/update/hud-review-20260925
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Install exact verified engine and templates
+        shell: bash
+        run: |
+          set -euo pipefail
           unzip -q /tmp/hud-toolchain/godot.zip -d /tmp/godot
           chmod +x /tmp/godot/Godot_v4.7.2-stable_linux.x86_64
           ln -s /tmp/godot/Godot_v4.7.2-stable_linux.x86_64 /tmp/godot/godot
@@ -83,6 +72,7 @@ jobs:
       - name: Native rendered touch and HUD review
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
+          LP_NUM_THREADS: '2'
         run: |
           mkdir -p logs/screenshots
           python3 tools/check_godot.py logs/input.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/input_suite.gd
@@ -101,7 +91,7 @@ jobs:
       - name: Include render evidence and export code backup
         if: always()
         run: |
-          mkdir -p delivery
+          mkdir -p delivery logs
           python3 - <<'PY'
           import pathlib,zipfile
           root=pathlib.Path('.')
@@ -109,7 +99,8 @@ jobs:
             for folder in ['game3d','scripts','tests3d','tools','assets3d/icons','assets3d/ui']:
               for f in (root/folder).rglob('*'):
                 if f.is_file() and not f.name.endswith('.pyc'):z.write(f,str(f))
-            for f in ['project.godot','export_presets.cfg','PROJECT_STATE.md','docs/HUD_REVIEW_2026-09-25.md']:z.write(f,f)
+            for f in ['project.godot','export_presets.cfg','PROJECT_STATE.md','docs/HUD_REVIEW_2026-09-25.md']:
+              if pathlib.Path(f).exists():z.write(f,f)
           PY
           cp -r logs delivery/
       - uses: actions/upload-artifact@v4
