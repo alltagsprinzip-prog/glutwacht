@@ -40,4 +40,8 @@ CI-Nachtrag: Beide Workflows auf 1efa2fe erfolgreich (Spiel 36186155713, Datenba
 - E-Mail-Links für Signup/Magic Link/Recovery: URL-Fragment vor Engine-Start entfernt, Identität bei Supabase geprüft, Kontodorf erst nach ausdrücklichem Öffnen geladen. Abgelaufene Links und Accountwechsel blockiert.
 - Zehn feste PvE-Kampagnenlager, Freischaltung ab einem Stern, beste Sterne pro Lager im bestehenden Save-Schema 7. Keine Rangliste/Serverautorität behauptet.
 - Gemeinsame Heerlagerkapazität für Armee und Stärkeberechnung; Ladeanzeige heißt Glutwacht.
-- Lokal: Account/Save 37/37, Kampagne 68/68, Regeln 187/187, HUD-Geometrie 135/135; JS-Callback-Prüfung bestanden. Lokale Grafikprüfung durch nicht verfügbare X11-Sockets blockiert; grafische CI-Abnahme ausstehend.
+- Lokal: Account/Save 37/37, Kampagne 68/68, Regeln 187/187, HUD-Geometrie 135/135; JS-Callback-Prüfung bestanden. Grafische Prüfung über TCP-Xvfb erfolgreich: 72/72; Kampagnen-/Kontobilder angesehen.
+
+## Geprüfter Checkpoint d946b807
+Beide CI-Workflows erfolgreich: Spiel 36192843143, Datenbank 36192843156. WebGL-Artefakt browser/result.json: errors=[], Rückkehr ins Dorf, Held erhalten. Touch-, Render-, Export- und vollständiger Angriffs-/Reloadtest bestanden. Quellcode im Draft-PR #4; nicht auf main veröffentlicht. Diese Dokumentationsaktualisierung verändert keinen getesteten Code.
+Als Nächstes: tatsächliche Mehrkonten-/Geräteabnahme und mobile Safe-Area-Umsetzung; danach SERVER-01. SMTP und bestätigte Nutzer-E-Mail sind erledigt. Zehn Lager sind implementiert und technisch geprüft; Balance/Nutzerabnahme bleibt offen.

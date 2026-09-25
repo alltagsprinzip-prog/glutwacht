@@ -32,4 +32,8 @@ Echte Supabase-Auth/PostgREST-Sitzungen, drei Live-Konten, zwei Geräte, paralle
 CI-Nachtrag: Beide Workflows auf 1efa2fe erfolgreich (Spiel 36186155713, Datenbank 36186155762).
 
 ## E-Mail-Einstieg und Kampagne
-Nutzer bestätigt Zustellung; Auth-Datenbank bestätigt email_confirmed_at. Neuer Code lokal: Account/Save 37/37; Kampagne 68/68; Regeln 187/187; HUD-Geometrie 135/135; Node-Callback-Prüfung bestanden. Legacy-Save ohne Kampagnenfelder bleibt kompatibel. Xvfb scheitert lokal an X11-Sockets, daher neue grafische CI-Artefakte noch prüfen. Keine tatsächliche Mehrgeräte-Abnahme daraus ableiten.
+Nutzer bestätigt Zustellung; Auth-Datenbank bestätigt email_confirmed_at. Neuer Code lokal: Account/Save 37/37; Kampagne 68/68; Regeln 187/187; HUD-Geometrie 135/135; Node-Callback-Prüfung bestanden. Legacy-Save ohne Kampagnenfelder bleibt kompatibel. TCP-Xvfb: 72/72 Renderprüfungen bestanden; Ansichten angesehen. Keine tatsächliche Mehrgeräte-Abnahme daraus ableiten.
+
+## Geprüfter Checkpoint d946b807
+Beide CI-Workflows erfolgreich: Spiel 36192843143, Datenbank 36192843156. WebGL-Artefakt browser/result.json: errors=[], Rückkehr ins Dorf, Held erhalten. Touch-, Render-, Export- und vollständiger Angriffs-/Reloadtest bestanden. Quellcode im Draft-PR #4; nicht auf main veröffentlicht. Diese Dokumentationsaktualisierung verändert keinen getesteten Code.
+Als Nächstes: tatsächliche Mehrkonten-/Geräteabnahme und mobile Safe-Area-Umsetzung; danach SERVER-01. SMTP und bestätigte Nutzer-E-Mail sind erledigt. Zehn Lager sind implementiert und technisch geprüft; Balance/Nutzerabnahme bleibt offen.

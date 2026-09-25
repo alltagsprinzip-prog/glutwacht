@@ -22,5 +22,9 @@ Brevo-Logliste zeigte unmittelbar danach noch keine Einträge; tatsächlicher Em
 
 ## Aktuelle Fortsetzung
 Nutzer bestätigte Mail-Empfang und Klick. Auth-Datenbank: email_confirmed_at vorhanden. SMTP nicht erneut einrichten.
-Neu implementiert: sichere E-Mail-Callback-Übernahme (tools/auth_callback.js + account.gd + main.gd), zehn feste Kampagnenlager mit kompatibler Sternspeicherung, gemeinsame Heerlagerkapazität, Glutwacht-Ladeanzeige. Lokal Account 37/37, Kampagne 68/68, Regeltest 187/187, Geometrie 135/135, Callback-JS bestanden. Neue grafische CI-Artefakte prüfen. Lokales Xvfb kann keine Unix-Sockets öffnen; keine weitere Retry-Schleife.
+Neu implementiert: sichere E-Mail-Callback-Übernahme (tools/auth_callback.js + account.gd + main.gd), zehn feste Kampagnenlager mit kompatibler Sternspeicherung, gemeinsame Heerlagerkapazität, Glutwacht-Ladeanzeige. Lokal Account 37/37, Kampagne 68/68, Regeltest 187/187, Geometrie 135/135, Callback-JS bestanden. Neue grafische CI-Artefakte prüfen. Lokales Xvfb funktionierte über TCP mit Authentifizierung: 72/72 Renderprüfungen; Ansichten angesehen.
 Nächste offene Risiken: reale Cloud-Anmeldung und Zwei-Geräte-Abnahme, responsive Handyoberfläche, serverautorisierte Wirtschaft. Keine Veröffentlichung oder vollständig erledigten Masterplan behaupten.
+
+## Geprüfter Checkpoint d946b807
+Beide CI-Workflows erfolgreich: Spiel 36192843143, Datenbank 36192843156. WebGL-Artefakt browser/result.json: errors=[], Rückkehr ins Dorf, Held erhalten. Touch-, Render-, Export- und vollständiger Angriffs-/Reloadtest bestanden. Quellcode im Draft-PR #4; nicht auf main veröffentlicht. Diese Dokumentationsaktualisierung verändert keinen getesteten Code.
+Als Nächstes: tatsächliche Mehrkonten-/Geräteabnahme und mobile Safe-Area-Umsetzung; danach SERVER-01. SMTP und bestätigte Nutzer-E-Mail sind erledigt. Zehn Lager sind implementiert und technisch geprüft; Balance/Nutzerabnahme bleibt offen.
