@@ -17,3 +17,5 @@ Engine 4.7.2.stable.official.ed1daf0bf.
 Die 408 bestandenen Einzelprüfungen beweisen keine fertige Onlineversion. Fehlgeschlagene Touch-Abnahme blockiert Merge/Veröffentlichung. Vorhandene CI führt echte Touch-/Render-/WebGL-Gates aus.
 
 Web-Release-Export lokal erfolgreich erzeugt (HTML/JS/PCK/WASM); Browserlauf ausstehend.
+
+CI-Nachtrag: Commit 383f51b hat die echte Touch-Prüfung und gerenderte Szenenprüfung bestanden (Run 36148677008). Der fehlgeschlagene Headless-Inputversuch ist damit kein nachgewiesener Spielfehler. Browser-Testkoordinate für den verschobenen Bauknopf korrigiert; Screenshot-Artefakte im Workflow aktiviert. Endgültigen Browserlauf weiterhin prüfen.

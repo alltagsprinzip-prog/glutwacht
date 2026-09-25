@@ -13,6 +13,7 @@ concurrency:
 jobs:
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Godot 4.7.2 and export templates
@@ -41,7 +42,10 @@ jobs:
       - name: Rendered scene regression tests
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
-        run: python3 tools/check_godot.py logs/visual.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/visual_release.gd
+          GLUTWACHT_QA_DIR: logs/screenshots
+        run: |
+          mkdir -p logs/screenshots
+          python3 tools/check_godot.py logs/visual.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/visual_release.gd
       - name: Export validated web build
         run: |
           mkdir -p dist/v08

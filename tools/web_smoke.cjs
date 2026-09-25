@@ -35,7 +35,7 @@ const assert=require('node:assert/strict');
   console.log('Joystick observations',JSON.stringify({start,moved}));
   assert.ok(Math.hypot(moved.hero_x-start.hero_x,moved.hero_z-start.hero_z)>1,'joystick moves hero');
   await page.screenshot({path:'logs/browser/home.png'});
-  for(const [x,y,name,closeX] of [[1040,654,'catalog',1104],[1188,654,'shop',1025]]){
+  for(const [x,y,name,closeX] of [[313,654,'catalog',1104],[1188,654,'shop',1025]]){
    await tap(x,y);await wait(new Function(`return window.__glutwacht?.dialog===${JSON.stringify(name)}`));
    await tap(closeX,name==='catalog'?107:129);
    await wait(()=>window.__glutwacht?.dialog==='');

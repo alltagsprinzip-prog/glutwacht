@@ -8,3 +8,5 @@ Noch vor Veröffentlichung: CI-Touch-Fehler untersuchen, HUD-Screenshots tatsäc
 
 Danach drei Accounts/zwei Geräte prüfen. SERVER-01 bleibt offen: Client-Snapshots nie als wirtschaftliche Autorität behandeln. Kampagne, Freundesbesuche, servervalidiertes PvP und Clans erst entsprechend Masterplan implementieren und prüfen.
 Nach jeder Stufe Status/Nachweise aktualisieren; keine wiederholte Komplettanalyse der ZIP.
+
+CI-Nachtrag: Commit 383f51b hat die echte Touch-Prüfung und gerenderte Szenenprüfung bestanden (Run 36148677008). Der fehlgeschlagene Headless-Inputversuch ist damit kein nachgewiesener Spielfehler. Browser-Testkoordinate für den verschobenen Bauknopf korrigiert; Screenshot-Artefakte im Workflow aktiviert. Endgültigen Browserlauf weiterhin prüfen.
