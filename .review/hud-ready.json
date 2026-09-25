@@ -1,8 +1,0 @@
-{
-  "parts": [".review/hud-part0.b64", ".review/hud-part1.b64"],
-  "compressed_sha256": "883d798394a77b8591884528824ee0622601e81180937058b3a20d50ef5fad5c",
-  "patch_sha256": "4992df6a77bcdb5b3c02596336eb053183a9b6e38f761e83e47b077a220d0ab1",
-  "patch_bytes": 97040,
-  "base_source": "c52831eb866b16f653cc0f6969995a75fbb07a9f",
-  "purpose": "Readable mobile HUD, permanent village joystick, protected local saves and distinct delayed hero abilities. No changes to the existing production site files."
-}

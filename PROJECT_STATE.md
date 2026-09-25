@@ -1,3 +1,9 @@
+# Aktuelle Arbeit: HUD-Review 2026-09-25
+
+Arbeitsbranch `update/hud-review-20260925`. Siehe `docs/HUD_REVIEW_2026-09-25.md`. Ursprung und Save-Schema bleiben unverändert. `game3d/ui/hud.gd` komponiert das neue Interface, `game3d/ui/ability_fx.gd` differenziert die Fähigkeiten. Quellstand unterhalb beschreibt die unverändert erhaltene Basis 0.8. Kein Live-Deploy aus dieser Notiz ableiten; tatsächlichen Workflowstatus prüfen.
+
+---
+
 # Glutwacht 0.8 — Entwicklungsübergabe
 
 ## Quelle und Freigabe

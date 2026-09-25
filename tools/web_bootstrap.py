@@ -10,7 +10,7 @@ s=s.replace('<head>','<head>\n<meta name="theme-color" content="#193943"><style>
 s=s.replace('<body>','<body>\n<div id="glutwacht-start-watch" role="status">Sonnenhain wird vorbereitet …</div>')
 script=r'''
 window.__glutwachtErrors=[];
-window.__glutwachtBuild='0.8';
+window.__glutwachtBuild='hud-review-20260925';
 const gwBox=document.getElementById('glutwacht-start-watch');
 function gwFail(message){
  const text=String(message);

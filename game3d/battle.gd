@@ -36,6 +36,7 @@ var alarm=false
 var traps:Array=[]
 var combat_texts:Array=[]
 var pending_hits:Array=[]
+var pending_skills:Array=[]
 var audio_events:Array=[]
 var looted={"wood":0,"stone":0,"gold":0}
 var raid_loot:Dictionary:
@@ -54,7 +55,7 @@ func make_hero(pos:Vector2):
  hero=unit("hero",pos,c.hp+35*(int(profile.hall)-1)+20*(level-1)+25*training("vitality"),c.damage+8*(int(profile.smithy)-1)+4*(level-1)+6*training("power")+(12 if profile.sword else 0),"ally")
  hero.class_key=hero_key()
 func home():
- mode="home";time=0;pending_hits.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
+ mode="home";time=0;pending_hits.clear();pending_skills.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
 func soldier(kind:String,pos:Vector2) -> Dictionary:
  var rank=int(profile.get("training",{}).get("troops",{}).get("archers" if kind=="archer" else "melee",0))
  return unit(kind,pos,(205 if kind=="melee" else 135)+int(profile.barracks)*30+20*rank,18+int(profile.barracks)*5+4*rank,"ally")
@@ -98,7 +99,7 @@ func home_buildings():
   var item=building(b.kind,Vector2(b.x,b.z),Catalog.BUILD[b.kind].radius,hp,b.level,b.uid,"ally",b.rotation)
   item.construction=b.construction;item.stock=float(b.get("stock",0.0));buildings.append(item)
 func reset_battle():
- pending_hits.clear();audio_events.clear();looted={"wood":0,"stone":0,"gold":0}
+ pending_hits.clear();pending_skills.clear();audio_events.clear();looted={"wood":0,"stone":0,"gold":0}
  time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0}
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
 func layout(index:int):
@@ -152,7 +153,7 @@ func accrue_loot(b:Dictionary):
   var delta=maxi(0,earned-int(b.plundered[key]))
   b.plundered[key]+=delta;looted[key]+=delta
 func animate_attack(u:Dictionary,duration:float):
- u.attack_time=duration;u.attack_total=duration;u.attack_seq+=1;u.anim="attack"
+ u.attack_time=duration;u.attack_total=duration;u.attack_seq+=1;u.anim="attack";u.cast_kind="normal"
 func queue_hit(u:Dictionary,target:Dictionary,amount:float,reach:float,ranged:bool=false,color:Color=Color("ffd98c"),delay:float=-1):
  var windup=delay if delay>=0 else float(u.get("attack_total",.6))*.52
  pending_hits.append({"source":u,"target":target,"damage":amount,"reach":reach,"ranged":ranged,"color":color,"wait":windup,"stage":"windup"})
@@ -281,35 +282,51 @@ func strike():
    if distance(hero,t)<c.range and (t.pos-hero.pos).normalized().dot(facing)>-.2:queue_hit(hero,t,hero.damage,c.range,false,Color(c.color))
 func skill():
  if not active() or result!="" or skill_cd>0 or hero.hp<=0:return
- var c=stats();skill_cd=maxf(2,c.skill_cd-.4*training("skill"));animate_attack(hero,.65)
- var skill_scale=1.0+.12*training("skill")
- var center:Vector2=hero.pos
- if hero_key()=="ninja":
-  var target=nearest(hero.pos,targets())
+ var c=stats();var key=hero_key();skill_cd=maxf(2,c.skill_cd-.4*training("skill"))
+ var duration=.8 if key!="mage" else 1.2
+ animate_attack(hero,duration);hero.cast_kind="skill";attack_cd=maxf(attack_cd,duration)
+ var scale=1.0+.12*training("skill");var center:Vector2=hero.pos;var target=nearest(hero.pos,targets())
+ if target!=null:hero.facing=(target.pos-hero.pos).normalized();facing=hero.facing
+ if key=="ninja":
   if target!=null and distance(hero,target)<11:
-   var origin:Vector2=hero.pos
-   var dir=(target.pos-hero.pos).normalized()
-   for i in range(16):
-    if distance(hero,target)>1.3:move(hero,dir,9,.045)
-   queue_hit(hero,target,hero.damage*4.2*skill_scale,4,false,Color(c.color),.18);invulnerable=.7
-   for trail in range(5):effects.append({"kind":"afterimage","pos":origin.lerp(hero.pos,float(trail)/5),"life":.5,"max":.5,"color":Color(c.color)})
-  center=hero.pos
- elif hero_key()=="shaman":
-  for u in [hero]+living(allies):
-   if u.pos.distance_to(hero.pos)<9:
-    var amount=minf(u.max_hp-u.hp,(120+12*Catalog.level(profile,hero_key()))*skill_scale);u.hp+=amount
-    if amount>0:combat_texts.append({"pos":u.pos,"value":"+%d"%amount,"heal":true,"life":.9,"max":.9})
-  for t in targets():
-   if distance(hero,t)<6:queue_hit(hero,t,hero.damage*1.3*skill_scale,6,false,Color(c.color))
- elif hero_key()=="mage":
-  var target=nearest(hero.pos,targets())
+   hero.dash_time=.22;hero.dash_target=target;hero.trail_time=0.0;invulnerable=.7
+   for delay in [.24,.36,.48]:queue_hit(hero,target,hero.damage*1.4*scale,4,false,Color(c.color),delay)
+  effects.append({"kind":"ninja_slash","pos":center,"life":.55,"max":.55,"color":Color(c.color)})
+ elif key=="mage":
   if target!=null and distance(hero,target)<13:center=target.pos
-  for t in targets():
-   if t.pos.distance_to(center)-float(t.get("radius",0))<4.2:queue_hit(hero,t,hero.damage*3.0*skill_scale,18,true,Color(c.color),.30)
+  effects.append({"kind":"meteor","pos":center,"life":.90,"max":.90,"color":Color("ffc271")})
+  pending_skills.append({"kind":key,"source":hero,"pos":center,"wait":.90,"scale":scale})
  else:
+  effects.append({"kind":"cast_charge","pos":center,"life":.40,"max":.40,"color":Color(c.color)})
+  pending_skills.append({"kind":key,"source":hero,"pos":center,"wait":.40,"scale":scale})
+func update_skills(dt:float):
+ if float(hero.get("dash_time",0))>0 and hero.hp>0:
+  hero.dash_time=maxf(0,float(hero.dash_time)-dt)
+  var target:Dictionary=hero.get("dash_target",{})
+  if not target.is_empty() and distance(hero,target)>1.3:move(hero,(target.pos-hero.pos).normalized(),40,dt)
+  hero.trail_time-=dt
+  if hero.trail_time<=0:
+   hero.trail_time=.04;effects.append({"kind":"ninja_echo","pos":hero.pos,"life":.32,"max":.32,"color":Color("b5a1ed")})
+ for i in range(pending_skills.size()-1,-1,-1):
+  var e=pending_skills[i];e.wait-=dt
+  if e.wait>0:continue
+  pending_skills.remove_at(i)
+  if e.source.hp<=0:continue
+  var radius=5.0 if e.kind=="warrior" else (4.2 if e.kind=="mage" else 6.0)
+  if e.kind=="shaman":
+   for u in [hero]+living(allies):
+    if u.pos.distance_to(e.pos)<=9:
+     var gain=minf(u.max_hp-u.hp,(120+12*Catalog.level(profile,hero_key()))*float(e.scale));u.hp+=gain
+     if gain>0:
+      combat_texts.append({"pos":u.pos,"value":"+%d"%gain,"heal":true,"life":.95,"max":.95})
+      effects.append({"kind":"heal_stream","pos":e.pos,"end":u.pos,"life":.6,"max":.6,"color":Color("9af3bd")})
   for t in targets():
-   if distance(hero,t)<5:queue_hit(hero,t,hero.damage*2.6*skill_scale,5,false,Color(c.color))
- effects.append({"kind":hero_key(),"pos":center,"life":.75,"max":.75,"color":Color(c.color)})
+   if t.pos.distance_to(e.pos)-float(t.get("radius",0))>radius:continue
+   if e.kind=="shaman":effects.append({"kind":"spirit_bolt","pos":e.pos,"end":t.pos,"life":.22,"max":.22,"color":Color("c6eaff")})
+   damage(t,hero.damage*float(e.scale)*(2.6 if e.kind=="warrior" else (3.0 if e.kind=="mage" else 1.3)))
+   if e.kind=="warrior" and not t.has("radius"):
+    move(t,(t.pos-e.pos).normalized(),12,.09);t.stagger=.35
+  effects.append({"kind":"earthbreak" if e.kind=="warrior" else ("spirit_wave" if e.kind=="shaman" else "meteor_burst"),"pos":e.pos,"life":1.15 if e.kind=="mage" else .85,"max":1.15 if e.kind=="mage" else .85,"color":Color(Catalog.hero(e.kind).color)})
 func roll(direction:Vector2):
  if not active() or result!="" or roll_cd>0 or hero.hp<=0:return
  roll_cd=2.0 if hero_key()=="ninja" else 2.5;invulnerable=.65
@@ -330,10 +347,10 @@ func step(dt:float,input:Vector2):
  if result!="":return
  time+=dt;attack_cd=maxf(0,attack_cd-dt);skill_cd=maxf(0,skill_cd-dt);roll_cd=maxf(0,roll_cd-dt);invulnerable=maxf(0,invulnerable-dt)
  for u in [hero]+allies+enemies:
-  u.flash=maxf(0,u.flash-dt);u.attack_time=maxf(0,u.attack_time-dt)
+  u.stagger=maxf(0,float(u.get("stagger",0))-dt);u.flash=maxf(0,u.flash-dt);u.attack_time=maxf(0,u.attack_time-dt)
   if u.hp<=0:u.dead_time+=dt
   u.anim="attack" if u.attack_time>0 else "Idle"
- if input.length()>.1 and hero.hp>0:facing=input.normalized();move(hero,input,stats().speed,dt)
+ if input.length()>.1 and hero.hp>0 and float(hero.get("dash_time",0))<=0:facing=input.normalized();move(hero,input,stats().speed,dt)
  hero.facing=facing
  if mode=="home":
   for u in allies:
@@ -346,6 +363,7 @@ func step(dt:float,input:Vector2):
    elif phase<12:u.anim="Sit_Floor"
    elif phase<15:u.anim="Interact"
   return
+ update_skills(dt)
  update_hits(dt)
  for b in buildings:b.flash=maxf(0,float(b.get("flash",0))-dt)
  for i in range(allies.size()):
@@ -378,7 +396,7 @@ func step(dt:float,input:Vector2):
      if a.pos.distance_to(trap.pos)<3:damage(a,trap.damage)
     break
  for u in enemies:
-  if u.hp<=0:continue
+  if u.hp<=0 or float(u.get("stagger",0))>0:continue
   u.cd=maxf(0,u.cd-dt)
   if mode=="raid" and not alarm:continue
   u.awake=true

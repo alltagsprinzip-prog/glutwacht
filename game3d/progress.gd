@@ -6,7 +6,8 @@ const MAX_LEVEL=10
 const TITLES={"hall":"Haupthaus","barracks":"Kaserne","smithy":"Schmiede"}
 var data:Dictionary
 var warning=""
-var protected_path=""
+var write_blocked=false
+var blocked_path=""
 var recent_gems=0
 func _init():data=fresh()
 func new_training() -> Dictionary:
@@ -254,9 +255,14 @@ func speedup(uid:String) -> bool:
  if job.is_empty():job=obstacle_job_for(uid)
  data.gems-=cost;job.finish=Time.get_unix_time_from_system();production();return true
 func store_file(path:String=SAVE) -> bool:
- if path==protected_path:
-  warning="Vorhandener Spielstand geschützt. Automatisches Speichern ist gesperrt."
+ if write_blocked and path==blocked_path:
+  warning="Unlesbarer Spielstand bleibt geschützt. Bitte eine gültige Sicherung importieren."
   return false
+ # Retain the last readable version before any schema migration or UI update writes.
+ if FileAccess.file_exists(path) and not FileAccess.file_exists(path+".before-hud"):
+  if DirAccess.copy_absolute(path,path+".before-hud")!=OK:
+   warning="Sicherung fehlgeschlagen; Spielstand wird nicht überschrieben."
+   return false
  var f=FileAccess.open(path+".tmp",FileAccess.WRITE)
  if f==null:warning="Speichern fehlgeschlagen.";return false
  f.store_string(JSON.stringify(data));f.close()
@@ -265,14 +271,16 @@ func store_file(path:String=SAVE) -> bool:
  return error==OK
 func load_file(path:String=SAVE) -> bool:
  if not FileAccess.file_exists(path):return false
- var decoder=JSON.new()
- var parse_error=decoder.parse(FileAccess.get_file_as_string(path))
- var parsed=decoder.data if parse_error==OK else null
+ var parser=JSON.new()
+ var parse_status=parser.parse(FileAccess.get_file_as_string(path))
+ var parsed=parser.data if parse_status==OK else null
  if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5,6,7]:
-  protected_path=path
-  warning="Spielstand nicht kompatibel oder unlesbar. Die Originaldatei bleibt unverändert; Speichern ist gesperrt."
+  write_blocked=true;blocked_path=path
+  var backup=FileAccess.open(path+".unreadable",FileAccess.WRITE)
+  if backup:backup.store_string(FileAccess.get_file_as_string(path));backup.close()
+  warning="Spielstand unlesbar. Die Originaldatei wurde als Sicherung erhalten."
   return false
- protected_path=""
+ write_blocked=false;blocked_path=""
  var clean=fresh()
  for k in ["wood","stone","gold","wins"]:clean[k]=clampi(int(parsed.get(k,clean[k])),0,999999)
  clean.gems=clampi(int(parsed.get("gems",clean.gems)),0,999999)

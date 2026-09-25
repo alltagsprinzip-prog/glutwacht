@@ -34,18 +34,15 @@ func _notification(what):
 func release():
  value=Vector2.ZERO;finger=-1;mouse=false;queue_redraw()
 func _draw():
- var c=size/2
- var radius=minf(size.x,size.y)*.43
- var knob=radius*.34
- draw_circle(c+Vector2(0,5),radius+3,Color(.015,.035,.045,.6))
- draw_circle(c,radius,Color(.05,.12,.16,.76))
- draw_arc(c,radius,0,TAU,64,Color("ead29b"),3,true)
- draw_arc(c,radius*.72,0,TAU,64,Color(.65,.80,.80,.28),2,true)
+ var c=size/2;var r=minf(size.x,size.y)*.43;var k=r*.33
+ draw_circle(c+Vector2(0,4),r+4,Color(0,0,0,.22))
+ draw_circle(c,r,Color(.05,.13,.18,.73))
+ draw_arc(c,r,0,TAU,72,Color(.88,.72,.42,.90),3,true)
+ draw_arc(c,r-7,0,TAU,64,Color(.45,.68,.75,.50),1.5,true)
  for i in range(4):
-  var d=Vector2.RIGHT.rotated(i*PI/2)
-  draw_line(c+d*radius*.78,c+d*radius*.9,Color("ead29b"),3,true)
- var center=c+value*radius*.62
- draw_circle(center+Vector2(0,4),knob+2,Color(.015,.035,.045,.8))
- draw_circle(center,knob,Color("dec493"))
- draw_circle(center-Vector2(0,4),knob*.78,Color("f6e5bd"))
- draw_arc(center,knob,0,TAU,32,Color("fff2cd"),2,true)
+  var d=Vector2.from_angle(i*TAU/4);draw_line(c+d*(r-21),c+d*(r-15),Color(.71,.80,.80,.7),3,true)
+ var p=c+value*r*.55
+ draw_circle(p+Vector2(0,4),k+3,Color(0,0,0,.28))
+ draw_circle(p,k,Color("d6b575"))
+ draw_circle(p-Vector2(0,3),k-3,Color("edd5a0"))
+ draw_arc(p,k,0,TAU,48,Color("8a6944"),2,true)
