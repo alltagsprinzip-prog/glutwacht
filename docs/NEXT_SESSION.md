@@ -15,3 +15,7 @@ Automatische Sicherheitsprüfung lehnte einen temporären privilegierten Admin-T
 Nächste Abnahme: drei echte Konten, zwei Geräte, Bestätigung und Recovery, Konflikte und Retry, Tokenablauf, Export und Last. SERVER-01 bleibt offen: Client-Snapshots nie als wirtschaftliche Autorität behandeln. Serverbestätigte Dorfaktionen, sichere Kampfprüfung, Kampagne/Freunde/PvP/Clans bleiben laut Masterplan abzuarbeiten. Kein Produktionsrelease behaupten.
 
 CI-Nachtrag: Beide Workflows auf 1efa2fe erfolgreich (Spiel 36186155713, Datenbank 36186155762).
+
+## SMTP-Test 2026-09-25, 23:30 Europe/Berlin
+Nutzer hat Testmail an seine Adresse ausdrücklich erlaubt. Erster Versuch: SMTP 535 (Credentials). Nach vom Nutzer erneuertem Schlüssel: SMTP 525 (IP-Sperre). Die beim Test erfasste IP 52.48.43.176 wurde mit konkreter Nutzerfreigabe in Brevo autorisiert; sonstige IP-Sperre bleibt aktiv. Danach Supabase /auth/v1/otp HTTP 200. Für die Nutzeradresse wurde ein unbestätigter Auth-Eintrag angelegt; confirmation_sent_at gesetzt. Keine Tokens/Schlüssel gelesen. Kein Dorf überschrieben.
+Brevo-Logliste zeigte unmittelbar danach noch keine Einträge; tatsächlicher Empfang und Link-Bestätigung bleiben offen. Keine erneuten SMTP-Schlüssel verlangen, solange kein neuer entsprechender Fehler vorliegt. IP kann bei Infrastrukturänderungen wechseln; bei erneutem 525 konkrete neue Adresse prüfen, nicht pauschal Schutz abschalten.
