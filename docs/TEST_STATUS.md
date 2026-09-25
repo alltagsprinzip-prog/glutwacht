@@ -16,7 +16,15 @@ https://github.com/alltagsprinzip-prog/glutwacht/actions/runs/36149121238
 - Recovery/Refresh/Signout ergänzt: Account-/Save-Suite lokal jetzt 28/28.
 - SQL-Migration: 27/27 mit PGlite 0.5.8, echtem SQL/RLS und simuliertem Auth-Schema. Fehlendes Versionsfeld wird abgelehnt; privilegierte Funktion in privatem Schema.
 - Layoutsuite nach Beschriftungs-/Balkenkorrektur lokal 131/131. Zwei Objekt-Leaks beim Testende bleiben zur Untersuchung dokumentiert.
-- Der vollständige CI-Lauf dieser nachfolgenden Änderungen ist separat zu prüfen.
+- Vollständiger nachfolgender CI-Lauf auf 4bf067c bestanden: Spiel 36150765747, Datenbank 36150765938.
+
+## Live-Backend-Prüfung
+Projekt totszgelioskmbmkmetd: private Save-Migration und RLS-Triggerhärtung angewandt. Security-Advisors: keine Befunde.
+- Drei synthetische Auth-Identitäten innerhalb einer vollständig zurückgerollten Transaktion: eigene Saves sichtbar, fremde unsichtbar, Revision/identischer Retry korrekt, veränderte Request-Wiederverwendung, veraltete Revision, aktives anderes Gerät, fehlende Schemaversion und direkter UPDATE abgewiesen.
+- Reproduzierbar: backend/acceptance/live_rls_rollback.sql. Dies beweist RLS/RPC-Verhalten, keine echten Anmeldungen oder parallelen Verbindungen.
+- Öffentliche HTTP-Anfragen ohne Nutzer-Token: SELECT und Save-RPC jeweils 401.
+- Nach Rollback: null Auth-Nutzer, null Saves. Keine Testdaten verblieben.
+- Site-/Redirect-URL gesetzt; Custom SMTP noch aus. Öffentlicher E-Mail-Versand ist blockiert.
 
 ## Noch offen
-Reale Supabase-Auth/PostgREST-Prüfung, drei Live-Konten, zwei Geräte, parallele Sitzungen/Last und echte E-Mail-Wiederherstellung. PGlite besitzt nur eine Verbindung und beweist keine Parallelität. Zieltelefon/Safe-Area-Abnahme sowie Vorher/Nachher-Nutzerprobe offen. Kein serverautorisiertes PvP.
+Echte Supabase-Auth/PostgREST-Sitzungen, drei Live-Konten, zwei Geräte, parallele Sitzungen/Last und echte E-Mail-Wiederherstellung. PGlite besitzt nur eine Verbindung und beweist keine Parallelität. Zieltelefon/Safe-Area-Abnahme sowie Vorher/Nachher-Nutzerprobe offen. Kein serverautorisiertes PvP.

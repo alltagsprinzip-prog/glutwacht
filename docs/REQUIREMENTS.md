@@ -4,10 +4,10 @@
 |---|---|---|
 | BASE-01 | umgesetzt | Bestehendes Repo, Parallelstand integriert, Echtzeituhr erhalten |
 | SAVE-01 | teilweise geprüft | Backups, Import/Export, Typprüfung; echter Browserwechsel noch offen |
-| UI-01/02/03 | in Arbeit | Neues HUD; Strukturtests bestanden; gerenderte Tests bestanden; letzte UI-Korrektur/mobile Abnahme offen |
+| UI-01/02/03 | in Arbeit | Neues HUD; Strukturtests bestanden; gerenderte Tests bestanden; letzte UI-Korrektur in CI bestanden; mobile Abnahme offen |
 | FX-01 | in Arbeit | Fähigkeitsmodul integriert, Regeln geprüft; gerenderte Tests bestanden |
-| AUTH-01/02 | vorbereitet | Client mit Recovery/Refresh und getrennten lokalen Konten; keine Live-Konfiguration |
-| SYNC-01/02 | vorbereitet | 27 SQL-Tests für RPC/RLS/Revision/Retry/Gerätebindung; Live-Test offen |
+| AUTH-01/02 | teilweise | Client und Live-Konfiguration vorhanden; SMTP und echte Auth-Abnahme offen |
+| SYNC-01/02 | teilweise geprüft | 27 lokale SQL-Tests plus Live-RLS/RPC-Rollback-Prüfung; echte Konten/Parallelgeräte offen |
 | SERVER-01 | offen | Private Snapshots sind keine serverautorisierte Spielwirtschaft |
 | LOOP-01 | teilweise | Vier Einstiegsziele; zehnstufige Kampagne noch offen |
 | SOCIAL-01 | offen | Chronik ist lokaler Status; keine Nachrichten/Clans |
