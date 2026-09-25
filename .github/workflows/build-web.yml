@@ -1,109 +1,92 @@
-name: Build and Deploy Glutwacht Web
-
+name: Validate and publish Glutwacht
 on:
   workflow_dispatch:
   push:
     branches: [main]
-
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages
+  group: glutwacht-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
-  web:
+  validate:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Godot 4.7.2
+      - uses: actions/checkout@v4
+      - name: Godot 4.7.2 and export templates
         uses: solarlabyrinth/action-setup-godot@v3
         with:
           version: 4.7.2-stable
           export-templates: true
-
-      - name: Import project
-        run: godot --headless --editor --path . --import
-
-      - name: Headless startup check
-        shell: bash
+      - name: Import all resources and reject script errors
+        run: python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
+      - name: Headless startup
+        run: python3 tools/check_godot.py logs/start.log godot --headless --audio-driver Dummy --path . --quit-after 120
+      - name: Gameplay and save regression tests
+        run: python3 tools/check_godot.py logs/rules.log godot --headless --path . --script tests3d/release_suite.gd
+      - name: Existing upstream regression gate
+        run: python3 tools/check_godot.py logs/upstream.log godot --headless --path . --script tests3d/release_gate.gd
+      - name: Touch interface regression tests
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: python3 tools/check_godot.py logs/input.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/input_suite.gd
+      - name: Rendered scene regression tests
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: python3 tools/check_godot.py logs/visual.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/visual_release.gd
+      - name: Export validated web build
         run: |
-          set -o pipefail
-          godot --headless --path . --quit-after 5 2>&1 | tee godot-start.log
-          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" godot-start.log; then
-            echo "Godot script error detected"
-            exit 1
-          fi
-
-      - name: Gameplay release gate
-        shell: bash
-        run: |
-          set -o pipefail
-          godot --headless --path . --script res://tests3d/release_gate.gd 2>&1 | tee release-gate.log
-          grep -q "RELEASE_GATE_OK" release-gate.log
-          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script|RELEASE GATE:" release-gate.log; then
-            echo "Gameplay release gate failed"
-            exit 1
-          fi
-
-      - name: Export Web
-        shell: bash
-        run: |
-          set -o pipefail
-          BUILD_DIR="dist/v08final"
-          mkdir -p "$BUILD_DIR"
-          godot --headless --path . --export-release "Web" "$BUILD_DIR/index.html" 2>&1 | tee godot-export.log
-          if grep -E "SCRIPT ERROR|Parse Error|Failed to load script" godot-export.log; then
-            echo "Godot script error detected during export"
-            exit 1
-          fi
-          test -f "$BUILD_DIR/index.html"
-          test -f "$BUILD_DIR/index.wasm"
-          test -f "$BUILD_DIR/index.pck"
+          mkdir -p dist/v08
+          python3 tools/check_godot.py logs/export.log godot --headless --path . --export-release Web dist/v08/index.html
+          python3 tools/web_bootstrap.py dist/v08
+          test -s dist/v08/index.html
+          test -s dist/v08/index.wasm
+          test -s dist/v08/index.pck
           touch dist/.nojekyll
-          cat > dist/index.html <<'EOF'
-          <!doctype html><meta charset="utf-8">
-          <meta http-equiv="refresh" content="0; url=./v08final/">
-          <title>Glutwacht</title>
-          <a href="./v08final/">Glutwacht starten</a>
-          EOF
-          python - <<'PY'
-          from pathlib import Path
-          p=Path("dist/v08final/index.html")
-          s=p.read_text()
-          marker='</body>'
-          overlay=r'''
-          <div id="gw-start-watch" style="position:fixed;left:12px;bottom:12px;z-index:99999;background:#12212a;color:#fff;padding:9px 12px;border-radius:8px;font:14px sans-serif">Glutwacht lädt…</div>
-          <script>
-          (() => {
-            const box=document.getElementById('gw-start-watch');
-            const fail=(m)=>{ if(box){ box.textContent='Startfehler: '+m; box.style.background='#7a2828'; } };
-            window.addEventListener('error',e=>fail(e.message||'JavaScript-Fehler'));
-            window.addEventListener('unhandledrejection',e=>fail(String(e.reason||'Unbekannter Fehler')));
-            const timer=setInterval(()=>{ if(window.__glutwacht){ clearInterval(timer); if(box) box.remove(); } },500);
-            setTimeout(()=>{ if(!window.__glutwacht && box && !box.textContent.startsWith('Startfehler')) box.textContent='Spielstart dauert länger als erwartet…'; },12000);
-          })();
-          </script>
-          '''
-          p.write_text(s.replace(marker,overlay+marker))
-          PY
-
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload Pages artifact
+          cp tools/web_entry.html dist/index.html
+          mkdir -p dist/v08final
+          sed 's#\./v08/#../v08/#g' tools/web_entry.html > dist/v08final/index.html
+      - name: Browser runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated browser test dependency
+        run: |
+          npm install --prefix "$RUNNER_TEMP/glutwacht-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/glutwacht-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Exported WebGL gameplay gate
+        timeout-minutes: 9
+        run: NODE_PATH="$RUNNER_TEMP/glutwacht-browser/node_modules" node tools/web_smoke.cjs
+      - name: Preserve validation logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-logs
+          path: logs
+      - name: Downloadable web build
+        uses: actions/upload-artifact@v4
+        with:
+          name: glutwacht-web-review
+          path: dist
+      - name: Upload tested site
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
-
-      - name: Deploy to GitHub Pages
+  deploy:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Deploy validated artifact
         id: deployment
         uses: actions/deploy-pages@v4

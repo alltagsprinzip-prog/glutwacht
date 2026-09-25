@@ -6,6 +6,7 @@ const MAX_LEVEL=10
 const TITLES={"hall":"Haupthaus","barracks":"Kaserne","smithy":"Schmiede"}
 var data:Dictionary
 var warning=""
+var protected_path=""
 var recent_gems=0
 func _init():data=fresh()
 func new_training() -> Dictionary:
@@ -24,7 +25,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":6,"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -49,8 +50,8 @@ func training_cost(group:String,key:String,attribute:String="") -> Dictionary:
  return {"wood":15*(level+1),"stone":10*(level+1),"gold":20*(level+1)}
 func train(group:String,key:String,attribute:String="") -> bool:
  if group not in ["heroes","troops"]:return false
- if group=="heroes" and (not Catalog.HEROES.has(key) or attribute not in ["power","vitality","skill"]):return false
- if group=="troops" and key not in ["melee","archers"]:return false
+ if group=="heroes" and (key!=String(data.hero) or not Catalog.HEROES.has(key) or attribute not in ["power","vitality","skill"]):return false
+ if group=="troops" and (key not in ["melee","archers"] or not Catalog.troop_unlocked(key,int(data.hall),int(data.barracks))):return false
  if training_level(group,key,attribute)>=5:return false
  var c=training_cost(group,key,attribute)
  if not affordable(c):return false
@@ -70,6 +71,7 @@ func all_buildings() -> Array:
  var out:Array=[]
  for key in TITLES:
   var p:Vector2=Catalog.CORE_POS[key]
+  if data.get("core_positions",{}).has(key):p=Vector2(data.core_positions[key].x,data.core_positions[key].z)
   out.append({"uid":key,"kind":key,"level":int(data[key]),"x":p.x,"z":p.y,"rotation":0,"stock":0.0})
  out+=data.structures.duplicate(true)
  for b in out:b.construction=job_for(b.uid).duplicate()
@@ -118,19 +120,22 @@ func army(kind:String,change:int) -> bool:
 func can_change_hero() -> bool:return data.hero==""
 func choose_hero(key:String) -> bool:
  if not Catalog.HEROES.has(key) or not can_change_hero():return false
- data.hero=key;return true
+ data.hero=key;data.hero_id=key;return true
 func count_kind(kind:String) -> int:
  var count=0
  for b in all_buildings():
   if b.kind==kind:count+=1
  return count
 func placement_error(kind:String,pos:Vector2,ignore_uid:String="") -> String:
- if not Catalog.BUILD.has(kind) or TITLES.has(kind):return "Dieses Gebäude kann nicht neu gebaut werden."
+ if not Catalog.BUILD.has(kind) or (TITLES.has(kind) and ignore_uid==""):return "Kein Bauplatz."
  if not Catalog.unlocked(kind,int(data.hall)):return "Freischaltung ab Haupthaus-Stufe %d."%Catalog.required_hall(kind)
  var radius=float(Catalog.BUILD[kind].radius)
  if absf(pos.x)>31-radius or absf(pos.y)>31-radius:return "Außerhalb deiner Dorfgrenze."
  if ignore_uid=="" and count_kind(kind)>=int(Catalog.BUILD[kind].limit):return "Maximale Anzahl dieses Gebäudes erreicht."
  if pos.distance_to(Vector2(0,18))<4.5:return "Der Sammelplatz der Armee muss frei bleiben."
+ for o in data.get("obstacles",[]):
+  var r=1.8 if o.kind=="tree" else 1.5
+  if pos.distance_to(Vector2(o.x,o.z))<radius+r+.3:return "Hindernis entfernen"
  for b in all_buildings():
   if b.uid==ignore_uid:continue
   var other_radius=float(Catalog.BUILD[b.kind].radius)
@@ -153,9 +158,10 @@ func build(kind:String,pos:Vector2,rotation:int=0,now:float=-1) -> Dictionary:
  return b
 func relocate(uid:String,pos:Vector2,rotation:int=0) -> bool:
  var b=find_building(uid)
- if b.is_empty() or TITLES.has(uid) or not job_for(uid).is_empty():return false
+ if b.is_empty() or not job_for(uid).is_empty():return false
  pos=pos.snapped(Vector2(2.5,2.5))
  if placement_error(b.kind,pos,uid)!="":return false
+ if TITLES.has(uid):data.core_positions[uid]={"x":pos.x,"z":pos.y};return true
  for item in data.structures:
   if item.uid==uid:item.x=pos.x;item.z=pos.y;item.rotation=posmod(rotation,2)
  return true
@@ -228,14 +234,29 @@ func remove_obstacle(uid:String,now:float=-1.0) -> bool:
 func shop_buy(key:String) -> bool:
  var prices={"wood":25,"stone":25,"gold":35,"builder":200}
  if not prices.has(key) or int(data.get("gems",0))<int(prices[key]):return false
- if key=="builder" and int(data.get("builder_bonus",0))>=1:return false
+ if key=="builder" and (int(data.get("builder_bonus",0))>=1 or builders()>=5):return false
+ if key in ["wood","stone","gold"] and int(data[key])>=storage():return false
  data.gems-=int(prices[key])
  if key=="builder":data.builder_bonus=int(data.get("builder_bonus",0))+1
  elif key=="wood":data.wood=mini(storage(),int(data.wood)+500)
  elif key=="stone":data.stone=mini(storage(),int(data.stone)+500)
  elif key=="gold":data.gold=mini(storage(),int(data.gold)+300)
  return true
+func speedup_cost(uid:String) -> int:
+ var job=job_for(uid)
+ if job.is_empty():job=obstacle_job_for(uid)
+ if job.is_empty():return 0
+ return maxi(1,ceili(maxf(0,float(job.finish)-Time.get_unix_time_from_system())/15.0))
+func speedup(uid:String) -> bool:
+ var cost=speedup_cost(uid)
+ if cost<=0 or int(data.gems)<cost:return false
+ var job=job_for(uid)
+ if job.is_empty():job=obstacle_job_for(uid)
+ data.gems-=cost;job.finish=Time.get_unix_time_from_system();production();return true
 func store_file(path:String=SAVE) -> bool:
+ if path==protected_path:
+  warning="Vorhandener Spielstand geschützt. Automatisches Speichern ist gesperrt."
+  return false
  var f=FileAccess.open(path+".tmp",FileAccess.WRITE)
  if f==null:warning="Speichern fehlgeschlagen.";return false
  f.store_string(JSON.stringify(data));f.close()
@@ -244,12 +265,14 @@ func store_file(path:String=SAVE) -> bool:
  return error==OK
 func load_file(path:String=SAVE) -> bool:
  if not FileAccess.file_exists(path):return false
- var parsed=JSON.parse_string(FileAccess.get_file_as_string(path))
- if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5,6]:
-  var backup=FileAccess.open(path+".unreadable",FileAccess.WRITE)
-  if backup:backup.store_string(FileAccess.get_file_as_string(path));backup.close()
-  warning="Spielstand unlesbar. Die Originaldatei wurde als Sicherung erhalten."
+ var decoder=JSON.new()
+ var parse_error=decoder.parse(FileAccess.get_file_as_string(path))
+ var parsed=decoder.data if parse_error==OK else null
+ if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5,6,7]:
+  protected_path=path
+  warning="Spielstand nicht kompatibel oder unlesbar. Die Originaldatei bleibt unverändert; Speichern ist gesperrt."
   return false
+ protected_path=""
  var clean=fresh()
  for k in ["wood","stone","gold","wins"]:clean[k]=clampi(int(parsed.get(k,clean[k])),0,999999)
  clean.gems=clampi(int(parsed.get("gems",clean.gems)),0,999999)
@@ -273,7 +296,7 @@ func load_file(path:String=SAVE) -> bool:
     if not Catalog.BUILD.has(kind) or TITLES.has(kind) or uid=="" or seen.has(uid) or TITLES.has(uid):continue
     if clean.structures.size()>=56:break
     seen[uid]=true
-    clean.structures.append({"uid":uid,"kind":kind,"level":clampi(int(b.get("level",1)),1,MAX_LEVEL),"x":clampf(float(b.get("x",0)),-29,29),"z":clampf(float(b.get("z",0)),-29,29),"rotation":posmod(int(b.get("rotation",0)),2),"stock":clampf(float(b.get("stock",0)),0,560)})
+    clean.structures.append({"uid":uid,"kind":kind,"level":clampi(int(b.get("level",1)),1,MAX_LEVEL),"x":clampf(float(b.get("x",0)),-29,29),"z":clampf(float(b.get("z",0)),-29,29),"rotation":posmod(int(b.get("rotation",0)),2),"stock":clampf(float(b.get("stock",0)),0,140*clampi(int(b.get("level",1)),1,MAX_LEVEL))})
   clean.next_uid=maxi(3,int(parsed.get("next_uid",3)))
   while seen.has("s"+str(clean.next_uid)):clean.next_uid+=1
  if int(parsed.get("version",0))>=6:
@@ -291,8 +314,17 @@ func load_file(path:String=SAVE) -> bool:
    for job in ojobs:
     if not job is Dictionary:continue
     var uid=String(job.get("uid",""));var start_time=float(job.get("start",0));var finish_time=float(job.get("finish",0))
-    if uid!="" and finish_time>start_time and finish_time-start_time<=15.0:clean.obstacle_jobs.append({"uid":uid,"start":start_time,"finish":finish_time})
+    if uid!="" and clean.obstacles.any(func(o):return o.uid==uid) and not clean.obstacle_jobs.any(func(j):return j.uid==uid) and finish_time>start_time and finish_time-start_time<=15.0:clean.obstacle_jobs.append({"uid":uid,"start":start_time,"finish":finish_time})
+ clean.hero=String(parsed.get("hero_id",clean.hero)) if Catalog.HEROES.has(String(parsed.get("hero_id",clean.hero))) else clean.hero
+ clean.hero_id=clean.hero
+ var positions=parsed.get("core_positions",{})
+ if positions is Dictionary:
+  for key in TITLES:
+   if positions.get(key) is Dictionary:clean.core_positions[key]={"x":clampf(float(positions[key].get("x",Catalog.CORE_POS[key].x)),-26,26),"z":clampf(float(positions[key].get("z",Catalog.CORE_POS[key].y)),-26,26)}
  data=clean
+ # Restore the roster only after camp capacity is known. Never truncate a valid old army.
+ var saved_melee=maxi(0,int(parsed.get("melee",5)));var saved_archers=maxi(0,int(parsed.get("archers",0)))
+ data.melee=mini(saved_melee,200);data.archers=mini(saved_archers,200)
  if int(parsed.version)>=4:
   var training=parsed.get("training",{})
   if training is Dictionary:
@@ -308,10 +340,10 @@ func load_file(path:String=SAVE) -> bool:
    for job in jobs:
     if not job is Dictionary:continue
     var uid=String(job.get("uid",""));var b=find_building(uid)
-    if b.is_empty() or not job_for(uid).is_empty() or data.jobs.size()>=2:continue
+    if b.is_empty() or not job_for(uid).is_empty() or data.jobs.size()+data.obstacle_jobs.size()>=builders():continue
     var start_time=float(job.get("start",0));var finish_time=float(job.get("finish",0));var target=clampi(int(job.get("target",1)),1,MAX_LEVEL)
     var expected_duration=float(build_seconds(b.kind,target))
-    if finish_time<=start_time or expected_duration<=0 or finish_time-start_time>expected_duration+5.0 or b.kind=="wall":continue
+    if finish_time<=start_time or expected_duration<=0 or finish_time-start_time>maxf(expected_duration+5.0,7200) or b.kind=="wall":continue
     if target!=int(b.level)+1 and not (bool(job.get("new",false)) and target==1 and b.level==1):continue
     data.jobs.append({"uid":uid,"start":start_time,"finish":finish_time,"target":target,"new":bool(job.get("new",false))})
  production();return true

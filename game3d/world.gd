@@ -8,7 +8,10 @@ var labels: Array = []
 var rng = RandomNumberGenerator.new()
 var mode="home"
 var materials: Dictionary = {}
+var asset_cache: Dictionary = {}
+var asset_materials: Dictionary = {}
 var sky_env: Environment
+const Architecture=preload("res://game3d/architecture.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 var zoom=42.0
 var target_zoom=42.0
@@ -23,6 +26,10 @@ var workers:Array=[]
 var selected_uid=""
 var obstacles:Dictionary={}
 var selected_obstacle=""
+var effect_nodes:Dictionary={}
+var effect_serial=0
+var selection:MeshInstance3D
+var edges:Node3D
 func health_bar(parent:Node3D,height:float,width:float,color:Color) -> Dictionary:
  var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height,0)
  var parts=[]
@@ -36,6 +43,7 @@ func set_health(bar:Dictionary,ratio:float,visible:bool):
  bar.root.global_basis=camera.global_basis
  ratio=clampf(ratio,0,1);bar.fill.scale.x=maxf(.001,ratio);bar.fill.position.x=(ratio-1)*bar.width*.5
 func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMaterial3D:
+ color.a=roundf(color.a*16.0)/16.0
  var key=str(color)+str(emission)
  if materials.has(key):return materials[key]
  var m=StandardMaterial3D.new();m.albedo_color=color;m.roughness=rough
@@ -45,7 +53,8 @@ func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMa
 func mesh_node(mesh:Mesh,pos:Vector3,mat:Material,parent:Node) -> MeshInstance3D:
  var n=MeshInstance3D.new();n.mesh=mesh;n.position=pos;n.material_override=mat;parent.add_child(n);return n
 func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",rotation_y:float=0,roof_tint:Color=Color(0,0,0,0)) -> Node3D:
- var resource=load("res://assets3d/"+name)
+ if not asset_cache.has(name):asset_cache[name]=load("res://assets3d/"+name)
+ var resource=asset_cache[name]
  var holder=Node3D.new();holder.set_meta("asset",name);parent.add_child(holder);holder.position=pos;holder.rotation.y=rotation_y
  var model:Node3D
  if resource==null:
@@ -59,11 +68,13 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  for n in meshes:
   for surface in range(n.mesh.get_surface_count()):
    var original=n.get_active_material(surface)
+   var palette_key=name+":"+str(surface)+":"+str(roof_tint)+":"+str(original.get_instance_id() if original else 0)
+   if asset_materials.has(palette_key):n.set_surface_override_material(surface,asset_materials[palette_key]);continue
    if original is StandardMaterial3D and name.ends_with("gltf"):
     if outline_material==null:
      outline_material=ShaderMaterial.new();outline_material.shader=load("res://game3d/character_outline.gdshader")
-    var character=original.duplicate();character.metallic=.02;character.roughness=.8;character.rim_enabled=true;character.rim=.22;character.rim_tint=.6;character.next_pass=outline_material
-    n.set_surface_override_material(surface,character)
+    var character=original.duplicate();character.metallic=.02;character.roughness=.8;character.rim_enabled=true;character.rim=.38;character.rim_tint=.25;character.next_pass=outline_material
+    n.set_surface_override_material(surface,character);asset_materials[palette_key]=character
    elif original is StandardMaterial3D:
     var mat=original.duplicate();mat.metallic=0;mat.roughness=.92
     var matname=mat.resource_name.to_lower()
@@ -72,7 +83,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
     elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("795030")
     elif "leaf" in matname:mat.albedo_color=Color("4c8735") if rng.randf()>.25 else Color("769841")
     elif "grass" in matname:mat.albedo_color=Color("649447")
-    n.set_surface_override_material(surface,mat)
+    n.set_surface_override_material(surface,mat);asset_materials[palette_key]=mat
   var box:AABB=holder.global_transform.affine_inverse()*n.global_transform*n.get_aabb()
   if first:bounds=box;first=false
   else:bounds=bounds.merge(box)
@@ -93,18 +104,18 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
 func setup(sim):
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
- actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
+ effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
  landscape=Node3D.new();add_child(landscape)
  var env=WorldEnvironment.new();sky_env=Environment.new();env.environment=sky_env;add_child(env)
  sky_env.background_mode=Environment.BG_COLOR;sky_env.background_color=Color("9fdcfa")
- sky_env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;sky_env.ambient_light_color=Color("d6ebff");sky_env.ambient_light_energy=.55
- sky_env.tonemap_mode=Environment.TONE_MAPPER_LINEAR;sky_env.fog_enabled=true;sky_env.fog_light_color=Color("91aeba");sky_env.fog_density=.001
- var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=.9;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
- var fill=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-30,140,0);fill.light_color=Color("c1e9ff");fill.light_energy=.2;add_child(fill)
+ sky_env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;sky_env.ambient_light_color=Color("d6ebff");sky_env.ambient_light_energy=.43
+ sky_env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;sky_env.fog_enabled=true;sky_env.fog_light_color=Color("91aeba");sky_env.fog_density=.001
+ var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=.8;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
+ var fill=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-30,140,0);fill.light_color=Color("c1e9ff");fill.light_energy=.12;add_child(fill)
  camera=Camera3D.new();add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.far=210;camera.current=true
- if mode=="scout":target_zoom=44;focus=Vector3(0,0,-2)
- elif sim.active():target_zoom=32;focus=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)
- else:target_zoom=38;focus=Vector3(0,0,1)
+ if mode=="scout":target_zoom=48;focus=Vector3(0,0,-2)
+ elif sim.active():target_zoom=48;focus=Vector3.ZERO
+ else:target_zoom=46;focus=Vector3(0,0,1)
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
  terrain();scenery(sim)
  if mode=="home":
@@ -114,17 +125,22 @@ func setup(sim):
   for u in [sim.hero]+sim.allies:create_actor(u)
  for u in sim.enemies:create_actor(u)
  fx=Node3D.new();add_child(fx)
+ selection=disc(1,Color(.1,.75,1,.2),Vector3.ZERO,fx);selection.visible=false
+ edges=Node3D.new();fx.add_child(edges)
+ for axis in range(4):
+  var p=Vector3(0,.065,27) if axis==0 else (Vector3(0,.065,-27) if axis==1 else (Vector3(27,.065,0) if axis==2 else Vector3(-27,.065,0)))
+  box(edges,p,Vector3(54,.04,.32) if axis<2 else Vector3(.32,.04,54),Color("f1b973"))
 func terrain():
  var surf=SurfaceTool.new();surf.begin(Mesh.PRIMITIVE_TRIANGLES)
  for x in range(-82,82,2):
   for z in range(-82,82,2):
    for v in [Vector2(x,z),Vector2(x+2,z),Vector2(x,z+2),Vector2(x+2,z),Vector2(x+2,z+2),Vector2(x,z+2)]:
     var meadow=clampf((sin(v.x*.08)+cos(v.y*.09)+2.0)/4.0,0,1)
-    var c=Color("559847").lerp(Color("70aa55"),meadow*.35)
+    var c=Color("548d38").lerp(Color("98b957"),meadow*.65)
     var noise=sin(v.x*.4+v.y*.25)*.017+rng.randf_range(-.012,.012)
-    surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise));surf.add_vertex(Vector3(v.x,0,v.y))
+    surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise).srgb_to_linear());surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
- var mat=StandardMaterial3D.new();mat.vertex_color_use_as_albedo=true;mat.vertex_color_is_srgb=true;mat.roughness=1;ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+ var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
  var water=PlaneMesh.new();water.size=Vector2(6,132)
  mesh_node(water,Vector3(39,.025,0),material(Color("218ba1"),.18),landscape)
  asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),7.2,"width",PI/2)
@@ -178,160 +194,12 @@ func create_obstacle(o:Dictionary,jobs:Array):
  obstacles[uid]={"root":root,"radius":radius,"height":height,"kind":kind,"job":job}
 func box(parent:Node,pos:Vector3,size:Vector3,color:Color):
  var mesh=BoxMesh.new();mesh.size=size;return mesh_node(mesh,pos,material(color),parent)
-func create_resource_marker(parent:Node3D,kind:String,height:float,stock:float,cap:float) -> Dictionary:
- var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height+1.8,0)
- var color=Color("9a622e") if kind=="lumber" else (Color("7f8e96") if kind=="quarry" else Color("e6b72f"))
- if kind=="lumber":
-  for i in range(3):
-   var log=CylinderMesh.new();log.top_radius=.14;log.bottom_radius=.14;log.height=.85;log.radial_segments=10
-   var m=mesh_node(log,Vector3((i-1)*.28,0,0),material(color,.8),root);m.rotation.z=PI/2
- elif kind=="quarry":
-  var rock=SphereMesh.new();rock.radius=.38;rock.height=.60;rock.radial_segments=8;rock.rings=5
-  mesh_node(rock,Vector3.ZERO,material(color,.9),root)
- else:
-  var coin=CylinderMesh.new();coin.top_radius=.38;coin.bottom_radius=.38;coin.height=.12;coin.radial_segments=24
-  var m=mesh_node(coin,Vector3.ZERO,material(color,.35,true),root);m.rotation.x=PI/2
- var text=Label3D.new();root.add_child(text);text.position=Vector3(0,.72,0);text.font_size=40;text.pixel_size=.017;text.outline_size=10
- text.billboard=BaseMaterial3D.BILLBOARD_ENABLED;text.no_depth_test=true;text.modulate=Color("fff5c2")
- text.text="MAX" if stock>=cap*.95 else str(int(stock))
- root.visible=stock>=1
- return {"root":root,"label":text,"kind":kind}
-
 func create_building(b:Dictionary):
  var def:Dictionary=Catalog.BUILD[b.kind]
  var level=int(b.level);var root=Node3D.new();root.position=Vector3(b.pos.x,.03,b.pos.y);landscape.add_child(root)
  var body=Node3D.new();root.add_child(body)
  var size=float(def.size)
- var model_height=2.0
- if b.kind=="wall":
-  var height=1.3+level*.45
-  var color=Color("6a5039") if level==1 else [Color("819292"),Color("718389"),Color("626f7b")][mini(level-2,2)]
-  body.rotation.y=PI/2*int(b.rotation)
-  box(body,Vector3(0,height*.5,0),Vector3(2.48,height,.65+level*.1),color)
-  for x in [-1.03,0.0,1.03]:box(body,Vector3(x,height+.22,0),Vector3(.42,.5,.95),color.lightened(.08))
-  if level>=2:box(body,Vector3(0,.2,0),Vector3(2.5,.4,1.3),Color("49595f"))
-  if level>=3:
-   for x in [-1.06,1.06]:box(body,Vector3(x,height*.5,0),Vector3(.36,height+.3,1.2),Color("4d606c"))
-  if level>=4:box(body,Vector3(0,height-.12,.53),Vector3(2.5,.16,.1),Color("ceae60"))
- else:
-  var roof_colors={"hall":Color("d99032"),"barracks":Color("9e4d3f"),"smithy":Color("4d5d67"),"lumber":Color("4e7f45"),"quarry":Color("727b7e"),"goldmine":Color("b58b32"),"tower":Color("4d607d"),"camp":Color("6d7541"),"hero_hall":Color("745b91")}
-  var roof_tint:Color=roof_colors.get(b.kind,Color("2c7ea3"))
-  var visual_scale=1.14 if b.kind in ["hall","barracks","smithy","camp","hero_hall"] else 1.08
-  var model=asset(def.model,body,Vector3.ZERO,size*(visual_scale+.04*(level-1)),"width",PI if b.team=="enemy" else 0,roof_tint)
-  model_height=float(model.get_meta("height",5.0))
-  if level>=2:
-   box(body,Vector3(0,.16,0),Vector3(size*.92,.32,size*.73),Color("778382"))
-   for x in [-size*.42,size*.42]:banner(body,Vector3(x,0,size*.36),2.8,b.team=="enemy")
-  if level>=3:
-   match String(b.kind):
-    "tower":
-     for x in [-1.25,1.25]:box(body,Vector3(x,4.3,0),Vector3(.4,.4,2.8),Color("d2bb80"))
-    "hall":
-     asset("Bell_Tower.obj",body,Vector3(-size*.30,0,-size*.28),size*.28,"width",PI/2,Color("d99032"))
-    "barracks":
-     asset("MarketStand_1.obj",body,Vector3(-size*.42,0,-size*.30),size*.32,"width",PI/2,Color("9e4d3f"))
-    "smithy":
-     asset("Cart.obj",body,Vector3(-size*.40,0,-size*.32),1.8,"width",.3)
-    "lumber":
-     asset("log_stackLarge.glb",body,Vector3(-size*.38,0,-size*.34),1.55,"height")
-    "quarry":
-     asset("rock_largeA.glb",body,Vector3(-size*.36,0,-size*.32),2.0,"height",.2)
-    "goldmine":
-     asset("Cart.obj",body,Vector3(-size*.38,0,-size*.30),1.9,"width",.2)
-    "camp":
-     asset("Bench_1.obj",body,Vector3(-size*.38,0,-size*.28),2.5,"width",PI/2)
-    "hero_hall":
-     asset("Bonfire_Lit.obj",body,Vector3(0,.02,-size*.38),1.25,"width")
-  if level>=4:
-   match String(b.kind):
-    "hall":
-     for x in [-size*.36,size*.36]:
-      var post=CylinderMesh.new();post.top_radius=.1;post.bottom_radius=.15;post.height=3.8
-      mesh_node(post,Vector3(x,1.9,size*.48),material(Color("9b7947")),body)
-     box(body,Vector3(0,.40,size*.40),Vector3(size*.92,.16,.16),Color("d7b86b"))
-    "barracks":
-     for x in [-size*.34,size*.34]:banner(body,Vector3(x,0,size*.44),3.4,b.team=="enemy")
-    "smithy":
-     box(body,Vector3(size*.30,2.2,-size*.22),Vector3(1.0,4.0,1.0),Color("464b4d"))
-    "lumber":
-     for x in [-size*.35,size*.35]:asset("log_stackLarge.glb",body,Vector3(x,0,size*.42),1.35,"height")
-    "quarry":
-     for x in [-size*.36,size*.36]:asset("rock_largeD.glb",body,Vector3(x,0,size*.42),1.8,"height",x)
-    "goldmine":
-     for x in [-size*.34,size*.34]:
-      var gem=SphereMesh.new();gem.radius=.24;gem.height=.48
-      mesh_node(gem,Vector3(x,1.2,size*.42),material(Color("f3c54b"),.25,true),body)
-    "camp":
-     for x in [-size*.32,size*.32]:asset("Barrel.obj",body,Vector3(x,0,size*.36),1.15,"height")
-    "hero_hall":
-     for x in [-size*.35,size*.35]:
-      var globe=SphereMesh.new();globe.radius=.28;globe.height=.56
-      mesh_node(globe,Vector3(x,3.4,size*.38),material(Color("b493e6"),.25,true),body)
-  if b.kind=="hall":
-   for x in [-size*.44,size*.44]:banner(body,Vector3(x,0,size*.42),3.2,b.team=="enemy")
-   box(body,Vector3(0,.22,-size*.42),Vector3(size*.78,.44,.30),Color("6f695d"))
-  if b.kind=="barracks":
-   for x in [-2.0,0.0,2.0]:
-    var post=CylinderMesh.new();post.top_radius=.09;post.bottom_radius=.12;post.height=2.6
-    mesh_node(post,Vector3(x,1.3,size*.48),material(Color("7b5533")),body)
-  if b.kind=="smithy":
-   var chimney=BoxMesh.new();chimney.size=Vector3(.9,3.4,.9)
-   mesh_node(chimney,Vector3(size*.28,2.2,-size*.22),material(Color("4f5150")),body)
-  if b.kind=="camp":
-   disc(size*.48,Color(.35,.29,.18,.32),Vector3(0,.03,0),body)
-  if b.kind=="hero_hall":
-   for x in [-size*.35,size*.35]:
-    var pillar=CylinderMesh.new();pillar.top_radius=.14;pillar.bottom_radius=.18;pillar.height=3.4
-    mesh_node(pillar,Vector3(x,1.7,size*.36),material(Color("76608e")),body)
-  if b.kind in ["quarry","goldmine"]:
-   for i in range(5):
-    var color=Color("d6ac52") if b.kind=="goldmine" else Color("8b9ba0")
-    var rock=asset("rock_largeD.glb",body,Vector3(-size*.5+i*.8,.0,size*.3),1.1+i%2*.35,"height",i*.7)
-    for m in rock.find_children("*","MeshInstance3D",true,false):
-     for surface in range(m.mesh.get_surface_count()):m.set_surface_override_material(surface,material(color))
-   asset("Cart.obj",body,Vector3(size*.4,0,size*.35),1.7,"width",.3)
-  if b.kind=="lumber":
-   asset("log_stackLarge.glb",body,Vector3(size*.35,0,size*.45),1.8,"height")
-   for i in range(4):asset("stump_roundDetailed.glb",body,Vector3(-2.2+i*1.35,0,3.8),.55,"height")
-  elif b.kind=="barracks":
-   asset("Barrel.obj",body,Vector3(size*.42,0,size*.38),1.15,"height")
-   asset("Bench_1.obj",body,Vector3(-size*.40,0,size*.40),2.2,"width",PI/2)
-  elif b.kind=="smithy":
-   asset("Bonfire_Lit.obj",body,Vector3(size*.35,.02,size*.32),1.15,"width")
-   asset("Cart.obj",body,Vector3(-size*.42,0,size*.34),1.5,"width")
-  elif b.kind=="camp":
-   asset("Bonfire_Lit.obj",body,Vector3(0,.02,size*.43),1.3,"width")
-   asset("Bags.obj",body,Vector3(size*.38,0,size*.35),1.4,"width")
-  elif b.kind=="hero_hall":
-   var orb=SphereMesh.new();orb.radius=.34;orb.height=.68
-   mesh_node(orb,Vector3(0,3.8,size*.40),material(Color("b493e6"),.25,true),body)
- if level>=5 and b.kind!="wall":
-  for i in range(mini(level-4,6)):
-   var angle=TAU*float(i)/float(maxi(1,mini(level-4,6)))
-   var accent=SphereMesh.new();accent.radius=.16+.025*level;accent.height=accent.radius*2
-   mesh_node(accent,Vector3(cos(angle)*size*.38,1.0+.32*i,sin(angle)*size*.38),material(Color("ffd36b"),.35,true),body)
- if level>=5 and b.kind=="wall":
-  box(body,Vector3(0,1.15+level*.28,.0),Vector3(2.42,.12,.92),Color("d5a94f"))
- if level>=6:
-  var tier_color=Color("537485") if level<8 else Color("4b536d")
-  if b.kind=="wall":
-   for x in [-.78,.78]:box(body,Vector3(x,1.05+level*.28,.0),Vector3(.22,.48,1.08),tier_color)
-  else:
-   box(body,Vector3(0,.52,-size*.40),Vector3(size*.72,.22,.18),tier_color)
-   for x in [-size*.31,size*.31]:box(body,Vector3(x,1.05,size*.40),Vector3(.22,1.9,.22),tier_color.lightened(.08))
- if level>=8:
-  var crystal=Color("72d9e8") if level<10 else Color("f2b94b")
-  if b.kind=="wall":
-   for x in [-.82,.82]:
-    var gem=SphereMesh.new();gem.radius=.13;gem.height=.26
-    mesh_node(gem,Vector3(x,1.48+level*.28,.0),material(crystal,.25,true),body)
-  else:
-   for x in [-size*.30,size*.30]:
-    var gem=SphereMesh.new();gem.radius=.22;gem.height=.44
-    mesh_node(gem,Vector3(x,2.15,size*.40),material(crystal,.25,true),body)
- if level>=10 and b.kind!="wall":
-  var crown=TorusMesh.new();crown.inner_radius=size*.24;crown.outer_radius=size*.28;crown.rings=32;crown.ring_segments=6
-  mesh_node(crown,Vector3(0,3.0,0),material(Color("f3bd4d"),.25,true),body)
+ var model_height=Architecture.draw(self,b,body)
  var label=Label3D.new();label.font_size=34;label.pixel_size=.015;label.modulate=Color("f9e4ad");label.outline_size=8;label.billboard=BaseMaterial3D.BILLBOARD_ENABLED;label.no_depth_test=true;root.add_child(label)
  label.position=Vector3(0,model_height+1.05,0)
  label.visible=b.kind!="wall"
@@ -350,11 +218,12 @@ func create_building(b:Dictionary):
    for z in [-r,r]:box(scaffold,Vector3(0,y,z),Vector3(r*2+.4,.16,.22),Color("e4c58b"))
    for x in [-r,r]:box(scaffold,Vector3(x,y,0),Vector3(.22,.16,r*2+.4),Color("e4c58b"))
   create_worker(b,job)
- var marker=null
+ var bubble=null
  if mode=="home" and Catalog.RESOURCES.has(b.kind):
-  var stock=float(b.get("stock",0.0));var cap=140.0*level
-  marker=create_resource_marker(root,b.kind,model_height,stock,cap)
- forts[b.id]={"root":root,"body":body,"label":label,"text":text,"height":model_height,"hpbar":hpbar,"job":job,"ruin":null,"marker":marker}
+  bubble=Node3D.new();root.add_child(bubble);bubble.position=Vector3(0,model_height+1.65,0)
+  var img=Sprite3D.new();img.texture=load("res://assets3d/icons/"+Catalog.RESOURCES[b.kind]+".svg");img.pixel_size=.055;img.billboard=BaseMaterial3D.BILLBOARD_ENABLED;img.no_depth_test=true;img.shaded=false;bubble.add_child(img)
+  var full=Label3D.new();full.text="MAX";full.font_size=33;full.pixel_size=.018;full.position=Vector3(0,-1.7,0);full.billboard=BaseMaterial3D.BILLBOARD_ENABLED;full.no_depth_test=true;full.modulate=Color("ffdc79");full.outline_size=7;bubble.add_child(full)
+ forts[b.id]={"root":root,"body":body,"label":label,"text":text,"height":model_height,"hpbar":hpbar,"job":job,"ruin":null,"bubble":bubble,"collapse":0.0,"smoke":null}
 func create_worker(b:Dictionary,job:Dictionary):
  var destination:Vector2=b.pos+Vector2(b.radius+.9,b.radius*.25)
  var holder=asset("Warrior.gltf",self,Vector3.ZERO,2.35)
@@ -373,7 +242,7 @@ func create_worker(b:Dictionary,job:Dictionary):
  if animation:
   for name in ["Walk","Punch"]:
    if animation.has_animation(name):animation.get_animation(name).loop_mode=Animation.LOOP_LINEAR
- var text=Label3D.new();holder.add_child(text);text.text="BAUARBEITER";text.position.y=2.85;text.font_size=27;text.pixel_size=.018;text.billboard=BaseMaterial3D.BILLBOARD_ENABLED;text.no_depth_test=true;text.modulate=Color("ffe597")
+ var text=Label3D.new();holder.add_child(text);text.text="";text.position.y=2.85;text.font_size=27;text.pixel_size=.018;text.billboard=BaseMaterial3D.BILLBOARD_ENABLED;text.no_depth_test=true;text.modulate=Color("ffe597")
  workers.append({"node":holder,"anim":animation,"job":job,"goal":destination,"site":b.pos})
 func banner(parent:Node,pos:Vector3,height:float,enemy:bool):
  var pole=CylinderMesh.new();pole.top_radius=.045;pole.bottom_radius=.07;pole.height=height
@@ -423,23 +292,33 @@ func sync(sim,dt:float):
   a.node.visible=true;a.bar.visible=true
   if u.facing.length()>.01:a.node.rotation.y=lerp_angle(a.node.rotation.y,atan2(u.facing.x,u.facing.y),minf(1,dt*12))
   var state=String(u.anim)
+  var attacking=state=="attack"
   if state=="attack":
    if u.kind in ["archer","ranger"]:state="Bow_Shoot"
    elif u.kind=="guard" or u.get("class_key","")=="ninja":state="Dagger_Attack"
-   elif u.get("class_key","") in ["shaman","mage"]:state="Spellcast_Shoot" if a.anim and a.anim.has_animation("Spellcast_Shoot") else "Spellcast"
+   elif u.get("class_key","") in ["shaman","mage"]:state="Spell1"
    else:state="Sword_Attack"
   elif state=="Idle":state="Idle_Weapon" if a.anim and a.anim.has_animation("Idle_Weapon") else "Idle"
   elif state=="Run":
    if a.anim and a.anim.has_animation("Run_Weapon"):state="Run_Weapon"
    elif a.anim and a.anim.has_animation("Run_Holding"):state="Run_Holding"
+  if state=="Sit_Floor":state="Idle"
+  if state=="Interact":state="Idle_Attacking" if a.anim and a.anim.has_animation("Idle_Attacking") else "Idle"
   if a.anim and not a.anim.has_animation(state):
    if u.anim=="attack":
     for candidate in a.anim.get_animation_list():
      if "Attack" in candidate or "Spell" in candidate or "Shoot" in candidate:state=candidate;break
    else:state="Idle"
-  if a.anim and a.anim.has_animation(state) and (a.state!=state or not a.anim.is_playing()):a.anim.play(state,.10);a.state=state
+  if a.anim and a.anim.has_animation(state):
+   var sequence=int(u.get("attack_seq",0))
+   if a.state!=state or (attacking and sequence!=int(a.get("attack_seq",-1))) or not a.anim.is_playing():
+    a.anim.play(state,.025 if attacking else .12);a.state=state;a.attack_seq=sequence
+   a.anim.speed_scale=a.anim.get_animation(state).length/maxf(.15,float(u.get("attack_total",.6))) if attacking else 1.0
+  if bool(a.get("flash_on",false))!=(u.flash>0):
+   a.flash_on=u.flash>0
+   for part in a.node.find_children("*","GeometryInstance3D",true,false):part.material_overlay=material(Color(1,.94,.68,.6),.5,true) if u.flash>0 else null
   a.bar.position.y=a.size+.55
-  a.bar.text=("HAUPTMANN " if u.kind=="captain" else "")+"%d / %d"%[u.hp,u.max_hp] if sim.active() or mode=="scout" else (Catalog.hero(u.class_key).name.to_upper() if u.kind=="hero" else "")
+  a.bar.text=""
   set_health(a.hpbar,u.hp/u.max_hp,sim.active() or mode=="scout")
   a.ring.visible=sim.active() or u.kind=="hero" or mode=="scout"
  for b in sim.buildings:
@@ -448,7 +327,7 @@ func sync(sim,dt:float):
   if b.hp>0:
    f.body.scale=Vector3(.65,.25,.65) if f.job.get("new",false) else Vector3.ONE
   else:
-   f.body.scale=Vector3(1.05,.16,1.05);f.body.rotation_degrees.z=7
+   f.collapse=minf(1,float(f.collapse)+dt*2.6);f.body.scale=Vector3(1.0+.05*f.collapse,lerpf(1,.16,f.collapse),1.0+.05*f.collapse);f.body.rotation_degrees.z=7*f.collapse
    if f.ruin==null:
     var ruin=Node3D.new();f.root.add_child(ruin);f.ruin=ruin
     disc(maxf(1.0,b.radius*.72),Color(.12,.10,.08,.92),Vector3(0,.04,0),ruin)
@@ -456,30 +335,33 @@ func sync(sim,dt:float):
      var a=TAU*float(i)/7.0;var r=b.radius*(.25+.5*float((i%3)+1)/3.0)
      box(ruin,Vector3(cos(a)*r,.12,sin(a)*r),Vector3(.55+.18*(i%2),.22,.42),Color("51483e"))
     if b.kind!="wall":
-     var smoke=Label3D.new();smoke.text="✦";smoke.font_size=54;smoke.pixel_size=.02;smoke.position=Vector3(0,.65,0);smoke.billboard=BaseMaterial3D.BILLBOARD_ENABLED;smoke.modulate=Color(.32,.30,.28,.75);ruin.add_child(smoke)
-  f.label.visible=b.hp>0 and b.kind!="wall" and target_zoom<55 and (sim.active() or mode=="scout" or b.uid==selected_uid or not f.job.is_empty())
+     var smoke=Label3D.new();smoke.text="";smoke.font_size=54;smoke.pixel_size=.02;smoke.position=Vector3(0,.65,0);smoke.billboard=BaseMaterial3D.BILLBOARD_ENABLED;smoke.modulate=Color(.32,.30,.28,.75);ruin.add_child(smoke)
+  if bool(f.get("flash_on",false))!=(float(b.get("flash",0))>0):
+   f.flash_on=float(b.get("flash",0))>0
+   for part in f.body.find_children("*","GeometryInstance3D",true,false):part.material_overlay=material(Color(1,.8,.52,.5),.8,true) if f.flash_on else null
+  if b.hp<b.max_hp*.35 and f.smoke==null:
+   var smoke_root=Node3D.new();f.root.add_child(smoke_root);f.smoke=smoke_root
+   for i in range(3):
+    var cloud=SphereMesh.new();cloud.radius=.4;cloud.height=.8;cloud.radial_segments=8;cloud.rings=4
+    mesh_node(cloud,Vector3(float(i-1)*.45,1+float(i)*.65,0),material(Color(.19,.24,.25,.28)),smoke_root)
+  if f.smoke!=null:
+   f.smoke.position.y=.4+sin(float(sim.time)*1.5+b.id)*.3
+   f.smoke.scale=Vector3.ONE*(.8+.2*sin(float(sim.time)+b.id))
+  f.label.visible=b.hp>0 and b.uid==selected_uid
   f.label.text=(f.text+"\n%d / %d"%[b.hp,b.max_hp]) if sim.active() else f.text
-  set_health(f.hpbar,b.hp/b.max_hp,(sim.active() or mode=="scout") and b.hp>0)
-  if mode=="home" and f.get("marker")!=null:
+  set_health(f.hpbar,b.hp/b.max_hp,sim.active() and b.hp<b.max_hp and b.hp>0)
+  if mode=="home" and f.get("bubble")!=null:
    var stock=0.0
    for sb in sim.profile.get("structures",[]):
     if String(sb.get("uid",""))==String(b.uid):stock=float(sb.get("stock",0.0));break
-   var cap=140.0*int(b.level);f.marker.root.visible=stock>=1
-   f.marker.label.text="MAX" if stock>=cap*.95 else str(int(stock))
-   var pulse=1.0+(.10*sin(Time.get_ticks_msec()/160.0) if stock>=cap*.95 else 0.0);f.marker.root.scale=Vector3.ONE*pulse
+   var cap=140.0*int(b.level);f.bubble.visible=stock>=1 and f.job.is_empty()
+   var fraction=clampf(stock/cap,0,1)
+   f.bubble.scale=Vector3.ONE*(1.0+.22*fraction)
+   f.bubble.get_child(1).visible=stock>=cap-1
   if not f.job.is_empty():
    var remaining=maxf(0,float(f.job.finish)-Time.get_unix_time_from_system())
    f.label.text="BAUSTELLE · %d s"%ceili(remaining)
    f.label.visible=true;set_health(f.hpbar,1-remaining/maxf(1,float(f.job.finish)-float(f.job.start)),true)
- for b in sim.buildings:
-  if b.hp<=0 or b.hp>=b.max_hp*.35:continue
-  var smoke=SphereMesh.new();smoke.radius=.22;smoke.height=.44;smoke.radial_segments=10;smoke.rings=6
-  var y=2.2+fmod(Time.get_ticks_msec()/500.0+float(b.id),1.8)
-  var sm=mesh_node(smoke,Vector3(b.pos.x,y,b.pos.y),material(Color(.25,.24,.22,.42)),fx)
-  sm.scale=Vector3.ONE*(.8+y*.08)
-  if b.hp<b.max_hp*.15:
-   var ember=SphereMesh.new();ember.radius=.10;ember.height=.20
-   mesh_node(ember,Vector3(b.pos.x+.3,1.1,b.pos.y-.2),material(Color("ff8a3c"),.25,true),fx)
  for w in workers:
   var elapsed=Time.get_unix_time_from_system()-float(w.job.start);var ratio=clampf(elapsed/3,0,1)
   var p:Vector2=Vector2(0,-5).lerp(w.goal,ratio);w.node.position=Vector3(p.x,.05,p.y)
@@ -487,69 +369,109 @@ func sync(sim,dt:float):
   w.node.rotation.y=atan2(direction.x,direction.y)
   var state="Walk" if ratio<1 else "Punch"
   if w.anim and w.anim.current_animation!=state:w.anim.play(state,.1)
- for child in fx.get_children():child.queue_free()
- for u in sim.enemies:
-  if u.hp>0 and u.wind>0:disc(3.2 if u.kind=="captain" else 1.7,Color(1,.21,.08,.45),Vector3(u.aim.x,.08,u.aim.y),fx)
- for e in sim.effects:
-  var t=1-e.life/e.max;var col:Color=e.color
-  if e.kind=="arrow":
-   var p:Vector2=e.pos.lerp(e.end,t);var sphere=SphereMesh.new();sphere.radius=.13;sphere.height=.26
-   mesh_node(sphere,Vector3(p.x,1.5+sin(t*PI)*1.6,p.y),material(col,.25,true),fx)
-  elif e.kind=="afterimage":
-   for i in range(6):
-    var r=float(i)/5.0;var p:Vector2=e.pos.lerp(e.end,r)
-    var ghost=SphereMesh.new();ghost.radius=.23;ghost.height=.46
-    var gc=col;gc.a=(1.0-r)*(1.0-t)*.45
-    mesh_node(ghost,Vector3(p.x,.8,p.y),material(gc,.3,true),fx)
-  elif e.kind=="spark":
-   for i in range(10):
-    var a=TAU*float(i)/10.0+t*.8;var r=.4+t*3.0
-    var sp=SphereMesh.new();sp.radius=.09;sp.height=.18
-    mesh_node(sp,Vector3(e.pos.x+cos(a)*r,.5+sin(t*PI)*1.2,e.pos.y+sin(a)*r),material(col,.2,true),fx)
-  elif e.kind=="burst":
-   var radius=.5+t*4.0;var bc=col;bc.a=(1-t)*.42
-   disc(radius,bc,Vector3(e.pos.x,.10,e.pos.y),fx)
-   var ring=TorusMesh.new();ring.inner_radius=maxf(.1,radius-.18);ring.outer_radius=radius;ring.rings=36;ring.ring_segments=7
-   mesh_node(ring,Vector3(e.pos.x,.22,e.pos.y),material(col,.2,true),fx)
-  elif e.kind=="windup":
-   var radius=.7+t*.8;var ring=TorusMesh.new();ring.inner_radius=radius-.12;ring.outer_radius=radius;ring.rings=32;ring.ring_segments=6
-   mesh_node(ring,Vector3(e.pos.x,.35,e.pos.y),material(col,.25,true),fx)
-  elif e.kind=="invalid":
-   var radius=.5+t*1.4;var rc=col;rc.a=(1-t)*.55
-   var ring=TorusMesh.new();ring.inner_radius=radius-.10;ring.outer_radius=radius;ring.rings=28;ring.ring_segments=6
-   mesh_node(ring,Vector3(e.pos.x,.12,e.pos.y),material(rc,.25,true),fx)
-  elif e.kind=="impact":
-   var radius=.25+t*1.25;var ic=col;ic.a=(1-t)*.6
-   disc(radius,ic,Vector3(e.pos.x,.14,e.pos.y),fx)
-  else:
-   var radius=.4+t*4.8;var sc=col;sc.a=(1-t)*.42
-   disc(radius,sc,Vector3(e.pos.x,.10,e.pos.y),fx)
-   if e.kind=="skill":
-    for mul in [1.0,.72]:
-     var rr=radius*mul;var ring=TorusMesh.new();ring.inner_radius=maxf(.1,rr-.15);ring.outer_radius=rr;ring.rings=40;ring.ring_segments=6
-     mesh_node(ring,Vector3(e.pos.x,.25+(1.0-mul)*.3,e.pos.y),material(col,.25,true),fx)
- for text in sim.combat_texts:
-  var l=Label3D.new();l.text=text.value;l.font_size=40;l.pixel_size=.018;l.outline_size=8;l.no_depth_test=true;l.billboard=BaseMaterial3D.BILLBOARD_ENABLED
-  l.modulate=Color("8dffb3") if text.heal else Color("fff4d1");l.position=Vector3(text.pos.x,4+(1-text.life/text.max)*1.7,text.pos.y);fx.add_child(l)
- for trap in sim.traps:
-  if trap.used:continue
-  disc(.75,Color(.85,.34,.1,.42),Vector3(trap.pos.x,.1,trap.pos.y),fx)
+ update_effects(sim)
+ selection.visible=false
  if selected_uid!="":
   for b in sim.buildings:
    if b.uid==selected_uid and b.hp>0:
-    disc(13 if b.kind=="tower" else b.radius+.5,Color(.1,.65,1,.16),Vector3(b.pos.x,.06,b.pos.y),fx)
+    selection.visible=true;selection.position=Vector3(b.pos.x,.08,b.pos.y);selection.scale=Vector3.ONE*(b.radius+.5)
  if selected_obstacle!="" and obstacles.has(selected_obstacle):
   var o=obstacles[selected_obstacle];var root:Node3D=o.root
-  disc(float(o.radius)+.45,Color(.95,.72,.18,.25),Vector3(root.position.x,.07,root.position.z),fx)
- if mode=="scout" or (mode=="raid" and sim.manual_deployment and sim.reserve.melee+sim.reserve.archers>0):
-  for axis in range(4):
-   var p=Vector3(0,.055,27) if axis==0 else (Vector3(0,.055,-27) if axis==1 else (Vector3(27,.055,0) if axis==2 else Vector3(-27,.055,0)))
-   box(fx,p,Vector3(50,.025,1.2) if axis<2 else Vector3(1.2,.025,50),Color(.12,.8,.7,.24))
+  selection.visible=true;selection.position=Vector3(root.position.x,.08,root.position.z);selection.scale=Vector3.ONE*(float(o.radius)+.45)
+ edges.visible=mode=="scout" or (mode=="raid" and sim.manual_deployment and sim.reserve.melee+sim.reserve.archers>0)
  update_camera(sim,dt)
+func effect_id(e:Dictionary) -> int:
+ if not e.has("visual_id"):effect_serial+=1;e.visual_id=effect_serial
+ return int(e.visual_id)
+func effect_visual(e:Dictionary) -> Node3D:
+ var root=Node3D.new();fx.add_child(root)
+ var color:Color=e.color;var kind=String(e.kind)
+ if kind=="arrow":
+  var orb=SphereMesh.new();orb.radius=.14;orb.height=.28;orb.radial_segments=8;orb.rings=4
+  mesh_node(orb,Vector3.ZERO,material(color,.3,true),root)
+  for i in range(3):
+   var tail=SphereMesh.new();tail.radius=.08-float(i)*.015;tail.height=tail.radius*2;tail.radial_segments=6;tail.rings=3
+   mesh_node(tail,Vector3(0,0,.25+float(i)*.18),material(color,.4,true),root)
+ elif kind=="mage":
+  # Target rune, descending crystal and an impact halo are separate silhouettes.
+  for radius in [2.8,3.3]:
+   var rune=TorusMesh.new();rune.inner_radius=radius-.09;rune.outer_radius=radius;rune.rings=32;rune.ring_segments=6
+   mesh_node(rune,Vector3(0,.16,0),material(color,.3,true),root)
+  for i in range(8):
+   var mark=BoxMesh.new();mark.size=Vector3(.16,.1,.65)
+   var a=i*TAU/8;var node=mesh_node(mark,Vector3(cos(a)*3.0,.18,sin(a)*3.0),material(color,.3,true),root);node.rotation.y=-a
+  var crystal=PrismMesh.new();crystal.size=Vector3(1.0,2.7,1.0)
+  var meteor=mesh_node(crystal,Vector3(0,7,0),material(Color("dcecff"),.3,true),root);meteor.name="FallingRune"
+ elif kind=="warrior":
+  for i in range(2):
+   var shock=TorusMesh.new();shock.inner_radius=.8+i*.6;shock.outer_radius=1.0+i*.6;shock.rings=32;shock.ring_segments=6
+   mesh_node(shock,Vector3(0,.1+i*.1,0),material(color,.6,true),root)
+  for i in range(10):
+   var rock=BoxMesh.new();rock.size=Vector3(.28,.45,.35)
+   var a=i*TAU/10;var shard=mesh_node(rock,Vector3(cos(a)*1.4,.3,sin(a)*1.4),material(Color("c99a68")),root)
+   shard.rotation=Vector3(a,.4,a*.5)
+ elif kind=="shaman":
+  var halo=TorusMesh.new();halo.inner_radius=3.6;halo.outer_radius=3.75;halo.rings=40;halo.ring_segments=6
+  mesh_node(halo,Vector3(0,.18,0),material(color,.5,true),root)
+  for i in range(9):
+   var spirit=SphereMesh.new();spirit.radius=.18;spirit.height=.65;spirit.radial_segments=8;spirit.rings=4
+   var a=i*TAU/9
+   mesh_node(spirit,Vector3(cos(a)*2.5,.8+i*.16,sin(a)*2.5),material(Color("baffdc"),.3,true),root)
+ elif kind=="ninja":
+  for i in range(3):
+   var slash=BoxMesh.new();slash.size=Vector3(.11,.13,3.6)
+   var blade=mesh_node(slash,Vector3((i-1)*.5,1+i*.3,0),material(Color("ead7ff"),.3,true),root)
+   blade.rotation=Vector3(.4,(-.6 if i%2==0 else .6),.7)
+ elif kind=="afterimage":
+  var shape=CapsuleMesh.new();shape.radius=.35;shape.height=2.5;shape.radial_segments=8;shape.rings=4
+  mesh_node(shape,Vector3(0,1.3,0),material(Color(color,.3),.7,true),root)
+ else:
+  var ring=TorusMesh.new();ring.inner_radius=.90;ring.outer_radius=1;ring.rings=32;ring.ring_segments=6
+  mesh_node(ring,Vector3(0,.18,0),material(color,.4,true),root)
+  var particles=8 if kind in ["warrior","mage","shaman","ninja","skill","fall"] else 4
+  for i in range(particles):
+   var spark=SphereMesh.new();spark.radius=.12;spark.height=.24;spark.radial_segments=6;spark.rings=3
+   var a=float(i)*TAU/particles
+   mesh_node(spark,Vector3(cos(a),.15+float(i%3)*.25,sin(a)),material(color,.5,true),root)
+ return root
+func update_effects(sim):
+ var live={}
+ for e in sim.effects.slice(maxi(0,sim.effects.size()-48)):
+  var id=effect_id(e);live[id]=true
+  if not effect_nodes.has(id):effect_nodes[id]=effect_visual(e)
+  var root:Node3D=effect_nodes[id];var t=clampf(1-float(e.life)/float(e.max),0,1)
+  if e.kind=="arrow":
+   var end:Vector2=e.get("target",{}).get("pos",e.end);var pos:Vector2=e.pos.lerp(end,t)
+   root.position=Vector3(pos.x,1.5+sin(t*PI)*1.2,pos.y);root.rotation.y=atan2(end.x-e.pos.x,end.y-e.pos.y)
+  else:
+   root.position=Vector3(e.pos.x,.12,e.pos.y)
+   var radius=1.0+t*.5
+   if e.kind=="warrior":radius=.6+maxf(0,t-.24)*4.0
+   elif e.kind=="mage":
+    radius=1.0
+    root.get_node("FallingRune").position.y=maxf(.4,7.0*(1-t*2.4))
+   elif e.kind=="shaman":radius=.7+t*.65
+   elif e.kind=="skill":radius=.5+t*5.0
+   elif e.kind=="fall":radius=.8+t*3
+   elif e.kind=="invalid":radius=1.0+t*.5
+   root.scale=Vector3(radius,1.0 if e.kind in ["warrior","shaman","mage"] else radius,radius);root.rotation.y=t*2
+   if e.kind=="warrior":root.position.y+=sin(t*PI)*.9
+   elif e.kind=="shaman":root.position.y+=t*.9
+   elif e.kind=="mage":root.rotation.y=0
+   for part in root.get_children():
+    if part is GeometryInstance3D:part.transparency=t
+ for entry in sim.combat_texts.slice(maxi(0,sim.combat_texts.size()-28)):
+  var id=effect_id(entry);live[id]=true
+  if not effect_nodes.has(id):
+   var text=Label3D.new();text.text=entry.value;text.font_size=38;text.pixel_size=.018;text.outline_size=8;text.no_depth_test=true;text.billboard=BaseMaterial3D.BILLBOARD_ENABLED;fx.add_child(text);effect_nodes[id]=text
+  var label:Label3D=effect_nodes[id];var t=1-float(entry.life)/float(entry.max)
+  label.position=Vector3(entry.pos.x,3+t*1.7,entry.pos.y);label.modulate=Color("8dffb3") if entry.heal else Color("fff4d1");label.modulate.a=1-t*.8
+ for id in effect_nodes.keys():
+  if not live.has(id):effect_nodes[id].queue_free();effect_nodes.erase(id)
 func update_camera(sim,dt:float):
  if not camera:return
  var goal=Vector3(pan.x,0,pan.y)
- if mode!="scout" and not build_focus:
+ if false:
   var factor=clampf((60-target_zoom)/35.0,0,1)
   goal+=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)*factor
  focus=focus.lerp(goal,minf(1,dt*5));zoom=lerpf(zoom,target_zoom,minf(1,dt*9));camera.size=zoom
@@ -574,6 +496,13 @@ func building_at(screen:Vector2):
    var dist=origin.distance_to(hit)
    if dist<best:chosen=b;best=dist
  return chosen
+func collection_at(screen:Vector2) -> String:
+ for b in shown_buildings:
+  if not forts.has(b.id):continue
+  var bubble=forts[b.id].get("bubble")
+  if bubble==null or not bubble.visible:continue
+  if camera.unproject_position(bubble.global_position).distance_to(screen)<33:return String(b.uid)
+ return ""
 func obstacle_at(screen:Vector2):
  var origin=camera.project_ray_origin(screen);var direction=camera.project_ray_normal(screen)
  var chosen="";var best=INF
@@ -591,5 +520,6 @@ func show_ghost(kind:String,pos:Vector2,valid:bool,rotation:int=0):
  ghost=Node3D.new();add_child(ghost);ghost.position=Vector3(pos.x,.08,pos.y)
  var color=Color(.25,.85,.57,.38) if valid else Color(1,.25,.2,.45)
  disc(float(Catalog.BUILD[kind].radius)+.3,color,Vector3.ZERO,ghost)
- var size=Vector3(2.5,1.8,.6) if kind=="wall" else Vector3(2.5,2.5,2.5)
- var preview=box(ghost,Vector3(0,size.y/2,0),size,color);preview.rotation.y=rotation*PI/2
+ var body=Node3D.new();ghost.add_child(body)
+ Architecture.draw(self,{"kind":kind,"level":1,"team":"ally","rotation":rotation},body)
+ for part in body.find_children("*","GeometryInstance3D",true,false):part.transparency=.35

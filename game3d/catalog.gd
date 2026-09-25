@@ -1,9 +1,9 @@
 extends RefCounted
 const HEROES={
- "warrior":{"name":"Krieger","model":"Warrior.gltf","title":"DIE EISERNE KLINGE","description":"Standfester Nahkämpfer.\nWirbel trifft alle Gegner im Umkreis.","hp":460,"damage":34,"range":3.0,"speed":6.2,"attack_cd":.50,"skill":"Klingenwirbel","skill_cd":7.0,"color":"edba68"},
- "ninja":{"name":"Ninja","model":"Rogue.gltf","title":"SCHATTEN DES WALDES","description":"Schnelle Dolche und hohe Mobilität.\nSchattensprung trifft ein fernes Ziel.","hp":320,"damage":26,"range":2.7,"speed":7.8,"attack_cd":.30,"skill":"Schattensprung","skill_cd":6.0,"color":"c997ef"},
- "shaman":{"name":"Schamane","model":"Cleric.gltf","title":"HÜTER DER AHNEN","description":"Geistergeschosse aus der Distanz.\nAhnenkreis heilt Held und Armee.","hp":370,"damage":32,"range":9.0,"speed":6.0,"attack_cd":.75,"skill":"Ahnenkreis","skill_cd":9.0,"color":"72d6b0"},
- "mage":{"name":"Runenmagier","model":"Wizard.gltf","title":"FEUER DER RUNEN","description":"Mächtige Fernangriffe.\nRunenfeuer trifft eine ganze Gruppe.","hp":330,"damage":44,"range":10.0,"speed":6.1,"attack_cd":.85,"skill":"Runenfeuer","skill_cd":8.0,"color":"7faeea"}
+ "warrior":{"name":"Krieger","model":"Warrior.gltf","title":"DIE EISERNE KLINGE","description":"Standfester Nahkämpfer.\nErdbrecher trifft alle Gegner im Umkreis.","hp":460,"damage":34,"range":3.0,"speed":6.2,"attack_cd":.50,"skill":"Erdbrecher","skill_cd":7.0,"color":"edba68"},
+ "ninja":{"name":"Ninja","model":"Rogue.gltf","title":"SCHATTEN DES WALDES","description":"Schnelle Dolche und hohe Mobilität.\nSchattenschnitt trifft ein fernes Ziel.","hp":320,"damage":26,"range":2.7,"speed":7.8,"attack_cd":.30,"skill":"Schattenschnitt","skill_cd":6.0,"color":"c997ef"},
+ "shaman":{"name":"Schamane","model":"Cleric.gltf","title":"HÜTER DER AHNEN","description":"Geistergeschosse aus der Distanz.\nGeisterstrom heilt Held und Armee.","hp":370,"damage":32,"range":9.0,"speed":6.0,"attack_cd":.75,"skill":"Geisterstrom","skill_cd":9.0,"color":"72d6b0"},
+ "mage":{"name":"Runenmagier","model":"Wizard.gltf","title":"FEUER DER RUNEN","description":"Mächtige Fernangriffe.\nRunenfall trifft eine ganze Gruppe.","hp":330,"damage":44,"range":10.0,"speed":6.1,"attack_cd":.85,"skill":"Runenfall","skill_cd":8.0,"color":"7faeea"}
 }
 const HERO_ORDER=["warrior","ninja","shaman","mage"]
 const BUILD={
@@ -22,7 +22,7 @@ const CORE_POS={"hall":Vector2(0,-10),"barracks":Vector2(-12,2),"smithy":Vector2
 const RESOURCES={"lumber":"wood","quarry":"stone","goldmine":"gold"}
 const RATES={"lumber":18.0,"quarry":14.0,"goldmine":9.0}
 const BUILD_HALL={"lumber":1,"quarry":1,"wall":2,"tower":2,"goldmine":3,"camp":4,"hero_hall":5}
-const HALL_UNLOCKS={1:["Sägewerk","Steinbruch","Kaserne","Schwertkämpfer","2 Bauarbeiter"],2:["Bogenschützen","Mauern","Wachturm"],3:["Goldmine","Schmiede"],4:["Heerlager","Schildträger"],5:["Heldenhalle","Heldentraining","3. Bauarbeiter"],6:["Mörser","Mauerbrecher"],7:["Runeneinheit","Fallen"],8:["4. Bauarbeiter","Spezialverteidigung"],9:["Meistertraining"],10:["Festungszeitalter"]}
+const HALL_UNLOCKS={1:["Schwertkämpfer", "2 Bauarbeiter"],2:["Bogenschützen: Kaserne 2", "Mauern", "Wachturm"],3:["Goldmine"],4:["Heerlager"],5:["Heldenhalle", "3. Bauarbeiter"],6:["Gebäude bis Stufe 7"],7:["Gebäude bis Stufe 8"],8:["4. Bauarbeiter"],9:["Gebäude bis Stufe 10"],10:["Größtes Rohstofflager"]}
 const VILLAGES=[
  {"name":"Mooswacht","level":1,"theme":"Waldlager","seed":410,"tower_count":1,"wall_count":0,"guards":3,"captains":0,"wood":90,"stone":65,"gold":45},
  {"name":"Eisenfang","level":2,"theme":"Befestigtes Dorf","seed":621,"tower_count":2,"wall_count":5,"guards":5,"captains":1,"wood":145,"stone":110,"gold":75},
@@ -43,8 +43,15 @@ static func strength(profile:Dictionary) -> int:
  var army=int(profile.get("melee",0))+int(profile.get("archers",0))
  var training=profile.get("training",{}).get("troops",{})
  var hero_training=profile.get("training",{}).get("heroes",{}).get(String(profile.get("hero","warrior")),{})
- var power=int(profile.get("hall",1))*100+int(profile.get("barracks",1))*35+int(profile.get("smithy",1))*30+army*18
+ var capacity=mini(10,4+int(profile.get("hall",1))*2)
+ for b in profile.get("structures",[]):
+  if b is Dictionary and b.get("kind","")=="camp":capacity+=2+int(b.get("level",1))*2
+ var class_data=hero(String(profile.get("hero","warrior")))
+ var power=capacity*4+int(class_data.hp)/20+int(class_data.damage)+int(profile.get("hall",1))*100+int(profile.get("barracks",1))*35+int(profile.get("smithy",1))*30+army*18
  power+=int(training.get("melee",0))*14+int(training.get("archers",0))*14
+ power+=level(profile,String(profile.get("hero","warrior")))*25
+ for b in profile.get("structures",[]):
+  if b is Dictionary:power+=int(b.get("level",1))*6
  power+=int(hero_training.get("power",0))*12+int(hero_training.get("vitality",0))*7+int(hero_training.get("skill",0))*10
  for b in profile.get("structures",[]):
   if not b is Dictionary:continue
@@ -55,6 +62,7 @@ static func strength(profile:Dictionary) -> int:
    "camp":power+=10*level
  return power
 static func village_strength(v:Dictionary) -> int:
+ if v.has("rating"):return int(v.rating)
  return int(v.get("level",1))*150+int(v.get("tower_count",0))*18+int(v.get("wall_count",0))*3+int(v.get("guards",0))*10+int(v.get("captains",0))*28
 static func strength_for_village_level(level:int) -> int:
  var preview={"level":level,"tower_count":clampi(1+int(level/2),1,5),"wall_count":maxi(0,(level-1)*4),"guards":3+level,"captains":int(level/4)}
@@ -78,5 +86,7 @@ static func matched_village(index:int,profile:Dictionary) -> Dictionary:
  base.captains=int(level/4)
  var loot_scale=.78+float(posmod(index*37+11,31))/100.0
  base.wood=int((70+level*55)*loot_scale);base.stone=int((55+level*46)*loot_scale);base.gold=int((35+level*31)*loot_scale)
+ base.rating=int(round(target_power))
+ base.combat_scale=target_power/maxf(1.0,float(strength_for_village_level(level)))
  base.theme="Gegner deiner Stärke"
  return base
