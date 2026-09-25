@@ -1,7 +1,7 @@
 shader_type spatial;
 render_mode diffuse_lambert_wrap;
-uniform vec4 grass_dark : source_color = vec4(0.25, 0.40, 0.12, 1.0);
-uniform vec4 grass_light : source_color = vec4(0.47, 0.60, 0.23, 1.0);
+uniform vec4 grass_dark : source_color = vec4(0.22, 0.39, 0.07, 1.0);
+uniform vec4 grass_light : source_color = vec4(0.40, 0.58, 0.16, 1.0);
 varying vec2 ground_uv;
 float hash(vec2 p) { return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float noise2(vec2 p) {

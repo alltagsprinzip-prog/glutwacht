@@ -47,7 +47,7 @@ func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMa
  color.a=roundf(color.a*16.0)/16.0
  var key=str(color)+str(emission)
  if materials.has(key):return materials[key]
- var m=StandardMaterial3D.new();m.albedo_color=color;m.roughness=rough
+ var m=StandardMaterial3D.new();m.albedo_color=color.darkened(.20) if not emission else color;m.roughness=rough
  if color.a<1:m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
  if emission:m.emission_enabled=true;m.emission=color;m.emission_energy_multiplier=.7
  materials[key]=m;return m
@@ -77,13 +77,14 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
     var character=original.duplicate();character.metallic=.02;character.roughness=.8;character.rim_enabled=true;character.rim=.38;character.rim_tint=.25;character.next_pass=outline_material
     n.set_surface_override_material(surface,character);asset_materials[palette_key]=character
    elif original is StandardMaterial3D:
-    var mat=original.duplicate();mat.metallic=0;mat.roughness=.92
+    var mat=original.duplicate();mat.metallic=0;mat.roughness=.92;mat.emission_enabled=false
     var matname=mat.resource_name.to_lower()
     if "roof" in matname:mat.albedo_color=roof_tint if roof_tint.a>0 else (Color("2c7ea3") if mode in ["home","defense"] else Color("d97443"))
     elif "plaster" in matname or "beige" in matname:mat.albedo_color=Color("f1dfb0")
-    elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("795030")
-    elif "leaf" in matname:mat.albedo_color=Color("4c8735") if rng.randf()>.25 else Color("769841")
+    elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("aa7444")
+    elif "leaf" in matname:mat.albedo_color=Color("69b53e") if rng.randf()>.25 else Color("97cd52")
     elif "grass" in matname:mat.albedo_color=Color("649447")
+    mat.albedo_color=mat.albedo_color.darkened(.15)
     n.set_surface_override_material(surface,mat);asset_materials[palette_key]=mat
   var box:AABB=holder.global_transform.affine_inverse()*n.global_transform*n.get_aabb()
   if first:bounds=box;first=false
@@ -109,16 +110,16 @@ func setup(sim):
  landscape=Node3D.new();add_child(landscape)
  var env=WorldEnvironment.new();sky_env=Environment.new();env.environment=sky_env;add_child(env)
  sky_env.background_mode=Environment.BG_COLOR;sky_env.background_color=Color("9fdcfa")
- sky_env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;sky_env.ambient_light_color=Color("d6ebff");sky_env.ambient_light_energy=.43
- sky_env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;sky_env.fog_enabled=true;sky_env.fog_light_color=Color("91aeba");sky_env.fog_density=.001
- var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=.8;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
- var fill=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-30,140,0);fill.light_color=Color("c1e9ff");fill.light_energy=.12;add_child(fill)
+ sky_env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;sky_env.ambient_light_color=Color("d6ebff");sky_env.ambient_light_energy=.46
+ sky_env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;sky_env.fog_enabled=false;sky_env.fog_light_color=Color("91aeba");sky_env.fog_density=.001
+ var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=.64;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
+ var fill=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-30,140,0);fill.light_color=Color("c1e9ff");fill.light_energy=.10;add_child(fill)
  camera=Camera3D.new();add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.far=210;camera.current=true
  if mode=="scout":target_zoom=48;focus=Vector3(0,0,-2)
  elif sim.active():target_zoom=48;focus=Vector3.ZERO
  else:target_zoom=46;focus=Vector3(0,0,1)
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
- terrain();scenery(sim)
+ terrain();village_paths(sim);scenery(sim)
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
@@ -148,6 +149,23 @@ func terrain():
  for i in range(10):
   var m=CylinderMesh.new();m.top_radius=0;m.bottom_radius=rng.randf_range(9,17);m.height=rng.randf_range(13,26);m.radial_segments=7
   mesh_node(m,Vector3(-60+i*14,m.height/2-2,-65),material(Color("637d89")),landscape)
+# Paths follow the actual building positions, including relocated legacy buildings.
+func village_paths(sim):
+ if mode!="home":return
+ for b in sim.buildings:
+  if b.kind=="wall":continue
+  var end:Vector2=b.pos+Vector2(0,float(b.radius)*.72)
+  var start=Vector2(0,8)
+  var length=start.distance_to(end)
+  for i in range(int(length/1.1)+1):
+   var point=start.lerp(end,float(i)/maxf(1,int(length/1.1)))
+   var paving=disc(1.03,Color("d9bd7c"),Vector3(point.x,.022,point.y),landscape)
+   paving.scale.z=.84
+ # A small meeting place rather than a square tile under each house.
+ disc(3.4,Color("e3c88d"),Vector3(0,.026,8),landscape)
+ for i in range(9):
+  var angle=float(i)*TAU/9.0
+  asset("flower_yellowC.glb" if i%2 else "flower_purpleA.glb",landscape,Vector3(4.1*cos(angle),.03,8+4.1*sin(angle)),.6,"height",angle)
 func scenery(sim):
  for i in range(95):
   var p=Vector3(rng.randf_range(-58,56),0,rng.randf_range(-52,46))
@@ -252,7 +270,7 @@ func banner(parent:Node,pos:Vector3,height:float,enemy:bool):
  box(parent,pos+Vector3(.35,height-.6,.04),Vector3(.12,.48,.035),Color("e5c47c"))
 func disc(radius:float,color:Color,pos:Vector3,parent:Node) -> MeshInstance3D:
  var mesh=CylinderMesh.new();mesh.top_radius=radius;mesh.bottom_radius=radius;mesh.height=.025;mesh.radial_segments=40
- return mesh_node(mesh,pos,material(color,.8,color.a>.5),parent)
+ return mesh_node(mesh,pos,material(color,.8,false),parent)
 func hero_showcase(key:String,parent:Node) -> Node3D:
  var h=asset(Catalog.hero(key).model,parent,Vector3.ZERO,3.5)
  var players=h.find_children("*","AnimationPlayer",true,false)
@@ -265,8 +283,15 @@ func create_actor(u:Dictionary):
  if u.kind=="hero":file=Catalog.hero(u.class_key).model
  elif u.kind in ["archer","ranger"]:file="Ranger.gltf"
  elif u.kind=="guard":file="Rogue.gltf"
- var size=3.15 if u.kind=="hero" else (3.2 if u.kind=="captain" else 2.65)
+ elif u.kind=="siege":file="Cleric.gltf"
+ var size=3.15 if u.kind=="hero" else (3.2 if u.kind in ["captain","shield"] else 2.65)
  var holder=asset(file,self,Vector3(u.pos.x,.06,u.pos.y),size)
+ if u.kind=="shield":
+  var shield=box(holder,Vector3(0,1.35,.6),Vector3(1.45,1.75,.22),Color("398edd"))
+  box(shield,Vector3(0,0,.15),Vector3(.18,1.3,.1),Color("ffe091"))
+ if u.kind=="siege":
+  var rock=SphereMesh.new();rock.radius=.42;rock.height=.84
+  mesh_node(rock,Vector3(.45,1.7,.5),material(Color("a9aca4")),holder)
  var anims=holder.find_children("*","AnimationPlayer",true,false);var anim:AnimationPlayer=anims[0] if not anims.is_empty() else null
  if anim:
   for name in anim.get_animation_list():
@@ -296,6 +321,7 @@ func sync(sim,dt:float):
   var attacking=state=="attack"
   if state=="attack":
    if u.kind in ["archer","ranger"]:state="Bow_Shoot"
+   elif u.kind=="siege":state="Spell1"
    elif u.kind=="guard" or u.get("class_key","")=="ninja":state="Dagger_Attack"
    elif u.get("class_key","") in ["shaman","mage"]:state="Spell1"
    else:state="Sword_Attack2" if u.get("cast_kind","")=="skill" else "Sword_Attack"

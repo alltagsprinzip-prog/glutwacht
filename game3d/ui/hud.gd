@@ -1,12 +1,12 @@
 extends RefCounted
 # One composition for each mode; screen zones never share pointer ownership.
-const TEXT=Color("fff7df")
-const GOLD=Color("ffd274")
+const TEXT=Color("493826")
+const GOLD=Color("88501d")
 static func text(g,value:String,rect:Rect2,size:int=28,color:Color=TEXT,center:bool=false):
  return g.label(g.hud,value,rect,size,color,center)
 static func plate(g,rect:Rect2,color:Color=Color("263e46")):
  var p=Panel.new();p.position=rect.position;p.size=rect.size;p.mouse_filter=Control.MOUSE_FILTER_STOP
- p.add_theme_stylebox_override("panel",g.style(color,Color("a9a079"),3,17));g.hud.add_child(p);return p
+ p.add_theme_stylebox_override("panel",g.skin("panel"));g.hud.add_child(p);return p
 static func action(g,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false):
  var b=g.icon_button(g.hud,key,title,rect,func():g.tone("click");callback.call(),primary)
  b.set_meta("hud_action",title)
@@ -83,10 +83,10 @@ static func combat(g):
  for i in range(3):g.stars_view.append(g.icon(g.hud,"star",Rect2(399+i*48,36,43,43)))
  g.objective=text(g,"",Rect2(558,31,280,57),34,TEXT,true)
  action(g,"menu","",Rect2(1158,18,102,91),func():g.open_menu())
- for i in range(2):
-  var key=["melee","archers"][i];var b=action(g,key,"",Rect2(20,185+i*109,130,98),func():g.choose_deploy(key))
-  b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,7);b.get_child(0).size=Vector2(52,52)
-  b.set_meta("count",g.label(b,"",Rect2(65,10,60,48),32,TEXT,true));g.label(b,"Schwert" if i==0 else "Bogen",Rect2(5,60,120,31),24,TEXT,true)
+ for i in range(4):
+  var key=g.Catalog.TROOP_ORDER[i];var b=action(g,key,"",Rect2(20+(i%2)*112,185+int(i/2)*109,104,98),func():g.choose_deploy(key))
+  b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,7);b.get_child(0).size=Vector2(44,44)
+  b.set_meta("count",g.label(b,"",Rect2(49,10,50,48),32,TEXT,true));g.label(b,["Schwert","Bogen","Schild","Stein"][i],Rect2(3,60,98,31),20,TEXT,true)
  g.create_stick()
  plate(g,Rect2(265,617,460,85));g.icon(g.hud,g.sim.hero_key(),Rect2(274,626,67,67))
  text(g,g.sim.stats().name,Rect2(350,620,204,35),27,GOLD)
@@ -110,7 +110,7 @@ static func scout(g):
  g.button(g.hud,"Zurück",Rect2(20,608,215,96),func():g.return_home())
  g.button(g.hud,"Kampagne",Rect2(247,608,208,96),func():g.open_campaign())
  g.button(g.hud,"Freie Lager" if g.sim.campaign_index>=0 else "Nächstes Dorf",Rect2(470,608,335,96),func():g.open_raid() if g.sim.campaign_index>=0 else g.scout_next())
- var b=action(g,"attack","ANGREIFEN",Rect2(991,597,269,107),func():g.start_raid(),true);b.disabled=g.progress.data.melee+g.progress.data.archers==0
+ var b=action(g,"attack","ANGREIFEN",Rect2(991,597,269,107),func():g.start_raid(),true);b.disabled=g.Catalog.army_count(g.progress.data)==0
 static func update(g):
  if not g.stats:return
  for key in g.resource_bars:

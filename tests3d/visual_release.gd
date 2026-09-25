@@ -30,6 +30,7 @@ func run():
  game.selected_obstacle="o1";game.remove_selected_obstacle();check(game.progress.obstacle_job_for("o1").size()>0 and game.world.workers.size()>0,"obstacle removal renders a worker")
  await shot("worker-final")
  game.open_building("hall");await shot("upgrade-final");game.close_dialog();game.open_catalog();await shot("catalog-final");game.close_dialog()
+ game.open_upgrades();await shot("progression-map");game.close_dialog()
  game.open_army();await shot("army-final");game.close_dialog();game.open_training();await shot("training-final");game.close_dialog();game.open_shop();await shot("shop-final");game.close_dialog()
  game.open_campaign();await shot("campaign-map")
  check(game.dialog=="campaign","campaign map opens with ten stages")

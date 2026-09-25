@@ -31,7 +31,7 @@ var raid_building_total=0
 var attack_side="south"
 var priority="nearest"
 var first_target=""
-var reserve={"melee":0,"archers":0}
+var reserve={"melee":0,"archers":0,"shield":0,"siege":0}
 var manual_deployment=false
 var alarm=false
 var traps:Array=[]
@@ -54,18 +54,25 @@ func unit(kind:String,pos:Vector2,hp:float,damage:float,team:String) -> Dictiona
 func make_hero(pos:Vector2):
  var c=stats();var level=Catalog.level(profile,hero_key())
  hero=unit("hero",pos,c.hp+35*(int(profile.hall)-1)+20*(level-1)+25*training("vitality"),c.damage+8*(int(profile.smithy)-1)+4*(level-1)+6*training("power")+(12 if profile.sword else 0),"ally")
+ for site in profile.get("structures",[]):
+  if site.kind=="hero_hall":hero.hp+=15*int(site.level);hero.max_hp=hero.hp
  hero.class_key=hero_key()
 func home():
  campaign_index=-1
- mode="home";time=0;pending_hits.clear();pending_skills.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
+ mode="home";time=0;pending_hits.clear();pending_skills.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0,"shield":0,"siege":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
 func soldier(kind:String,pos:Vector2) -> Dictionary:
- var rank=int(profile.get("training",{}).get("troops",{}).get("archers" if kind=="archer" else "melee",0))
- return unit(kind,pos,(205 if kind=="melee" else 135)+int(profile.barracks)*30+20*rank,18+int(profile.barracks)*5+4*rank,"ally")
+ var key="archers" if kind=="archer" else kind
+ var rank=int(profile.get("training",{}).get("troops",{}).get(key,0))
+ var spec=Catalog.TROOPS[key]
+ return unit(kind,pos,int(spec.hp)+int(profile.barracks)*30+20*rank,int(spec.damage)+int(profile.barracks)*5+4*rank,"ally")
 func form_army():
  allies.clear()
- var total=int(profile.melee)+int(profile.archers)
+ var roster=[]
+ for key in Catalog.TROOP_ORDER:
+  for n in range(int(profile.get(key,0))):roster.append("archer" if key=="archers" else key)
+ var total=roster.size()
  for i in range(total):
-  var kind="melee" if i<int(profile.melee) else "archer"
+  var kind=roster[i]
   var barracks_pos:Vector2=Vector2(profile.get("core_positions",{}).get("barracks",{}).get("x",-12),profile.get("core_positions",{}).get("barracks",{}).get("z",2))
   for site in profile.get("structures",[]):
    if site.kind=="camp":barracks_pos=Vector2(site.x,site.z);break
@@ -81,11 +88,11 @@ func deployment_valid(pos:Vector2) -> bool:
  return true
 func deploy(kind:String,pos:Vector2) -> bool:
  if mode!="raid" or result!="" or not reserve.has(kind) or int(reserve[kind])<=0 or not deployment_valid(pos):return false
- reserve[kind]-=1;allies.append(soldier("archer" if kind=="archers" else "melee",pos));return true
+ reserve[kind]-=1;allies.append(soldier("archer" if kind=="archers" else kind,pos));return true
 func deploy_all():
  var center=entry_position();var along=Vector2(1,0) if attack_side in ["south","north"] else Vector2(0,1)
  var n=0
- for kind in ["melee","archers"]:
+ for kind in Catalog.TROOP_ORDER:
   while int(reserve[kind])>0:
    var pos=center+along*((n%7)-3)*1.25
    if not deploy(kind,pos):break
@@ -102,7 +109,7 @@ func home_buildings():
   item.construction=b.construction;item.stock=float(b.get("stock",0.0));buildings.append(item)
 func reset_battle():
  pending_hits.clear();pending_skills.clear();audio_events.clear();looted={"wood":0,"stone":0,"gold":0}
- time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0}
+ time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0,"shield":0,"siege":0}
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
 func layout(index:int):
  selected_village=maxi(0,index);village=Catalog.campaign(campaign_index) if campaign_index>=0 else Catalog.matched_village(selected_village,profile)
@@ -181,10 +188,10 @@ func scout_campaign(index:int) -> bool:
  campaign_index=index;scout(index);return true
 func start(index:int=-1,manual:bool=false) -> bool:
  if campaign_index>=0 and not Catalog.campaign_unlocked(profile,campaign_index):return false
- if int(profile.melee)+int(profile.archers)==0:return false
+ if Catalog.army_count(profile)==0:return false
  if index<0:index=selected_village
  mode="raid";reset_battle();layout(index);make_hero(entry_position());manual_deployment=manual
- if manual:allies.clear();reserve={"melee":int(profile.melee),"archers":int(profile.archers)}
+ if manual:allies.clear();reserve={"melee":int(profile.melee),"archers":int(profile.archers),"shield":int(profile.get("shield",0)),"siege":int(profile.get("siege",0))}
  else:form_army()
  return true
 func start_defense():
@@ -219,6 +226,9 @@ func stars() -> int:
 func targets() -> Array:
  return living(enemies)+(living(buildings) if mode=="raid" else [])
 func army_target(u:Dictionary):
+ if u.kind=="siege" and mode=="raid":
+  var walls=living(buildings).filter(func(b):return b.kind=="wall")
+  if not walls.is_empty():return nearest(u.pos,walls)
  var close_enemy=nearest(u.pos,living(enemies))
  var goal=null
  if close_enemy!=null and distance(u,close_enemy)<(9 if u.kind=="archer" else 4):goal=close_enemy
@@ -381,13 +391,14 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
   if command=="Rückzug":follow=entry_position()+Vector2((i%4-1.5)*.6,0)
   var target=army_target(u) if active() and command!="Rückzug" else null
   if target!=null and (command=="Angriff" or distance(u,target)<5):
-   var reach=8.5 if u.kind=="archer" else 1.3
-   if distance(u,target)>reach:approach(u,target,4.7,dt)
+   var spec=Catalog.TROOPS["archers" if u.kind=="archer" else u.kind]
+   var reach=float(spec.range)
+   if distance(u,target)>reach:approach(u,target,float(spec.speed),dt)
    else:
     u.facing=(target.pos-u.pos).normalized()
     if u.cd<=0:
-     u.cd=1.0 if u.kind=="archer" else .8;animate_attack(u,u.cd*.85)
-     queue_hit(u,target,u.damage,reach,u.kind=="archer",Color("ecd28e"))
+     u.cd=1.8 if u.kind=="siege" else (1.0 if u.kind=="archer" else .8);animate_attack(u,u.cd*.85)
+     queue_hit(u,target,u.damage*(3 if u.kind=="siege" and target.kind=="wall" else 1),reach,u.kind in ["archer","siege"],Color("ecd28e"))
   elif u.pos.distance_to(follow)>1.0:approach(u,{"id":-1,"pos":follow},5.3,dt)
  if not active():return
  if mode=="raid" and not alarm:
@@ -408,7 +419,8 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
   if mode=="raid" and not alarm:continue
   u.awake=true
   var opponents=[hero]+living(allies)+(living(buildings) if mode=="defense" else [])
-  var target=nearest(u.pos,opponents)
+  var protectors=opponents.filter(func(a):return a.kind=="shield" and u.pos.distance_to(a.pos)<7)
+  var target=nearest(u.pos,protectors if not protectors.is_empty() else opponents)
   if target==null:continue
   if u.wind>0:
    u.wind-=dt
@@ -439,7 +451,7 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
    b.cd=2.0;queue_hit(b,target,(12+8*int(b.level))*float(village.get("combat_scale",1.0)),13,true,Color("ffce84"),0)
  if mode=="raid":
   if destruction_percent()>=100:result="victory"
-  elif hero.hp<=0 and living(allies).is_empty() and int(reserve.melee)+int(reserve.archers)==0:result="complete"
+  elif hero.hp<=0 and living(allies).is_empty() and Catalog.army_count(reserve)==0:result="complete"
  elif mode=="defense":
   if hero.hp<=0:result="defeat"
   for b in buildings:

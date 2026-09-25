@@ -5,8 +5,8 @@ const Progress=preload("res://game3d/progress.gd")
 const Battle=preload("res://game3d/battle.gd")
 const World=preload("res://game3d/world.gd")
 const Stick=preload("res://game3d/stick.gd")
-const CREAM=Color("f6e9c7")
-const GOLD=Color("f2c46b")
+const CREAM=Color("493826")
+const GOLD=Color("8b501f")
 var progress
 var save_path=Progress.SAVE
 var sim
@@ -100,12 +100,12 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  parent.add_child(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
  var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
- l.add_theme_color_override("font_shadow_color",Color(0.03,.10,.14,.75));l.add_theme_constant_override("shadow_offset_y",1)
+ l.add_theme_color_override("font_shadow_color",Color(1,.98,.88,.3));l.add_theme_constant_override("shadow_offset_y",1)
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);return l
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",27)
- b.add_theme_color_override("font_color",Color("31251a") if primary else Color("fff0d0"))
+ b.add_theme_color_override("font_color",Color("31251a") if primary else Color("143a60"))
  b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("c3cecf"))
  b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
@@ -118,7 +118,7 @@ func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Call
  var b=button(parent,"",rect,callback,primary);b.name="Action_"+key;b.tooltip_text=title;b.set_meta("icon_key",key)
  var h=minf(47,rect.size.y-32) if title!="" else minf(46,rect.size.y-12)
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
- if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,Color("30291e") if primary else CREAM,true)
+ if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,Color("30291e") if primary else Color("143a60"),true)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
  var index=0
@@ -170,6 +170,7 @@ func _process(dt):
    var imported=JavaScriptBridge.eval("window.__glutwachtImportText || null",true)
    if imported is String and imported!="":
     JavaScriptBridge.eval("window.__glutwachtImportText=null",true);prepare_save_import(imported)
+  var old_hall=int(progress.data.hall)
   var finished=progress.production();production_clock=0
   if finished:
    save()
@@ -178,7 +179,7 @@ func _process(dt):
     refresh_home()
     if old_dialog=="building":open_building(old_building)
     elif old_dialog=="upgrades":open_upgrades()
-    toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else "Bau abgeschlossen!")
+    toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else ("NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(int(progress.data.hall),[])) if int(progress.data.hall)>old_hall else "Bau abgeschlossen!"))
  if save_clock>=15:save();save_clock=0
  cloud_clock+=dt
  if account_active and not cloud_sync_paused and cloud_clock>=45 and not account.busy:
@@ -396,8 +397,8 @@ func open_catalog():
   var unlocked=Catalog.unlocked(k,int(progress.data.hall));var cc=d.cost
   if unlocked:costs(p,cc,Vector2(x+10,y+141),219,13)
   else:icon(p,"lock",Rect2(x+18,y+139,30,30));label(p,"Haupthaus %d"%Catalog.required_hall(k),Rect2(x+56,y+140,158,31),16)
-  var b=button(p,"BAUEN  %d/%d"%[progress.count_kind(k),d.limit] if unlocked else "GESPERRT",Rect2(x+10,y+177,212,40),func():begin_build(k),unlocked)
-  b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
+  var b=button(p,"BAUEN  %d/%d"%[progress.count_kind(k),Catalog.building_limit(k,int(progress.data.hall))] if unlocked else "GESPERRT",Rect2(x+10,y+177,212,40),func():begin_build(k),unlocked)
+  b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=Catalog.building_limit(k,int(progress.data.hall)) or (k!="wall" and progress.free_builders()==0)
 func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
@@ -426,7 +427,14 @@ func place_building():
 func cancel_build():
  build_kind="";move_uid="";world.build_focus=false;close_dialog();sim.home();world.setup(sim);build_hud()
 func open_upgrades():
- open_building("hall")
+ var p=open_dialog("progression","Dein Ausbaupfad","Haupthaus %d · tippe auf Ausbau für Details"%progress.data.hall)
+ for i in range(10):
+  var lv=i+1;var col=int(i/5);var y=118+(i%5)*71;var x=28+col*405
+  panel(p,Rect2(x,y,393,70))
+  label(p,str(lv),Rect2(x+8,y+8,40,50),29,GOLD,true)
+  var row=label(p,("FREI · " if lv<=int(progress.data.hall) else "AB STUFE %d · "%lv)+" · ".join(Catalog.HALL_UNLOCKS[lv]),Rect2(x+54,y+4,326,62),17)
+  row.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"HAUPTHAUS AUSBAUEN",Rect2(370,478,457,50),func():open_building("hall"),true)
 func upgrade_building(uid:String,from:String="detail"):
  if progress.upgrade(uid):
   save();refresh_home();tone("equip")
@@ -449,11 +457,11 @@ func open_building(uid:String):
   label(p,"NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(next,[])),Rect2(342,238,470,58),15,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  elif b.kind=="barracks":
   stat_row(p,"melee","Angriff",str(18+5*level),str(18+5*next),195)
-  label(p,"NEU: Bogenschützen · Haupthaus 2" if level==1 else "Alle Soldaten: +30 Leben",Rect2(344,239,450,42),19,GOLD)
+  label(p,Catalog.upgrade_benefit(b.kind,next),Rect2(344,239,450,60),17,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  elif b.kind=="smithy":stat_row(p,"melee","Heldenangriff","+%d"%(8*(level-1)),"+%d"%(8*(next-1)),195)
  elif b.kind=="tower":stat_row(p,"attack","Schaden",str(12+8*level),str(12+8*next),195)
  elif b.kind=="camp":stat_row(p,"army","Plätze",str(2+2*level),str(2+2*next),195)
- elif b.kind=="hero_hall":label(p,"Heldenprofil & Soforttraining",Rect2(346,199,460,48),20,GOLD)
+ elif b.kind=="hero_hall":label(p,"Held: +15 Leben je Hallenstufe",Rect2(346,199,460,48),20,GOLD)
  var cc=progress.cost(uid);var job=progress.job_for(uid);var reason=""
  if not job.is_empty():reason="Bau läuft: %d s"%ceili(maxf(0,float(job.finish)-Time.get_unix_time_from_system()))
  elif level>=Progress.MAX_LEVEL:reason="MAXIMALE STUFE"
@@ -477,28 +485,32 @@ func confirm_remove(uid:String):
  button(p,"Behalten",Rect2(32,488,468,68),func():open_building(uid),true)
  button(p,"Gebäude abbauen",Rect2(526,488,517,68),func():progress.demolish(uid);save();close_dialog();refresh_home())
 func open_army():
- var p=open_dialog("army","Armee","Plätze %d / %d"%[int(progress.data.melee)+int(progress.data.archers),progress.capacity()])
- var count=int(progress.data.melee)+int(progress.data.archers)
- for i in range(2):
-  var k=["melee","archers"][i];var y=126+i*145;var unlocked=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
-  panel(p,Rect2(28,y,804,130),Color("34545b"));icon(p,k,Rect2(43,y+18,88,88))
-  label(p,"Schwertkämpfer" if i==0 else "Bogenschützen",Rect2(148,y+13,340,37),24,GOLD)
-  label(p,"Nahkampf" if i==0 else "Fernkampf",Rect2(149,y+51,310,28),17)
-  if not unlocked:label(p,"Benötigt Haupthaus 2 + Kaserne 2",Rect2(148,y+87,430,27),15,Color("f1b479"))
-  var minus=button(p,"−",Rect2(548,y+34,72,66),func():progress.army(k,-1);save();refresh_home();open_army());minus.disabled=progress.data[k]==0
-  label(p,str(progress.data[k]),Rect2(625,y+34,72,66),28,CREAM,true)
-  var plus=button(p,"+",Rect2(712,y+34,94,66),func():progress.army(k,1);save();refresh_home();open_army(),true);plus.disabled=count>=progress.capacity() or not unlocked
- button(p,"FERTIG",Rect2(545,447,282,65),func():close_dialog(),true)
-func open_training():
- var key=sim.hero_key();var p=open_dialog("training","Soforttraining","")
- var kinds=["power","vitality","skill","melee","archers"];var names=["Kraft","Leben","Fähigkeit","Schwerter","Bogenschützen"];var effects=["+6 Angriff","+25 Leben","+12% / −0,4s","+20 HP / +4 Angriff","+20 HP / +4 Angriff"]
- for i in range(5):
-  var group="heroes" if i<3 else "troops";var who=key if i<3 else kinds[i];var attribute=kinds[i] if i<3 else "";var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=87+i*86
-  panel(p,Rect2(23,y,814,78),Color("34545b"));icon(p,kinds[i],Rect2(31,y+13,46,46));label(p,names[i]+"  %d/5"%rank,Rect2(86,y+5,259,33),24,GOLD);label(p,effects[i],Rect2(86,y+40,260,29),22)
-  costs(p,cost,Vector2(355,y+24),310,24)
-  var b=icon_button(p,"upgrade","",Rect2(725,y+8,95,61),func():
-   if progress.train(group,who,attribute):save();refresh_home();open_training();tone("equip"),true)
-  b.disabled=rank>=5 or not progress.affordable(cost) or (group=="troops" and not Catalog.troop_unlocked(who,int(progress.data.hall),int(progress.data.barracks)))
+ var p=open_dialog("army","Armee","Plätze %d / %d · Zusammenstellen kostenlos"%[Catalog.army_slots(progress.data),progress.capacity()])
+ var count=Catalog.army_slots(progress.data)
+ for i in range(Catalog.TROOP_ORDER.size()):
+  var k=Catalog.TROOP_ORDER[i];var d=Catalog.TROOPS[k];var y=121+i*83;var unlocked=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
+  panel(p,Rect2(28,y,804,78));icon(p,k,Rect2(43,y+10,65,65))
+  label(p,d.name,Rect2(125,y+2,402,30),23,GOLD)
+  label(p,d.role if unlocked else "Haupthaus %d + Kaserne %d"%[d.hall,d.barracks],Rect2(125,y+36,410,38),17)
+  var minus=button(p,"−",Rect2(550,y+12,65,62),func():progress.army(k,-1);save();refresh_home();open_army());minus.disabled=int(progress.data.get(k,0))==0
+  label(p,str(progress.data.get(k,0)),Rect2(625,y+12,65,62),27,CREAM,true)
+  var plus=button(p,"+",Rect2(712,y+12,94,62),func():progress.army(k,1);save();refresh_home();open_army(),true);plus.disabled=count+int(d.slots)>progress.capacity() or not unlocked
+ button(p,"FERTIG",Rect2(545,471,282,55),func():close_dialog(),true)
+func open_training(troops:bool=false):
+ var key=sim.hero_key();var p=open_dialog("training","Soforttraining","Dauerhafte Verbesserung · keine Wartezeit")
+ button(p,"HELD",Rect2(28,117,388,51),func():open_training(false),not troops)
+ button(p,"TRUPPEN",Rect2(432,117,388,51),func():open_training(true),troops)
+ var kinds=Catalog.TROOP_ORDER if troops else ["power","vitality","skill"]
+ for i in range(kinds.size()):
+  var kind=kinds[i];var group="troops" if troops else "heroes";var who=kind if troops else key;var attribute="" if troops else kind
+  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=175+i*86
+  var title=Catalog.TROOPS[kind].name if troops else {"power":"Kraft","vitality":"Leben","skill":"Fähigkeit"}[kind]
+  var effect="+20 Leben / +4 Angriff" if troops else {"power":"+6 Angriff","vitality":"+25 Leben","skill":"+12% / −0,4s"}[kind]
+  panel(p,Rect2(23,y,814,83));icon(p,kind,Rect2(31,y+17,46,46));label(p,title+"  %d/5"%rank,Rect2(86,y+4,320,32),22,GOLD);label(p,effect,Rect2(86,y+40,310,29),19)
+  costs(p,cost,Vector2(410,y+24),280,21)
+  var b=icon_button(p,"upgrade","",Rect2(725,y+10,95,61),func():
+   if progress.train(group,who,attribute):save();refresh_home();open_training(troops);tone("equip"),true)
+  b.disabled=rank>=5 or not progress.affordable(cost) or (troops and not Catalog.troop_unlocked(who,int(progress.data.hall),int(progress.data.barracks)))
 func priority_name(key:String) -> String:return {"nearest":"Nächstes Ziel","defenses":"Verteidigung","hall":"Haupthaus","resources":"Rohstoffe"}.get(key,"Nächstes Ziel")
 func open_attack_plan():
  close_dialog()
@@ -553,7 +565,7 @@ func open_campaign_stage(index:int):
  close_dialog();build_kind="";selected_building="";world.build_focus=false;world.setup(sim);build_hud()
 func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
 func start_raid():
- if sim.start(-1,true):close_dialog();result_shown=false;deploying="melee" if sim.reserve.melee>0 else "archers";world.setup(sim);build_hud();tone("equip")
+ if sim.start(-1,true):close_dialog();result_shown=false;deploying=Catalog.TROOP_ORDER.filter(func(k):return int(sim.reserve.get(k,0))>0)[0];world.setup(sim);build_hud();tone("equip")
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
 func end_raid():
@@ -596,7 +608,7 @@ func open_local_overview(status:bool=false):
  if status:
   rows=[["worker","Bauarbeiter","%d frei von %d"%[progress.free_builders(),progress.builders()]], ["collect","Lager","%d Kapazität je Rohstoff"%progress.storage()], ["star","Siege",str(progress.data.wins)]]
  else:
-  rows=[["upgrade","Dorf erweitern","Gebäude antippen und Ausbau prüfen"], ["army","Armee vorbereiten","%d / %d Armeeplätze belegt"%[progress.data.melee+progress.data.archers,progress.capacity()]], ["attack","Beute sammeln","Gegner ansehen und gezielt angreifen"]]
+  rows=[["upgrade","Dorf erweitern","Gebäude antippen und Ausbau prüfen"], ["army","Armee vorbereiten","%d / %d Armeeplätze belegt"%[Catalog.army_slots(progress.data),progress.capacity()]], ["attack","Beute sammeln","Gegner ansehen und gezielt angreifen"]]
  for i in range(rows.size()):
   var y=106+i*104;panel(p,Rect2(28,y,804,91));icon(p,rows[i][0],Rect2(45,y+17,53,53));label(p,rows[i][1],Rect2(117,y+9,655,32),24,GOLD);label(p,rows[i][2],Rect2(118,y+49,660,30),20)
  label(p,"Lokaler Spielstand · kein Online-Postfach",Rect2(29,437,803,28),18,CREAM,true)

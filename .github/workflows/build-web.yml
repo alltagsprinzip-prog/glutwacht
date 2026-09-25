@@ -35,6 +35,8 @@ jobs:
         run: python3 tools/check_godot.py logs/account_save_suite.log godot --headless --path . --script tests3d/account_save_suite.gd
       - name: Campaign progression and save tests
         run: python3 tools/check_godot.py logs/campaign.log godot --headless --path . --script tests3d/campaign_suite.gd
+      - name: Troop unlock and progression tests
+        run: python3 tools/check_godot.py logs/progression.log godot --headless --path . --script tests3d/progression_suite.gd
       - name: HUD geometry and dialog tests
         run: python3 tools/check_godot.py logs/hud_layout_suite.log godot --headless --path . --script tests3d/hud_layout_suite.gd
       - name: Existing upstream regression gate

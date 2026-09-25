@@ -13,7 +13,7 @@ func _init():data=fresh()
 func new_training() -> Dictionary:
  var heroes={}
  for key in Catalog.HERO_ORDER:heroes[key]={"power":0,"vitality":0,"skill":0}
- return {"heroes":heroes,"troops":{"melee":0,"archers":0}}
+ return {"heroes":heroes,"troops":{"melee":0,"archers":0,"shield":0,"siege":0}}
 func fresh_obstacles() -> Array:
  return [
   {"uid":"o1","kind":"tree","x":-27.0,"z":-24.0},
@@ -26,7 +26,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"player_name":"Mein Dorf","claimed_tasks":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"player_name":"Mein Dorf","claimed_tasks":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -52,7 +52,7 @@ func training_cost(group:String,key:String,attribute:String="") -> Dictionary:
 func train(group:String,key:String,attribute:String="") -> bool:
  if group not in ["heroes","troops"]:return false
  if group=="heroes" and (key!=String(data.hero) or not Catalog.HEROES.has(key) or attribute not in ["power","vitality","skill"]):return false
- if group=="troops" and (key not in ["melee","archers"] or not Catalog.troop_unlocked(key,int(data.hall),int(data.barracks))):return false
+ if group=="troops" and (key not in Catalog.TROOP_ORDER or not Catalog.troop_unlocked(key,int(data.hall),int(data.barracks))):return false
  if training_level(group,key,attribute)>=5:return false
  var c=training_cost(group,key,attribute)
  if not affordable(c):return false
@@ -108,9 +108,10 @@ func finish_upgrade(uid:String,target:int):
   for item in data.structures:
    if item.uid==uid:item.level=target
 func army(kind:String,change:int) -> bool:
- if kind not in ["melee","archers"] or not Catalog.troop_unlocked(kind,int(data.hall),int(data.barracks)):return false
+ if kind not in Catalog.TROOP_ORDER:return false
+ if change>0 and not Catalog.troop_unlocked(kind,int(data.hall),int(data.barracks)):return false
  var amount=int(data[kind])+change
- if amount<0 or int(data.melee)+int(data.archers)+change>capacity():return false
+ if amount<0 or (change>0 and Catalog.army_slots(data)+change*int(Catalog.TROOPS[kind].slots)>capacity()):return false
  data[kind]=amount;return true
 func can_change_hero() -> bool:return data.hero==""
 func choose_hero(key:String) -> bool:
@@ -126,7 +127,7 @@ func placement_error(kind:String,pos:Vector2,ignore_uid:String="") -> String:
  if not Catalog.unlocked(kind,int(data.hall)):return "Freischaltung ab Haupthaus-Stufe %d."%Catalog.required_hall(kind)
  var radius=float(Catalog.BUILD[kind].radius)
  if absf(pos.x)>31-radius or absf(pos.y)>31-radius:return "Außerhalb deiner Dorfgrenze."
- if ignore_uid=="" and count_kind(kind)>=int(Catalog.BUILD[kind].limit):return "Maximale Anzahl dieses Gebäudes erreicht."
+ if ignore_uid=="" and count_kind(kind)>=Catalog.building_limit(kind,int(data.hall)):return "Maximale Anzahl dieses Gebäudes erreicht."
  if pos.distance_to(Vector2(0,18))<4.5:return "Der Sammelplatz der Armee muss frei bleiben."
  for o in data.get("obstacles",[]):
   var r=1.8 if o.kind=="tree" else 1.5
@@ -332,6 +333,7 @@ func load_file(path:String=SAVE) -> bool:
  # Restore the roster only after camp capacity is known. Never truncate a valid old army.
  var saved_melee=maxi(0,int(parsed.get("melee",5)));var saved_archers=maxi(0,int(parsed.get("archers",0)))
  data.melee=mini(saved_melee,200);data.archers=mini(saved_archers,200)
+ for kind in ["shield","siege"]:data[kind]=clampi(int(parsed.get(kind,0)),0,200)
  if int(parsed.version)>=4:
   var training=parsed.get("training",{})
   if training is Dictionary:
@@ -341,7 +343,7 @@ func load_file(path:String=SAVE) -> bool:
      if heroes.get(k) is Dictionary:
       for a in ["power","vitality","skill"]:data.training.heroes[k][a]=clampi(int(heroes[k].get(a,0)),0,5)
    if troops is Dictionary:
-    for k in ["melee","archers"]:data.training.troops[k]=clampi(int(troops.get(k,0)),0,5)
+    for k in Catalog.TROOP_ORDER:data.training.troops[k]=clampi(int(troops.get(k,0)),0,5)
   var jobs=parsed.get("jobs",[])
   if jobs is Array:
    for job in jobs:
@@ -360,7 +362,7 @@ static func validate_save(raw) -> String:
  if not raw is Dictionary:return "Die Sicherung enthält kein Dorf."
  if not raw.get("version") is float and not raw.get("version") is int:return "Version fehlt."
  if int(raw.version) not in [2,3,4,5,6,7]:return "Unbekannte Spielstandversion."
- for key in ["wood","stone","gold","gems","hall","barracks","smithy","melee","archers","wins","builder_bonus","next_uid","last_production"]:
+ for key in ["wood","stone","gold","gems","hall","barracks","smithy","melee","archers","shield","siege","wins","builder_bonus","next_uid","last_production"]:
   if raw.has(key) and (not numeric(raw[key]) or float(raw[key])<0):return "Ungültiges Zahlenfeld: "+key
  if not raw.get("campaign_stars",{}) is Dictionary:return "Ungültige Kampagne."
  for stage in raw.get("campaign_stars",{}):
