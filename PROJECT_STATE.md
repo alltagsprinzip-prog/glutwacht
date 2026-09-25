@@ -31,3 +31,7 @@ Supabase read-only bestätigt player_saves mit aktiviertem RLS. Keine Datenbank-
 ## Nicht wiederholen
 Supabase totszgelioskmbmkmetd, Free, existiert. SMTP über Brevo eingerichtet; Mail empfangen und bestätigt. Keine Schlüssel erfragen. Ein privilegierter Admin-Testendpunkt wurde früher durch automatische Sicherheitsprüfung abgelehnt und nicht eingerichtet; nicht erneut/indirekt versuchen. Echte Accounttests nicht durch synthetische SQL-Identitäten vortäuschen.
 Persönliche Saves nie löschen oder ungefragt überschreiben. Öffentliche alte Spieladresse und private Testadresse haben getrennte lokale Browserstände.
+
+## Veröffentlichung dieses Meilensteins
+Privater Test erfolgreich aktualisiert am 26.09.2026, 00:35 Europe/Berlin. Spielcode 1bf2699999ab92cae0bbddf792a0f007ab6f20a4, ergänzender Migrationstest ef73874cc90472429136afcee1f6c3e84076e93a. Sites-Quellcommit 47ae0d53c03cacb18f23a3c650933f574dcd596d; Deployment appgdep_6ab6f72ff36881918b78dee2ec918e88 succeeded. Gleicher Link und /v08/, keine lokalen Saves gelöscht. Erstes Archiv wegen unvollständiger Kompression abgelehnt; bereinigtes Archiv vor Upload mit gzip -t geprüft. PCK lädt zusätzlich als exportiertes Paket in Godot.
+Weitere Nachweise: Touch 51/51, Migration/Fähigkeiten 73/73, ursprünglicher Release-Gate bestanden. GitHub-Datenbanklauf 36197182222 erfolgreich; Spiellauf 36197182223 zuletzt noch in Arbeit (Touch erfolgreich). Nachfolgend abschließenden CI-WebGL-Status abrufen; nicht mit realer iPhone-Abnahme verwechseln.
