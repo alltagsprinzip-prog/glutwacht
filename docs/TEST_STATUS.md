@@ -24,7 +24,9 @@ Projekt totszgelioskmbmkmetd: private Save-Migration und RLS-Triggerhärtung ang
 - Reproduzierbar: backend/acceptance/live_rls_rollback.sql. Dies beweist RLS/RPC-Verhalten, keine echten Anmeldungen oder parallelen Verbindungen.
 - Öffentliche HTTP-Anfragen ohne Nutzer-Token: SELECT und Save-RPC jeweils 401.
 - Nach Rollback: null Auth-Nutzer, null Saves. Keine Testdaten verblieben.
-- Site-/Redirect-URL gesetzt; Custom SMTP noch aus. Öffentlicher E-Mail-Versand ist blockiert.
+- Site-/Redirect-URL gesetzt; Brevo Custom SMTP nach Neuladen aktiviert und Schlüssel als gespeichert angezeigt. Echte Zustellung noch nicht geprüft.
 
 ## Noch offen
 Echte Supabase-Auth/PostgREST-Sitzungen, drei Live-Konten, zwei Geräte, parallele Sitzungen/Last und echte E-Mail-Wiederherstellung. PGlite besitzt nur eine Verbindung und beweist keine Parallelität. Zieltelefon/Safe-Area-Abnahme sowie Vorher/Nachher-Nutzerprobe offen. Kein serverautorisiertes PvP.
+
+CI-Nachtrag: Beide Workflows auf 1efa2fe erfolgreich (Spiel 36186155713, Datenbank 36186155762).
