@@ -321,14 +321,16 @@ func heal():
   potion-=1;hero.hp=minf(hero.max_hp,hero.hp+200)
   effects.append({"kind":"skill","pos":hero.pos,"life":.6,"max":.6,"color":Color("82eb9b")})
 func step(dt:float,input:Vector2):
- dt=minf(dt,.05)
+ # Bound movement integration, but never stretch the raid deadline on slow devices.
+ var elapsed=maxf(0,dt)
+ dt=minf(elapsed,.05)
  if mode=="scout":return
  for e in effects:e.life-=dt
  effects=effects.filter(func(e):return e.life>0)
  for e in combat_texts:e.life-=dt
  combat_texts=combat_texts.filter(func(e):return e.life>0)
  if result!="":return
- time+=dt;attack_cd=maxf(0,attack_cd-dt);skill_cd=maxf(0,skill_cd-dt);roll_cd=maxf(0,roll_cd-dt);invulnerable=maxf(0,invulnerable-dt)
+ time+=elapsed;attack_cd=maxf(0,attack_cd-dt);skill_cd=maxf(0,skill_cd-dt);roll_cd=maxf(0,roll_cd-dt);invulnerable=maxf(0,invulnerable-dt)
  for u in [hero]+allies+enemies:
   u.flash=maxf(0,u.flash-dt);u.attack_time=maxf(0,u.attack_time-dt)
   if u.hp<=0:u.dead_time+=dt

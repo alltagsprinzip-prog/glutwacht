@@ -46,6 +46,8 @@ jobs:
           test -s dist/v08/index.pck
           touch dist/.nojekyll
           cp tools/web_entry.html dist/index.html
+          mkdir -p dist/v08final
+          sed 's#\./v08/#../v08/#g' tools/web_entry.html > dist/v08final/index.html
       - name: Browser runtime
         uses: actions/setup-node@v4
         with:

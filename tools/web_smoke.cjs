@@ -11,6 +11,8 @@ const assert=require('node:assert/strict');
   browser=await chromium.launch({headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--disable-dev-shm-usage']});
   const context=await browser.newContext({viewport:{width:1280,height:720},hasTouch:true});
   const page=await context.newPage();
+  page.setDefaultTimeout(45000);
+  await page.route('**/favicon.ico',route=>route.fulfill({status:204,body:''}));
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
   await page.goto('http://127.0.0.1:8765/v08/?qa=1',{timeout:60000});
@@ -51,18 +53,24 @@ const assert=require('node:assert/strict');
    await wait(new Function(`return window.__glutwacht.reserve.melee===${before.reserve.melee-1}`));
   }
   await page.screenshot({path:'logs/browser/raid.png'});
+  console.log('Browser deployment verified',JSON.stringify(await state()));
   // Let the actual simulation reach defeat/victory/timeout without forcing a result.
   await wait(()=>window.__glutwacht?.dialog==='result',240000);
   await page.screenshot({path:'logs/browser/result.png'});
   await tap(640,574);await wait(()=>window.__glutwacht?.mode==='home' && window.__glutwacht.dialog==='');
-  fs.writeFileSync('logs/browser/result.json',JSON.stringify({state:await state(),errors},null,2));
+  const afterRaid=await state();
+  await page.goto('http://127.0.0.1:8765/v08final/');
+  await wait(()=>window.__glutwacht?.mode==='home' && window.__glutwacht.dialog==='',120000);
+  assert.equal((await state()).hero,afterRaid.hero,'old bookmarked URL retains the hero');
+  assert.equal((await state()).gold,afterRaid.gold,'old bookmarked URL retains resources');
+  fs.writeFileSync('logs/browser/result.json' ,JSON.stringify({state:await state(),errors},null,2));
   assert.deepEqual(errors,[],'browser has no runtime errors');
   console.log('WEB_SMOKE_OK: WebGL boot, touch joystick, dialogs, persistent hero/resources, five single deployments, full raid, return home');
  } catch(error) {
   if(browser){
    const page=browser.contexts()[0]?.pages()[0];
    if(page){
-    await page.screenshot({path:'logs/browser/failure.png'}).catch(()=>{});
+    await page.screenshot({path:'logs/browser/failure.png',timeout:15000}).catch(()=>{});
     const state=await page.evaluate(()=>({state:window.__glutwacht,errors:window.__glutwachtErrors,canvas:{width:document.querySelector('canvas')?.width,height:document.querySelector('canvas')?.height}})).catch(()=>null);
     fs.writeFileSync('logs/browser/failure.json',JSON.stringify(state,null,2));
     console.error('Browser state at failure',JSON.stringify(state));
