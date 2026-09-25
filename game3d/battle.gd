@@ -320,10 +320,10 @@ func heal():
  if active() and result=="" and potion>0 and hero.hp>0 and hero.hp<hero.max_hp:
   potion-=1;hero.hp=minf(hero.max_hp,hero.hp+200)
   effects.append({"kind":"skill","pos":hero.pos,"life":.6,"max":.6,"color":Color("82eb9b")})
-func step(dt:float,input:Vector2):
+func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
  # Bound movement integration, but never stretch the raid deadline on slow devices.
- var elapsed=maxf(0,dt)
- dt=minf(elapsed,.05)
+ var elapsed=maxf(0,elapsed_seconds if elapsed_seconds>=0 else dt)
+ dt=clampf(dt,0,.05)
  if mode=="scout":return
  for e in effects:e.life-=dt
  effects=effects.filter(func(e):return e.life>0)

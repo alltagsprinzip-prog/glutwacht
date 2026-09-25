@@ -50,7 +50,7 @@ func _initialize():
  for site in nonwall:b.damage(site,99999)
  b.step(.01,Vector2.ZERO);check(b.stars()==3 and b.destruction_percent()==100 and b.result=="victory","100 percent ends with three stars")
  b.start(0,true);b.time=179.99;b.step(.02,Vector2.ZERO);check(b.result=="timeout","three minute time limit")
- b.start(0,true);b.time=179.0;b.step(1.1,Vector2.ZERO)
+ b.start(0,true);b.time=179.0;b.step(.05,Vector2.ZERO,1.1)
  check(b.result=="timeout","slow rendered frame does not extend the raid deadline")
  b.start(0,true);var t=b.unit("guard",b.hero.pos+Vector2(0,-1),10000,0,"enemy");b.enemies=[t];b.buildings=[]
  b.strike();check(t.hp==10000,"melee windup has no immediate damage")

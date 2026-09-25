@@ -61,6 +61,7 @@ var loot_labels:Dictionary={}
 var stars_view:Array=[]
 var inspect_text:Label
 var browser_qa=false
+var last_frame_tick=0
 func _ready():
  if OS.has_feature("web"):browser_qa=bool(JavaScriptBridge.eval("new URLSearchParams(location.search).has('qa')"))
  progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data)
@@ -262,6 +263,10 @@ func movement() -> Vector2:
  v+=Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
  return world.screen_to_direction(v.limit_length(1))
 func _process(dt):
+ var frame_tick=Time.get_ticks_usec()
+ # Godot also caps its process delta at low FPS; use a monotonic wall clock for raids.
+ var elapsed=float(frame_tick-last_frame_tick)/1000000.0 if last_frame_tick>0 else dt
+ last_frame_tick=frame_tick
  if not sim:return
  clock+=dt;production_clock+=dt;save_clock+=dt;sound_time=maxf(0,sound_time-dt)
  if production_clock>=1:
@@ -278,7 +283,7 @@ func _process(dt):
  if not paused:
   update_gestures(dt)
   var hp=sim.hero.hp
-  sim.step(dt,movement())
+  sim.step(dt,movement(),elapsed)
   for cue in sim.audio_events:tone(cue)
   sim.audio_events.clear()
   if held or Input.is_physical_key_pressed(KEY_J):

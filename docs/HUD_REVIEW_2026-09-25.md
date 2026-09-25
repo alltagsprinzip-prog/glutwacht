@@ -27,6 +27,6 @@ No existing user save was accessed or deleted. Tests use isolated fixtures. This
 
 The exported game was exercised in Chromium/WebGL2 on GitHub Actions. Touch joystick movement, catalogue/shop closing, hero/resource persistence after reload and five single deployments succeeded. Screenshots confirm the new HUD.
 
-The full-raid test exposed a real bug: the movement delta cap also capped elapsed raid time. On the very slow software renderer, four real minutes advanced the timer by only 14 seconds. The raid clock now uses elapsed frame time while movement integration retains its stability cap. A regression test covers a delayed frame crossing the raid deadline.
+The full-raid test exposed a real bug: the movement delta cap also capped elapsed raid time. On the very slow software renderer, four real minutes advanced the timer by only 14 seconds. Godot itself also bounds process delta at low FPS (confirmed with a 1 FPS probe). The raid clock now receives monotonic elapsed real time from the main loop while movement integration retains its stability cap. Paused frames update the clock reference without advancing combat. A regression test covers a delayed frame crossing the raid deadline.
 
 The updated full browser gate must pass before merge/publication. No mobile FPS claim. Continued in isolated PR #3 after another work session modified the former shared review branch.
