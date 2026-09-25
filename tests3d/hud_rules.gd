@@ -19,8 +19,11 @@ func _initialize():
  p.upgrade("hall",now);p.upgrade("smithy",now);p.data.last_production=now
  var before=p.data.duplicate(true);write_raw(path,before);var original=FileAccess.get_file_as_string(path)
  var q=P.new();check(q.load_file(path),"existing levelled schema-7 save loads")
- for k in ["hero","hero_id","hall","barracks","smithy","wood","stone","gold","gems","wins","xp","training","obstacles","melee","archers","sword","builder_bonus","next_uid"]:check(q.data[k]==before[k],"preserves "+k)
+ for k in ["hero","hero_id","hall","barracks","smithy","wood","stone","gold","gems","wins","xp","obstacles","melee","archers","sword","builder_bonus","next_uid"]:check(q.data[k]==before[k],"preserves "+k)
  check(Vector2(q.data.core_positions.hall.x,q.data.core_positions.hall.z)==Vector2(before.core_positions.hall.x,before.core_positions.hall.z),"core building positions preserved")
+ check(q.data.training.heroes==before.training.heroes,"preserves all hero training")
+ for troop in before.training.troops:check(q.data.training.troops[troop]==before.training.troops[troop],"preserves training "+troop)
+ check(q.data.training.troops.shield==0 and q.data.training.troops.siege==0,"new training fields default zero without changing legacy values")
  var jobs_ok=q.data.jobs.size()==before.jobs.size()
  for i in range(mini(q.data.jobs.size(),before.jobs.size())):
   var a=q.data.jobs[i];var b=before.jobs[i]
