@@ -24,12 +24,13 @@ const assert=require('node:assert/strict');
   const start=await state();
   const cdp=await context.newCDPSession(page);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:145,y:502,id:4}]});
-  await page.waitForTimeout(1500);
+  await page.waitForFunction(p=>Math.hypot(window.__glutwacht.hero_x-p.hero_x,window.__glutwacht.hero_z-p.hero_z)>1,start,{timeout:30000});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:300,y:502,id:4}]});
   await page.waitForTimeout(500);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForTimeout(1200);
   const moved=await state();
+  console.log('Joystick observations',JSON.stringify({start,moved}));
   assert.ok(Math.hypot(moved.hero_x-start.hero_x,moved.hero_z-start.hero_z)>1,'joystick moves hero');
   await page.screenshot({path:'logs/browser/home.png'});
   for(const [x,y,name,closeX] of [[1040,654,'catalog',1104],[1188,654,'shop',1025]]){
@@ -57,5 +58,16 @@ const assert=require('node:assert/strict');
   fs.writeFileSync('logs/browser/result.json',JSON.stringify({state:await state(),errors},null,2));
   assert.deepEqual(errors,[],'browser has no runtime errors');
   console.log('WEB_SMOKE_OK: WebGL boot, touch joystick, dialogs, persistent hero/resources, five single deployments, full raid, return home');
+ } catch(error) {
+  if(browser){
+   const page=browser.contexts()[0]?.pages()[0];
+   if(page){
+    await page.screenshot({path:'logs/browser/failure.png'}).catch(()=>{});
+    const state=await page.evaluate(()=>({state:window.__glutwacht,errors:window.__glutwachtErrors,canvas:{width:document.querySelector('canvas')?.width,height:document.querySelector('canvas')?.height}})).catch(()=>null);
+    fs.writeFileSync('logs/browser/failure.json',JSON.stringify(state,null,2));
+    console.error('Browser state at failure',JSON.stringify(state));
+   }
+  }
+  throw error;
  } finally {if(browser)await browser.close();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
