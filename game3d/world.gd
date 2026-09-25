@@ -392,6 +392,36 @@ func effect_visual(e:Dictionary) -> Node3D:
   for i in range(3):
    var tail=SphereMesh.new();tail.radius=.08-float(i)*.015;tail.height=tail.radius*2;tail.radial_segments=6;tail.rings=3
    mesh_node(tail,Vector3(0,0,.25+float(i)*.18),material(color,.4,true),root)
+ elif kind=="mage":
+  # Target rune, descending crystal and an impact halo are separate silhouettes.
+  for radius in [2.8,3.3]:
+   var rune=TorusMesh.new();rune.inner_radius=radius-.09;rune.outer_radius=radius;rune.rings=32;rune.ring_segments=6
+   mesh_node(rune,Vector3(0,.16,0),material(color,.3,true),root)
+  for i in range(8):
+   var mark=BoxMesh.new();mark.size=Vector3(.16,.1,.65)
+   var a=i*TAU/8;var node=mesh_node(mark,Vector3(cos(a)*3.0,.18,sin(a)*3.0),material(color,.3,true),root);node.rotation.y=-a
+  var crystal=PrismMesh.new();crystal.size=Vector3(1.0,2.7,1.0)
+  var meteor=mesh_node(crystal,Vector3(0,7,0),material(Color("dcecff"),.3,true),root);meteor.name="FallingRune"
+ elif kind=="warrior":
+  for i in range(2):
+   var shock=TorusMesh.new();shock.inner_radius=.8+i*.6;shock.outer_radius=1.0+i*.6;shock.rings=32;shock.ring_segments=6
+   mesh_node(shock,Vector3(0,.1+i*.1,0),material(color,.6,true),root)
+  for i in range(10):
+   var rock=BoxMesh.new();rock.size=Vector3(.28,.45,.35)
+   var a=i*TAU/10;var shard=mesh_node(rock,Vector3(cos(a)*1.4,.3,sin(a)*1.4),material(Color("c99a68")),root)
+   shard.rotation=Vector3(a,.4,a*.5)
+ elif kind=="shaman":
+  var halo=TorusMesh.new();halo.inner_radius=3.6;halo.outer_radius=3.75;halo.rings=40;halo.ring_segments=6
+  mesh_node(halo,Vector3(0,.18,0),material(color,.5,true),root)
+  for i in range(9):
+   var spirit=SphereMesh.new();spirit.radius=.18;spirit.height=.65;spirit.radial_segments=8;spirit.rings=4
+   var a=i*TAU/9
+   mesh_node(spirit,Vector3(cos(a)*2.5,.8+i*.16,sin(a)*2.5),material(Color("baffdc"),.3,true),root)
+ elif kind=="ninja":
+  for i in range(3):
+   var slash=BoxMesh.new();slash.size=Vector3(.11,.13,3.6)
+   var blade=mesh_node(slash,Vector3((i-1)*.5,1+i*.3,0),material(Color("ead7ff"),.3,true),root)
+   blade.rotation=Vector3(.4,(-.6 if i%2==0 else .6),.7)
  elif kind=="afterimage":
   var shape=CapsuleMesh.new();shape.radius=.35;shape.height=2.5;shape.radial_segments=8;shape.rings=4
   mesh_node(shape,Vector3(0,1.3,0),material(Color(color,.3),.7,true),root)
@@ -416,10 +446,18 @@ func update_effects(sim):
   else:
    root.position=Vector3(e.pos.x,.12,e.pos.y)
    var radius=1.0+t*.5
-   if e.kind in ["mage","warrior","shaman","skill"]:radius=.5+t*(5.0 if e.kind!="shaman" else 8.0)
+   if e.kind=="warrior":radius=.6+maxf(0,t-.24)*4.0
+   elif e.kind=="mage":
+    radius=1.0
+    root.get_node("FallingRune").position.y=maxf(.4,7.0*(1-t*2.4))
+   elif e.kind=="shaman":radius=.7+t*.65
+   elif e.kind=="skill":radius=.5+t*5.0
    elif e.kind=="fall":radius=.8+t*3
    elif e.kind=="invalid":radius=1.0+t*.5
-   root.scale=Vector3.ONE*radius;root.rotation.y=t*2
+   root.scale=Vector3(radius,1.0 if e.kind in ["warrior","shaman","mage"] else radius,radius);root.rotation.y=t*2
+   if e.kind=="warrior":root.position.y+=sin(t*PI)*.9
+   elif e.kind=="shaman":root.position.y+=t*.9
+   elif e.kind=="mage":root.rotation.y=0
    for part in root.get_children():
     if part is GeometryInstance3D:part.transparency=t
  for entry in sim.combat_texts.slice(maxi(0,sim.combat_texts.size()-28)):

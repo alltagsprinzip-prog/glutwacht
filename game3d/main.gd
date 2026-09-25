@@ -60,7 +60,9 @@ var gestures:Dictionary={}
 var loot_labels:Dictionary={}
 var stars_view:Array=[]
 var inspect_text:Label
+var browser_qa=false
 func _ready():
+ if OS.has_feature("web"):browser_qa=bool(JavaScriptBridge.eval("new URLSearchParams(location.search).has('qa')"))
  progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data)
  world=World.new();add_child(world);world.setup(sim)
  var layer=CanvasLayer.new();add_child(layer);ui=Control.new();ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);ui.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(ui)
@@ -97,15 +99,15 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
  b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
- b.add_theme_stylebox_override("disabled",skin("disabled"))
+ b.add_theme_stylebox_override("disabled",style(Color("acb9b9"),Color("586a6b"),3,13) if primary else skin("disabled"))
  b.pressed.connect(callback);parent.add_child(b);return b
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
  var img=TextureRect.new();img.texture=load("res://assets3d/icons/"+key+".svg");img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(img);return img
 func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=button(parent,"",rect,callback,primary);b.name="Action_"+key;b.tooltip_text=title;b.set_meta("icon_key",key)
- var h=minf(45,rect.size.y-28) if title!="" else minf(44,rect.size.y-12)
+ var h=minf(52,rect.size.y-32) if title!="" else minf(44,rect.size.y-12)
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
- if title!="":label(b,title,Rect2(4,rect.size.y-27,rect.size.x-8,24),14,Color("392c1c") if primary else CREAM,true)
+ if title!="":label(b,title,Rect2(4,rect.size.y-30,rect.size.x-8,26),19,Color("392c1c") if primary else CREAM,true)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
  var index=0
@@ -127,8 +129,8 @@ func build_hud():
  toast_label=label(hud,"",Rect2(350,520,580,42),18,Color.WHITE,true)
  toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
  if sim.mode=="home" or build_kind!="":
-  icon(hud,"badge",Rect2(14,12,70,76));label(hud,str(Catalog.level(progress.data,sim.hero_key())),Rect2(20,24,58,40),26,CREAM,true)
-  label(hud,"SONNENHAIN",Rect2(89,15,210,28),20,CREAM)
+  panel(hud,Rect2(16,12,290,76));icon(hud,"badge",Rect2(14,12,70,76));label(hud,str(Catalog.level(progress.data,sim.hero_key())),Rect2(20,24,58,40),26,CREAM,true)
+  label(hud,"SONNENHAIN",Rect2(89,15,210,28),22,CREAM)
   label(hud,"Haupthaus "+str(progress.data.hall),Rect2(91,45,200,23),15,CREAM)
   panel(hud,Rect2(360,16,103,48));icon(hud,"worker",Rect2(365,21,34,34));builder_text=label(hud,"",Rect2(399,20,60,37),18,CREAM,true)
   panel(hud,Rect2(477,16,120,48));icon(hud,"gems",Rect2(483,21,36,36));resource_labels.gems=label(hud,"",Rect2(521,20,68,38),18,CREAM,true)
@@ -138,7 +140,7 @@ func build_hud():
    panel(hud,Rect2(1000,y,260,43),Color(.08,.15,.17,.92))
    var bar=ProgressBar.new();bar.show_percentage=false;bar.position=Vector2(1039,y+26);bar.size=Vector2(210,9);bar.max_value=progress.storage();bar.value=progress.data[key];bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
    bar.add_theme_stylebox_override("background",style(Color("152d34"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
-   resource_labels[key]=label(hud,"",Rect2(1044,y+1,200,25),16,CREAM,true);icon(hud,key,Rect2(992,y-1,48,48))
+   resource_labels[key]=label(hud,"",Rect2(1044,y+1,200,25),18,CREAM,true);icon(hud,key,Rect2(992,y-1,48,48))
   icon_button(hud,"menu","",Rect2(18,95,62,60),func():open_menu())
   icon_button(hud,"hero","",Rect2(18,164,62,60),func():open_heroes())
   if build_kind!="":build_placement_hud()
@@ -148,9 +150,9 @@ func build_hud():
  update_hud()
  if is_instance_valid(modal):ui.move_child(modal,-1)
 func build_home_hud():
- icon_button(hud,"attack","ANGRIFF",Rect2(18,620,144,82),func():open_raid(),true)
- icon_button(hud,"build","BAUEN",Rect2(1022,620,110,82),func():open_catalog(),true)
- icon_button(hud,"shop","SHOP",Rect2(1144,620,110,82),func():open_shop(),true)
+ icon_button(hud,"attack","ANGRIFF",Rect2(18,608,172,94),func():open_raid(),true)
+ icon_button(hud,"build","BAUEN",Rect2(972,608,136,94),func():open_catalog(),true)
+ icon_button(hud,"shop","SHOP",Rect2(1120,608,136,94),func():open_shop(),true)
  create_stick()
  if selected_obstacle!="":
   panel(hud,Rect2(423,605,435,97))
@@ -162,15 +164,16 @@ func build_home_hud():
  elif selected_building!="":
   var b=progress.find_building(selected_building)
   if b.is_empty():return
-  label(hud,Catalog.BUILD[b.kind].name+" · LV "+str(b.level),Rect2(400,570,480,30),19,CREAM,true)
-  var actions=[["info","INFO",func():open_building(b.uid)],["upgrade","AUSBAU",func():open_building(b.uid)],["move","VERSCHIEBEN",func():begin_build(b.kind,b.uid)]]
+  panel(hud,Rect2(342,565,596,137))
+  label(hud,Catalog.BUILD[b.kind].name+" · Stufe "+str(b.level),Rect2(352,569,576,32),21,CREAM,true)
+  var actions=[["info","INFO",func():open_building(b.uid)],["upgrade","AUSBAU",func():open_building(b.uid)],["move","BEWEGEN",func():begin_build(b.kind,b.uid)]]
   if Catalog.RESOURCES.has(b.kind):actions.append(["collect","SAMMELN",func():collect_building_resource(b.uid)])
   elif b.kind in ["barracks","camp"]:actions.append(["army","ARMEE",func():open_army()])
   elif b.kind=="smithy":actions.append(["training","TRAINING",func():open_training()])
   elif b.kind=="hero_hall":actions.append(["hero","HELD",func():open_heroes()])
-  var left=640-actions.size()*57
+  var left=640-actions.size()*71
   for i in range(actions.size()):
-   var a=actions[i];var btn=icon_button(hud,a[0],a[1],Rect2(left+i*114,611,104,83),a[2],i==1)
+   var a=actions[i];var btn=icon_button(hud,a[0],a[1],Rect2(left+i*142,610,132,83),a[2],i==1)
    if a[0]=="move":btn.disabled=not progress.job_for(b.uid).is_empty()
 func build_combat_hud():
  panel(hud,Rect2(18,18,251,134))
@@ -182,7 +185,8 @@ func build_combat_hud():
  objective=label(hud,"",Rect2(590,25,222,47),24,CREAM,true)
  icon_button(hud,"menu","",Rect2(1190,18,65,61),func():open_menu())
  create_stick()
- cooldowns.skill=icon_button(hud,"skill","",Rect2(1092,505,84,84),func():sim.skill(),true)
+ cooldowns.skill=icon_button(hud,sim.hero_key(),"SUPER",Rect2(1084,480,100,104),func():sim.skill(),true)
+ cooldowns.skill.tooltip_text=Catalog.HEROES[sim.hero_key()].skill
  cooldowns.roll=icon_button(hud,"roll","",Rect2(1004,601,77,77),func():sim.roll(movement()))
  cooldowns.heal=icon_button(hud,"heal","",Rect2(1092,611,77,77),func():sim.heal())
  var attack=icon_button(hud,"attack","",Rect2(1180,582,85,108),func():pass,true)
@@ -220,9 +224,10 @@ func build_placement_hud():
 func create_stick():
  stick=Stick.new()
  if sim.mode=="home":
-  stick.position=Vector2(34,490);stick.size=Vector2(132,132)
+  stick.position=Vector2(26,424);stick.size=Vector2(156,156)
  else:
   stick.position=Vector2(34,512);stick.size=Vector2(156,156)
+ stick.name="HeroJoystick"
  hud.add_child(stick)
 func update_hud():
  if not stats:return
@@ -285,7 +290,17 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,1.0)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Sonnenhain 0.8","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Sonnenhain 0.8","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"deployment_points":qa_deployment_points() if browser_qa else []}))
+# Read-only diagnostics for the exported browser gate; no gameplay controls are exposed.
+func qa_deployment_points() -> Array:
+ var points=[]
+ if sim.mode!="raid" or paused:return points
+ for axis in range(4):
+  for z in range(-21,22,3):
+   var p=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
+   var screen=world.camera.unproject_position(Vector3(p.x,0,p.y))
+   if Rect2(280,160,690,355).has_point(screen) and sim.deployment_valid(p) and p.distance_to(sim.hero.pos)>2 and not blocks_world_at(screen):points.append([screen.x,screen.y])
+ return points
 func blocks_world_at(pos:Vector2,node:Node=null) -> bool:
  if is_instance_valid(modal):return true
  if node==null:node=hud

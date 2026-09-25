@@ -89,5 +89,19 @@ func _initialize():
  check(not p.train("heroes","ninja","power"),"unselected hero cannot be trained")
  p.data.wood=p.storage();p.data.gems=500;gold=p.data.gems;check(not p.shop_buy("wood") and p.data.gems==gold,"full storage cannot waste gems")
  p.upgrade("hall");var price=p.speedup_cost("hall");check(p.speedup("hall") and p.data.hall==6 and p.data.gems==gold-price,"gem speedup completes exact job")
+ # Unknown/corrupt versions must never be replaced by the autosave timer.
+ for raw in ['{"version":99,"hero":"mage","gold":4242}', '{broken json']:
+  var path="user://release-protected-test.json"
+  var file=FileAccess.open(path,FileAccess.WRITE);file.store_string(raw);file.close()
+  q=P.new();check(not q.load_file(path),"unsupported save is rejected")
+  check(not q.store_file(path) and FileAccess.get_file_as_string(path)==raw,"autosave preserves unsupported original bytes")
+  DirAccess.remove_absolute(path)
+ # All supported migrations preserve progress and outstanding build deadlines.
+ for version in range(4,8):
+  p=rich();p.choose_hero("warrior");p.data.xp.warrior=550;p.data.training.heroes.warrior.power=3;p.data.training.troops.archers=2
+  p.data.version=version;p.upgrade("hall");p.store_file("user://release-state-test.json")
+  q=P.new();check(q.load_file("user://release-state-test.json"),"load schema "+str(version))
+  check(q.data.hero==p.data.hero and q.data.xp==p.data.xp and q.data.training==p.data.training and q.data.gold==p.data.gold and q.data.structures.map(func(site):return [site.uid,site.kind,site.level,site.x,site.z])==p.data.structures.map(func(site):return [site.uid,site.kind,site.level,site.x,site.z]),"migration preserves hero, level, training, resources and buildings "+str(version))
+  check(absf(q.job_for("hall").finish-p.job_for("hall").finish)<.001,"migration preserves deadline "+str(version))
  DirAccess.remove_absolute("user://release-state-test.json")
  print("RELEASE_TESTS ",checks-failures,"/",checks);quit(1 if failures else 0)

@@ -46,6 +46,17 @@ jobs:
           test -s dist/v08/index.pck
           touch dist/.nojekyll
           cp tools/web_entry.html dist/index.html
+      - name: Browser runtime
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated browser test dependency
+        run: |
+          npm install --prefix "$RUNNER_TEMP/glutwacht-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/glutwacht-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Exported WebGL gameplay gate
+        timeout-minutes: 9
+        run: NODE_PATH="$RUNNER_TEMP/glutwacht-browser/node_modules" node tools/web_smoke.cjs
       - name: Preserve validation logs
         if: always()
         uses: actions/upload-artifact@v4

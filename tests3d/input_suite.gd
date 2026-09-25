@@ -33,6 +33,17 @@ func run():
  await touch(stickpos,false,4)
  check(game.sim.hero.pos.distance_to(hero_start)>3,"touch joystick moves hero")
  check(game.gestures.is_empty() and game.stick.value==Vector2.ZERO,"joystick release clears movement without camera gesture")
+ var attack_button=game.hud.find_child("Action_attack",true,false)
+ check(not game.stick.get_global_rect().intersects(attack_button.get_global_rect()),"home joystick and attack have separate touch zones")
+ var center_stick=game.stick.get_global_rect().get_center()
+ await touch(center_stick+Vector2(40,0),true,4)
+ var first_direction=game.stick.value
+ await drag(center_stick+Vector2(40,0),Vector2.ZERO,4)
+ check(game.stick.value.distance_to(first_direction)<.001,"joystick press and drag have identical sensitivity")
+ await drag(center_stick+Vector2(230,0),Vector2(190,0),4)
+ check(game.stick.value.x>.99 and game.gestures.is_empty(),"drag outside stick retains pointer ownership")
+ await touch(center_stick+Vector2(230,0),false,4)
+ check(game.stick.value==Vector2.ZERO,"release outside joystick clears movement")
  for name in ["open_catalog","open_army","open_training","open_shop","open_heroes","open_menu"]:
   game.call(name);await frames();var close=game.modal.find_child("CloseDialog",true,false);check(close!=null,name+" exposes close button")
   if close:await click_button(close)

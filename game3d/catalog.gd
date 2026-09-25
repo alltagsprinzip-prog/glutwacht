@@ -1,9 +1,9 @@
 extends RefCounted
 const HEROES={
- "warrior":{"name":"Krieger","model":"Warrior.gltf","title":"DIE EISERNE KLINGE","description":"Standfester Nahkämpfer.\nWirbel trifft alle Gegner im Umkreis.","hp":460,"damage":34,"range":3.0,"speed":6.2,"attack_cd":.50,"skill":"Klingenwirbel","skill_cd":7.0,"color":"edba68"},
- "ninja":{"name":"Ninja","model":"Rogue.gltf","title":"SCHATTEN DES WALDES","description":"Schnelle Dolche und hohe Mobilität.\nSchattensprung trifft ein fernes Ziel.","hp":320,"damage":26,"range":2.7,"speed":7.8,"attack_cd":.30,"skill":"Schattensprung","skill_cd":6.0,"color":"c997ef"},
- "shaman":{"name":"Schamane","model":"Cleric.gltf","title":"HÜTER DER AHNEN","description":"Geistergeschosse aus der Distanz.\nAhnenkreis heilt Held und Armee.","hp":370,"damage":32,"range":9.0,"speed":6.0,"attack_cd":.75,"skill":"Ahnenkreis","skill_cd":9.0,"color":"72d6b0"},
- "mage":{"name":"Runenmagier","model":"Wizard.gltf","title":"FEUER DER RUNEN","description":"Mächtige Fernangriffe.\nRunenfeuer trifft eine ganze Gruppe.","hp":330,"damage":44,"range":10.0,"speed":6.1,"attack_cd":.85,"skill":"Runenfeuer","skill_cd":8.0,"color":"7faeea"}
+ "warrior":{"name":"Krieger","model":"Warrior.gltf","title":"DIE EISERNE KLINGE","description":"Standfester Nahkämpfer.\nErdbrecher trifft alle Gegner im Umkreis.","hp":460,"damage":34,"range":3.0,"speed":6.2,"attack_cd":.50,"skill":"Erdbrecher","skill_cd":7.0,"color":"edba68"},
+ "ninja":{"name":"Ninja","model":"Rogue.gltf","title":"SCHATTEN DES WALDES","description":"Schnelle Dolche und hohe Mobilität.\nSchattenschnitt trifft ein fernes Ziel.","hp":320,"damage":26,"range":2.7,"speed":7.8,"attack_cd":.30,"skill":"Schattenschnitt","skill_cd":6.0,"color":"c997ef"},
+ "shaman":{"name":"Schamane","model":"Cleric.gltf","title":"HÜTER DER AHNEN","description":"Geistergeschosse aus der Distanz.\nGeisterstrom heilt Held und Armee.","hp":370,"damage":32,"range":9.0,"speed":6.0,"attack_cd":.75,"skill":"Geisterstrom","skill_cd":9.0,"color":"72d6b0"},
+ "mage":{"name":"Runenmagier","model":"Wizard.gltf","title":"FEUER DER RUNEN","description":"Mächtige Fernangriffe.\nRunenfall trifft eine ganze Gruppe.","hp":330,"damage":44,"range":10.0,"speed":6.1,"attack_cd":.85,"skill":"Runenfall","skill_cd":8.0,"color":"7faeea"}
 }
 const HERO_ORDER=["warrior","ninja","shaman","mage"]
 const BUILD={
