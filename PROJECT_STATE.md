@@ -1,40 +1,37 @@
-# Glutwacht 0.8 — Entwicklungsübergabe
+# Glutwacht – Arbeitsstand 2026-09-25
 
-## Quelle und Freigabe
+## Verbindlicher Auftrag
+Bestehendes Spiel gemäß docs/MASTERPLAN.md weiterentwickeln. Accounts mit getrennten Spielständen, COC-inspirierte Bedienhierarchie, eigene Gestaltung, Save-Erhalt und geringe Kosten. Keine kostenpflichtigen Dienste beauftragt. Keine neue Spielbasis beginnen.
 
-Repository: `alltagsprinzip-prog/glutwacht`; Arbeitsbranch `update/mobile-v08`. Ausgangspunkt `744e1fd12dc9c000e479758132fac29a2b9cf50b`. Zwischenzeitliche Änderungen von `main` bis `85cbae9ed46a166ca4691864306a4578a747dc18` wurden integriert, einschließlich der robusteren Ressourcenbehandlung und des bisherigen `release_gate.gd`.
+## Basis und Arbeitsbranch
+Basis main: aba21e61f2878c0dbd8be8744af583e4f3103cc1.
+Branch: update/masterplan-online-20260925. Veröffentlichung noch nicht freigegeben: Live-Backend und gerenderte Touch-Prüfung fehlen.
+Aktiver Einstieg game3d/main.tscn. Root-main.gd ist der historische 2D-Prototyp.
 
-Auftrag: vollständige 25-Phasen-Spezifikation aus „Eingefügter Text.txt“. Godot 4.7.2/GDScript, Compatibility, WebGL2. Keine Erweiterung auf echtes PvP oder Monetarisierung. Der Stand ist ein geprüfter Entwicklungskandidat; Browserabnahme in der Prüf-Cloud ist durch fehlendes WebGL2 blockiert. Native Prüfungen und Webexport sind davon getrennt dokumentiert.
+## Implementiert
+- Parallelen HUD-/Fähigkeitenstand integriert, Echtzeit-Angriffsuhr erhalten.
+- Eigenes HUD-Modul mit getrennten Dorf-/Kampf-/Späheransichten, großen Aktionsflächen, Ressourcen oben rechts, Ziele/Chronik/Profil und direktem Held-Zugriff.
+- Vier unterschiedliche verzögerte Heldenfähigkeiten und Effektmodul aus dem Parallelstand.
+- Sicherungsexport, Import mit Bestätigung/Backup, Schutz unlesbarer Originale und verschachtelte Typprüfung.
+- Dauerhafter Dorfname und vier einmalig belohnte Einstiegsziele.
+- Konten-Client: Registrierung/Anmeldung, bestätigtes Öffnen des Kontodorfs, getrennte lokale Kontodateien, private Cloud-Snapshots, automatische Sicherung alle 45 Sekunden, manueller Retry, Konfliktstopp, Abmeldung zurück ins lokale Dorf.
+- SQL-Migration für eigene Datensätze per RLS, authentifizierte atomare RPC, Revision, Request-ID und 90-Sekunden-Gerätebindung.
 
-## Architektur
+## Wichtige Grenzen
+Supabase-Plugin ist installiert/aktiv. In dieser Sitzung wurden trotzdem keine Supabase-Projekt-/SQL-Aktionen bereitgestellt. Keine Migration live angewandt, kein Projekt erstellt und keine echten Konten getestet. config.json bleibt leer, Konten deshalb im Build gesperrt.
+Cloud-Snapshots sind ausdrücklich privat/unrangiert und vom Client geliefert. Das ist noch KEINE serverautorisierte Spielwirtschaft. Kein PvP/Clans/Mehrspielerbeweis daraus ableiten.
+1280×720-Komposition; vollständiges responsives Safe-Area-Layout und Zieltelefon-Abnahme offen.
 
-- `game3d/main.gd`: Laufzeit-UI, vollständige Pointer-Zuordnung, Kamera/Platzierung/Joystick voneinander getrennt, Vorschauen, Dialoge, Ergebnisanimation und Webdiagnose.
-- `game3d/battle.gd`: eigenständige Simulation; Reserve, autonome Truppen, Garnison, drei Minuten, Sterne, Trefferwarteschlange und Beute je Gebäude. `raid_loot` ist kompatibler Lesezugriff auf `looted`.
-- `game3d/progress.gd`: Daten und Migrationen; Bauaufträge, Offlineproduktion, Hindernisse, Juwelen, Soforttraining, Lager, Armee, verschiebbare Kerngebäude.
-- `game3d/catalog.gd`: vier Klassen, Gebäudedaten, tatsächliche Freischaltungen und Gegnerbudget innerhalb ca. ±15% der Spielerstärke.
-- `game3d/world.gd`: Kamera, animierte Modelle, Gerüste/Arbeiter, anklickbare Sammler, Schadensanzeige, wiederverwendete Effekte und dauerhaft referenzierte Assetmaterialien.
-- `game3d/architecture.gd`: gemeinsame Modellfabrik für Dorf, Baukatalog, Ausbau und Bauvorschau. Unterschiedliche Silhouetten und Ausbauteile.
-- `game3d/terrain.gdshader`: ruhige, räumlich variierende Grasfläche.
-- `game3d/stick.gd`: Touch-/Maus-Joystick; `scripts/audio.gd`: synthetisierte Effekte.
-- `assets3d/icons`: eigenes SVG-Iconset; `assets3d/ui`: skalierbare Oberflächen. Vorhandene Modelle und Lizenzdateien bleiben erhalten. `game3d/icons` aus dem parallel aktualisierten Hauptbranch bleibt erhalten.
+## Tests
+Headless: Release 187/187; HUD-Regeln 70/70; neue Account-/Save-Tests 20/20; Layout/Dialog-Struktur 131/131; vorhandener Release-Gate bestanden. Start und Import ohne Skriptfehler.
+Echte Touch-Suite im Headless-Versuch 18/51; kein erfolgreicher Touch-Nachweis. Xvfb hier nicht lauffähig. Gerenderte Prüfung muss im vorhandenen CI erfolgen. Layout-Suite meldet zwei Objekt-Leaks beim Testende; Ursache offen.
 
-Root-`main.gd`, Root-`main.tscn` und die übrigen `scripts` gehören zum früheren 2D-Prototyp. Aktiver Einstieg ist `game3d/main.tscn`.
+## Nächste Reihenfolge
+1. CI-Protokolle und gerenderte Touch-/HUD-Bilder prüfen, Fehler beheben; nicht ungeprüft mergen.
+2. Verfügbare Supabase-Projektaktionen verwenden; passendes bestehendes Projekt prüfen, keine bezahlte Ressource erstellen.
+3. Migration testen/anwenden und ausschließlich öffentliche URL/publishable key konfigurieren.
+4. Drei Testkonten/zwei Geräte: Isolation, Konflikte, Retry, Export, Anmeldung nach Tokenablauf.
+5. Serverautorisierte Aktionen/Online-Simulation; erst danach PvP und soziale Systeme.
+Weitere Details: docs/REQUIREMENTS.md, docs/TEST_STATUS.md, docs/NEXT_SESSION.md.
 
-## Persistenz und Regeln
-
-Save weiterhin `user://glutwacht_dorf_v2.json`, Schema **7**, Migration **2–7**. Unlesbare Daten werden gesichert. Wichtige Felder: `hero` + `hero_id`, `wood/stone/gold/gems`, `hall/barracks/smithy`, `core_positions`, `structures`, `jobs`, `obstacles/obstacle_jobs`, `builder_bonus`, `melee/archers`, `training`, `xp`, `last_production`, `next_uid`.
-
-- Heldenwahl einmalig. Migration erhält den gewählten Helden und eine bestehende Armee mit Heerlagerkapazität.
-- Erstbau 8–20 s, Ausbau auf Stufe 2/3/4: 12/25/45 s; bis Stufe 10 maximal 225 s. Mauern sofort. 2–4 reguläre Arbeiter nach Haupthausstufe, ein zusätzlich kaufbarer Arbeiter, insgesamt höchstens 5.
-- Lager: 1200 × Haupthausstufe. Produktion: 18 Holz, 14 Stein, 9 Gold pro Minute × Gebäudestufe. Gebäudestock: 140 × Stufe. Offlineproduktion höchstens vier Stunden; Bauzeit wird abgezogen.
-- Training sofort, höchstens Rang 5. Kraft +6 Angriff, Leben +25, Fähigkeit +12% und −0,4 s; Truppenrang +20 HP/+4 Angriff.
-- Hindernis: ein Arbeiter, 20 Gold, 10 s, einmalig 1–5 Juwelen. Juwelen für Rohstoffe, einen Arbeiter oder gezielte Beschleunigung.
-- Angriff: 180 s; je ein Stern für 50%, Haupthaus und 100%. Beute liegt in echten Produktionsgebäuden und im Haupthaus; Schaden schreibt anteilig gut. Verlust, Abbruch und Timeout behalten diese Beute; Lagerlimit gilt bei Gutschrift. Kein Geld für 0% ohne Schaden.
-- Einzelplatzierung an freiem Rand, genau eine Einheit pro Tap, Auswahl bleibt bis Reserve 0. Halten nach 0,30 s, danach alle 0,16 s. Pinch und UI-Eingaben platzieren nichts.
-- Treffer erst nach Ausholen, Fernkampf nach Projektilflug. Effekte maximal 48 gleichzeitig dargestellt, Schadenszahlen maximal 28.
-
-## Freigabe
-
-`tools/check_godot.py` kontrolliert Exitcode, Fehlermeldungen und Abschlussmarker der Tests. Workflow importiert vollständig, startet headless, prüft Regeln und gerenderte Touch-/Szenentests, exportiert Web und lädt Prüfprotokolle/Review-Build hoch. PRs deployen nicht. Ein Merge auf main würde den bestehenden Pages-Deploy auslösen; deshalb bleibt der Kandidat bis zur Browserabnahme auf dem Arbeitsbranch.
-
-Nächste konkrete Arbeit: Web-Build in einem WebGL2-fähigen Browser bzw. auf dem Zieltelefon starten; Erstwahl/Persistenz, Bewegungen, drei Truppenfolgen, Schließen aller Fenster und einen echten Angriff prüfen. Erst nach dieser Abnahme den Kandidaten veröffentlichen. Keine Behauptung einer bereits erreichten WoW-/LoL-Produktionsqualität oder gemessener Mobil-FPS.
+Web-Release-Export lokal erfolgreich erzeugt (HTML/JS/PCK/WASM); Browserlauf ausstehend.

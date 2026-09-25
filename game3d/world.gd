@@ -11,6 +11,7 @@ var materials: Dictionary = {}
 var asset_cache: Dictionary = {}
 var asset_materials: Dictionary = {}
 var sky_env: Environment
+const AbilityFX=preload("res://game3d/ui/ability_fx.gd")
 const Architecture=preload("res://game3d/architecture.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 var zoom=42.0
@@ -297,7 +298,7 @@ func sync(sim,dt:float):
    if u.kind in ["archer","ranger"]:state="Bow_Shoot"
    elif u.kind=="guard" or u.get("class_key","")=="ninja":state="Dagger_Attack"
    elif u.get("class_key","") in ["shaman","mage"]:state="Spell1"
-   else:state="Sword_Attack"
+   else:state="Sword_Attack2" if u.get("cast_kind","")=="skill" else "Sword_Attack"
   elif state=="Idle":state="Idle_Weapon" if a.anim and a.anim.has_animation("Idle_Weapon") else "Idle"
   elif state=="Run":
    if a.anim and a.anim.has_animation("Run_Weapon"):state="Run_Weapon"
@@ -311,9 +312,14 @@ func sync(sim,dt:float):
    else:state="Idle"
   if a.anim and a.anim.has_animation(state):
    var sequence=int(u.get("attack_seq",0))
-   if a.state!=state or (attacking and sequence!=int(a.get("attack_seq",-1))) or not a.anim.is_playing():
-    a.anim.play(state,.025 if attacking else .12);a.state=state;a.attack_seq=sequence
-   a.anim.speed_scale=a.anim.get_animation(state).length/maxf(.15,float(u.get("attack_total",.6))) if attacking else 1.0
+   if attacking:
+    if a.state!=state or sequence!=int(a.get("attack_seq",-1)):a.anim.play(state,0);a.state=state;a.attack_seq=sequence
+    a.anim.pause()
+    var phase=clampf(1.0-float(u.attack_time)/maxf(.001,float(u.attack_total)),0,.999)
+    a.anim.seek(a.anim.get_animation(state).length*phase,true)
+   else:
+    a.anim.speed_scale=1.0
+    if a.state!=state or not a.anim.is_playing():a.anim.play(state,.12);a.state=state
   if bool(a.get("flash_on",false))!=(u.flash>0):
    a.flash_on=u.flash>0
    for part in a.node.find_children("*","GeometryInstance3D",true,false):part.material_overlay=material(Color(1,.94,.68,.6),.5,true) if u.flash>0 else null
@@ -384,6 +390,7 @@ func effect_id(e:Dictionary) -> int:
  if not e.has("visual_id"):effect_serial+=1;e.visual_id=effect_serial
  return int(e.visual_id)
 func effect_visual(e:Dictionary) -> Node3D:
+ if e.kind in AbilityFX.KINDS:return AbilityFX.create(self,e)
  var root=Node3D.new();fx.add_child(root)
  var color:Color=e.color;var kind=String(e.kind)
  if kind=="arrow":
@@ -392,36 +399,6 @@ func effect_visual(e:Dictionary) -> Node3D:
   for i in range(3):
    var tail=SphereMesh.new();tail.radius=.08-float(i)*.015;tail.height=tail.radius*2;tail.radial_segments=6;tail.rings=3
    mesh_node(tail,Vector3(0,0,.25+float(i)*.18),material(color,.4,true),root)
- elif kind=="mage":
-  # Target rune, descending crystal and an impact halo are separate silhouettes.
-  for radius in [2.8,3.3]:
-   var rune=TorusMesh.new();rune.inner_radius=radius-.09;rune.outer_radius=radius;rune.rings=32;rune.ring_segments=6
-   mesh_node(rune,Vector3(0,.16,0),material(color,.3,true),root)
-  for i in range(8):
-   var mark=BoxMesh.new();mark.size=Vector3(.16,.1,.65)
-   var a=i*TAU/8;var node=mesh_node(mark,Vector3(cos(a)*3.0,.18,sin(a)*3.0),material(color,.3,true),root);node.rotation.y=-a
-  var crystal=PrismMesh.new();crystal.size=Vector3(1.0,2.7,1.0)
-  var meteor=mesh_node(crystal,Vector3(0,7,0),material(Color("dcecff"),.3,true),root);meteor.name="FallingRune"
- elif kind=="warrior":
-  for i in range(2):
-   var shock=TorusMesh.new();shock.inner_radius=.8+i*.6;shock.outer_radius=1.0+i*.6;shock.rings=32;shock.ring_segments=6
-   mesh_node(shock,Vector3(0,.1+i*.1,0),material(color,.6,true),root)
-  for i in range(10):
-   var rock=BoxMesh.new();rock.size=Vector3(.28,.45,.35)
-   var a=i*TAU/10;var shard=mesh_node(rock,Vector3(cos(a)*1.4,.3,sin(a)*1.4),material(Color("c99a68")),root)
-   shard.rotation=Vector3(a,.4,a*.5)
- elif kind=="shaman":
-  var halo=TorusMesh.new();halo.inner_radius=3.6;halo.outer_radius=3.75;halo.rings=40;halo.ring_segments=6
-  mesh_node(halo,Vector3(0,.18,0),material(color,.5,true),root)
-  for i in range(9):
-   var spirit=SphereMesh.new();spirit.radius=.18;spirit.height=.65;spirit.radial_segments=8;spirit.rings=4
-   var a=i*TAU/9
-   mesh_node(spirit,Vector3(cos(a)*2.5,.8+i*.16,sin(a)*2.5),material(Color("baffdc"),.3,true),root)
- elif kind=="ninja":
-  for i in range(3):
-   var slash=BoxMesh.new();slash.size=Vector3(.11,.13,3.6)
-   var blade=mesh_node(slash,Vector3((i-1)*.5,1+i*.3,0),material(Color("ead7ff"),.3,true),root)
-   blade.rotation=Vector3(.4,(-.6 if i%2==0 else .6),.7)
  elif kind=="afterimage":
   var shape=CapsuleMesh.new();shape.radius=.35;shape.height=2.5;shape.radial_segments=8;shape.rings=4
   mesh_node(shape,Vector3(0,1.3,0),material(Color(color,.3),.7,true),root)
@@ -440,24 +417,17 @@ func update_effects(sim):
   var id=effect_id(e);live[id]=true
   if not effect_nodes.has(id):effect_nodes[id]=effect_visual(e)
   var root:Node3D=effect_nodes[id];var t=clampf(1-float(e.life)/float(e.max),0,1)
-  if e.kind=="arrow":
+  if e.kind in AbilityFX.KINDS:AbilityFX.update(root,e,t)
+  elif e.kind=="arrow":
    var end:Vector2=e.get("target",{}).get("pos",e.end);var pos:Vector2=e.pos.lerp(end,t)
    root.position=Vector3(pos.x,1.5+sin(t*PI)*1.2,pos.y);root.rotation.y=atan2(end.x-e.pos.x,end.y-e.pos.y)
   else:
    root.position=Vector3(e.pos.x,.12,e.pos.y)
    var radius=1.0+t*.5
-   if e.kind=="warrior":radius=.6+maxf(0,t-.24)*4.0
-   elif e.kind=="mage":
-    radius=1.0
-    root.get_node("FallingRune").position.y=maxf(.4,7.0*(1-t*2.4))
-   elif e.kind=="shaman":radius=.7+t*.65
-   elif e.kind=="skill":radius=.5+t*5.0
+   if e.kind in ["mage","warrior","shaman","skill"]:radius=.5+t*(5.0 if e.kind!="shaman" else 8.0)
    elif e.kind=="fall":radius=.8+t*3
    elif e.kind=="invalid":radius=1.0+t*.5
-   root.scale=Vector3(radius,1.0 if e.kind in ["warrior","shaman","mage"] else radius,radius);root.rotation.y=t*2
-   if e.kind=="warrior":root.position.y+=sin(t*PI)*.9
-   elif e.kind=="shaman":root.position.y+=t*.9
-   elif e.kind=="mage":root.rotation.y=0
+   root.scale=Vector3.ONE*radius;root.rotation.y=t*2
    for part in root.get_children():
     if part is GeometryInstance3D:part.transparency=t
  for entry in sim.combat_texts.slice(maxi(0,sim.combat_texts.size()-28)):

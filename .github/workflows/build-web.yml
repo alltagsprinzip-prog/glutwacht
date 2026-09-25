@@ -26,6 +26,12 @@ jobs:
         run: python3 tools/check_godot.py logs/start.log godot --headless --audio-driver Dummy --path . --quit-after 120
       - name: Gameplay and save regression tests
         run: python3 tools/check_godot.py logs/rules.log godot --headless --path . --script tests3d/release_suite.gd
+      - name: HUD ability rules
+        run: python3 tools/check_godot.py logs/hud_rules.log godot --headless --path . --script tests3d/hud_rules.gd
+      - name: Account and save regression tests
+        run: python3 tools/check_godot.py logs/account_save_suite.log godot --headless --path . --script tests3d/account_save_suite.gd
+      - name: HUD geometry and dialog tests
+        run: python3 tools/check_godot.py logs/hud_layout_suite.log godot --headless --path . --script tests3d/hud_layout_suite.gd
       - name: Existing upstream regression gate
         run: python3 tools/check_godot.py logs/upstream.log godot --headless --path . --script tests3d/release_gate.gd
       - name: Touch interface regression tests

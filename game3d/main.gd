@@ -1,4 +1,5 @@
 extends Node3D
+const Hud=preload("res://game3d/ui/hud.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 const Progress=preload("res://game3d/progress.gd")
 const Battle=preload("res://game3d/battle.gd")
@@ -60,17 +61,25 @@ var gestures:Dictionary={}
 var loot_labels:Dictionary={}
 var stars_view:Array=[]
 var inspect_text:Label
-var browser_qa=false
 var last_frame_tick=0
+var browser_qa=false
+var hud_widgets:Dictionary={}
+var save_import_callback
+var account
+var account_active=false
+var cloud_clock=0.0
+var cloud_sync_paused=false
+var pending_import
 func _ready():
- if OS.has_feature("web"):browser_qa=bool(JavaScriptBridge.eval("new URLSearchParams(location.search).has('qa')"))
  progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data)
  world=World.new();add_child(world);world.setup(sim)
  var layer=CanvasLayer.new();add_child(layer);ui=Control.new();ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);ui.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(ui)
- var theme=Theme.new();theme.default_font_size=22;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
+ var theme=Theme.new();theme.default_font_size=28;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
+ account=load("res://game3d/online/account.gd").new();add_child(account)
  sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
  if not progress.warning.is_empty():toast(progress.warning)
- if progress.data.hero=="":call_deferred("open_heroes")
+ if progress.write_blocked:call_deferred("open_save_tools")
+ elif progress.data.hero=="":call_deferred("open_heroes")
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
  var s=StyleBoxFlat.new()
  s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
@@ -94,21 +103,21 @@ func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CR
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);return l
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
- var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",19)
- b.add_theme_color_override("font_color",Color("3c2c17") if primary else Color.WHITE)
- b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("394b53") if primary else Color("abb7b0"))
+ var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",27)
+ b.add_theme_color_override("font_color",Color("31251a") if primary else Color("fff0d0"))
+ b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("c3cecf"))
  b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
- b.add_theme_stylebox_override("disabled",style(Color("acb9b9"),Color("586a6b"),3,13) if primary else skin("disabled"))
+ b.add_theme_stylebox_override("disabled",skin("disabled"))
  b.pressed.connect(callback);parent.add_child(b);return b
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
- var img=TextureRect.new();img.texture=load("res://assets3d/icons/"+key+".svg");img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(img);return img
+ var img=TextureRect.new();img.texture=load("res://assets3d/icons/"+key+".svg");img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
 func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=button(parent,"",rect,callback,primary);b.name="Action_"+key;b.tooltip_text=title;b.set_meta("icon_key",key)
- var h=minf(52,rect.size.y-32) if title!="" else minf(44,rect.size.y-12)
+ var h=minf(47,rect.size.y-32) if title!="" else minf(46,rect.size.y-12)
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
- if title!="":label(b,title,Rect2(4,rect.size.y-30,rect.size.x-8,26),19,Color("392c1c") if primary else CREAM,true)
+ if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,Color("30291e") if primary else CREAM,true)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
  var index=0
@@ -124,97 +133,13 @@ func clear_hud():
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
  stick=null;production_text=null;collect_button=null;objective=null;health=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear();loot_labels.clear();stars_view.clear()
 func build_hud():
- clear_hud()
- stats=label(hud,"",Rect2(0,0,1,1),1);stats.hide()
- subtitle=label(hud,"",Rect2(0,0,1,1),1);subtitle.hide()
- toast_label=label(hud,"",Rect2(350,520,580,42),18,Color.WHITE,true)
- toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
- if sim.mode=="home" or build_kind!="":
-  panel(hud,Rect2(16,12,290,76));icon(hud,"badge",Rect2(14,12,70,76));label(hud,str(Catalog.level(progress.data,sim.hero_key())),Rect2(20,24,58,40),26,CREAM,true)
-  label(hud,"SONNENHAIN",Rect2(89,15,210,28),22,CREAM)
-  label(hud,"Haupthaus "+str(progress.data.hall),Rect2(91,45,200,23),15,CREAM)
-  panel(hud,Rect2(360,16,103,48));icon(hud,"worker",Rect2(365,21,34,34));builder_text=label(hud,"",Rect2(399,20,60,37),18,CREAM,true)
-  panel(hud,Rect2(477,16,120,48));icon(hud,"gems",Rect2(483,21,36,36));resource_labels.gems=label(hud,"",Rect2(521,20,68,38),18,CREAM,true)
-  var colors=[Color("ce964e"),Color("8aafc7"),Color("f2c04f")]
-  for i in range(3):
-   var key=["wood","stone","gold"][i];var y=14+i*49
-   panel(hud,Rect2(1000,y,260,43),Color(.08,.15,.17,.92))
-   var bar=ProgressBar.new();bar.show_percentage=false;bar.position=Vector2(1039,y+26);bar.size=Vector2(210,9);bar.max_value=progress.storage();bar.value=progress.data[key];bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
-   bar.add_theme_stylebox_override("background",style(Color("152d34"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
-   resource_labels[key]=label(hud,"",Rect2(1044,y+1,200,25),18,CREAM,true);icon(hud,key,Rect2(992,y-1,48,48))
-  icon_button(hud,"menu","",Rect2(18,95,62,60),func():open_menu())
-  icon_button(hud,"hero","",Rect2(18,164,62,60),func():open_heroes())
-  if build_kind!="":build_placement_hud()
-  else:build_home_hud()
- elif sim.mode=="scout":build_scout_hud()
- else:build_combat_hud()
- update_hud()
- if is_instance_valid(modal):ui.move_child(modal,-1)
+ Hud.build(self)
 func build_home_hud():
- icon_button(hud,"attack","ANGRIFF",Rect2(18,608,172,94),func():open_raid(),true)
- icon_button(hud,"build","BAUEN",Rect2(972,608,136,94),func():open_catalog(),true)
- icon_button(hud,"shop","SHOP",Rect2(1120,608,136,94),func():open_shop(),true)
- create_stick()
- if selected_obstacle!="":
-  panel(hud,Rect2(423,605,435,97))
-  icon(hud,"worker",Rect2(439,624,36,36));icon(hud,"gold",Rect2(500,624,32,32));label(hud,"20",Rect2(536,624,48,32),18)
-  icon(hud,"clock",Rect2(582,624,30,30));label(hud,"10s",Rect2(615,624,48,32),18)
-  var remove=icon_button(hud,"worker","ENTFERNEN",Rect2(698,615,148,74),func():remove_selected_obstacle(),true)
-  remove.disabled=not progress.obstacle_job_for(selected_obstacle).is_empty() or progress.free_builders()==0
-  label(hud,"1–5 Juwelen",Rect2(444,665,220,24),14,GOLD)
- elif selected_building!="":
-  var b=progress.find_building(selected_building)
-  if b.is_empty():return
-  panel(hud,Rect2(342,565,596,137))
-  label(hud,Catalog.BUILD[b.kind].name+" · Stufe "+str(b.level),Rect2(352,569,576,32),21,CREAM,true)
-  var actions=[["info","INFO",func():open_building(b.uid)],["upgrade","AUSBAU",func():open_building(b.uid)],["move","BEWEGEN",func():begin_build(b.kind,b.uid)]]
-  if Catalog.RESOURCES.has(b.kind):actions.append(["collect","SAMMELN",func():collect_building_resource(b.uid)])
-  elif b.kind in ["barracks","camp"]:actions.append(["army","ARMEE",func():open_army()])
-  elif b.kind=="smithy":actions.append(["training","TRAINING",func():open_training()])
-  elif b.kind=="hero_hall":actions.append(["hero","HELD",func():open_heroes()])
-  var left=640-actions.size()*71
-  for i in range(actions.size()):
-   var a=actions[i];var btn=icon_button(hud,a[0],a[1],Rect2(left+i*142,610,132,83),a[2],i==1)
-   if a[0]=="move":btn.disabled=not progress.job_for(b.uid).is_empty()
+ Hud.home(self)
 func build_combat_hud():
- panel(hud,Rect2(18,18,251,134))
- label(hud,"ERBEUTET / MÖGLICH",Rect2(32,23,225,25),14,GOLD)
- for i in range(3):
-  var key=["wood","stone","gold"][i];icon(hud,key,Rect2(29,51+i*31,28,28));loot_labels[key]=label(hud,"",Rect2(65,49+i*31,193,30),17)
- panel(hud,Rect2(448,15,382,81))
- for i in range(3):stars_view.append(icon(hud,"star",Rect2(470+i*38,22,35,35)))
- objective=label(hud,"",Rect2(590,25,222,47),24,CREAM,true)
- icon_button(hud,"menu","",Rect2(1190,18,65,61),func():open_menu())
- create_stick()
- cooldowns.skill=icon_button(hud,sim.hero_key(),"SUPER",Rect2(1084,480,100,104),func():sim.skill(),true)
- cooldowns.skill.tooltip_text=Catalog.HEROES[sim.hero_key()].skill
- cooldowns.roll=icon_button(hud,"roll","",Rect2(1004,601,77,77),func():sim.roll(movement()))
- cooldowns.heal=icon_button(hud,"heal","",Rect2(1092,611,77,77),func():sim.heal())
- var attack=icon_button(hud,"attack","",Rect2(1180,582,85,108),func():pass,true)
- attack.button_down.connect(func():held=true);attack.button_up.connect(func():held=false)
- if sim.mode=="raid":
-  deployment_buttons.melee=icon_button(hud,"melee","",Rect2(402,599,110,98),func():choose_deploy("melee"))
-  deployment_buttons.archers=icon_button(hud,"archers","",Rect2(529,599,110,98),func():choose_deploy("archers"))
-  deployment_buttons.hero=icon_button(hud,sim.hero_key(),"HELD",Rect2(656,599,110,98),func():choose_deploy(""))
-  for kind in ["melee","archers"]:
-   var b:Button=deployment_buttons[kind];b.get_child(0).position=Vector2(29,9);b.get_child(0).size=Vector2(52,52)
-   var count=label(b,"",Rect2(8,62,94,28),23,CREAM,true);b.set_meta("count",count)
-  health=ProgressBar.new();health.show_percentage=false;health.position=Vector2(665,688);health.size=Vector2(92,7);health.show_percentage=false;health.max_value=sim.hero.max_hp;health.mouse_filter=Control.MOUSE_FILTER_IGNORE
-  health.add_theme_stylebox_override("background",style(Color("18323c"),Color.TRANSPARENT,0,3));health.add_theme_stylebox_override("fill",style(Color("83ca7c"),Color.TRANSPARENT,0,3));hud.add_child(health)
-  health_text=label(hud,"",Rect2(628,559,166,32),15,CREAM,true)
-  button(hud,"Beenden",Rect2(801,635,128,62),func():end_raid())
+ Hud.combat(self)
 func build_scout_hud():
- var v=sim.village
- panel(hud,Rect2(18,18,271,164))
- label(hud,v.name,Rect2(34,27,237,32),22,GOLD)
- var ratio=float(Catalog.village_strength(v))/maxf(1,float(Catalog.strength(progress.data)))
- label(hud,"STÄRKE  %d%%"%roundi(ratio*100),Rect2(34,63,237,27),15,CREAM)
- for i in range(3):
-  var key=["wood","stone","gold"][i];icon(hud,key,Rect2(34+i*78,100,32,32));label(hud,str(v[key]),Rect2(29+i*80,135,74,30),17,CREAM,true)
- button(hud,"Zurück",Rect2(20,630,142,66),func():return_home())
- button(hud,"Nächstes Dorf",Rect2(525,630,230,66),func():scout_next())
- var b=icon_button(hud,"attack","ANGREIFEN",Rect2(1096,609,160,88),func():start_raid(),true)
- b.disabled=int(progress.data.melee)+int(progress.data.archers)==0
+ Hud.scout(self)
 func build_placement_hud():
  panel(hud,Rect2(334,585,612,113))
  placement_text=label(hud,"",Rect2(350,592,580,35),17,CREAM,true)
@@ -223,40 +148,11 @@ func build_placement_hud():
  place_button=button(hud,"Hier bauen",Rect2(633,634,293,53),func():place_building(),true)
  update_ghost()
 func create_stick():
- stick=Stick.new()
- if sim.mode=="home":
-  stick.position=Vector2(26,424);stick.size=Vector2(156,156)
- else:
-  stick.position=Vector2(34,512);stick.size=Vector2(156,156)
- stick.name="HeroJoystick"
- hud.add_child(stick)
+ stick=Stick.new();stick.name="VillageJoystick" if sim.mode=="home" else "CombatJoystick"
+ stick.position=Vector2(20,432) if sim.mode=="home" else Vector2(20,409)
+ stick.size=Vector2(172,172) if sim.mode=="home" else Vector2(220,195);hud.add_child(stick)
 func update_hud():
- if not stats:return
- for key in resource_bars:
-  resource_bars[key].max_value=progress.storage();resource_bars[key].value=lerpf(float(resource_bars[key].value),float(progress.data[key]),.24)
-  resource_labels[key].text="%d / %d"%[roundi(resource_bars[key].value),progress.storage()]
- if resource_labels.has("gems"):resource_labels.gems.text=str(int(progress.data.get("gems",0)))
- if builder_text:builder_text.text="%d/%d"%[progress.free_builders(),progress.builders()]
- for key in loot_labels:loot_labels[key].text="%d / %d"%[sim.looted[key],sim.village[key]]
- if sim.active():
-  if health:health.value=sim.hero.hp;health_text.text="%d / %d"%[ceili(sim.hero.hp),sim.hero.max_hp]
-  if objective:
-   var remain=maxi(0,180-int(sim.time))
-   objective.text="%d%%   %d:%02d"%[sim.destruction_percent(),int(remain/60),remain%60]
-  for i in range(stars_view.size()):stars_view[i].modulate=Color.WHITE if i<sim.stars() else Color("4e6266")
-  if cooldowns.has("skill"):
-   cooldowns.skill.text="%.1f"%sim.skill_cd if sim.skill_cd>0 else ""
-   cooldowns.roll.text="%.1f"%sim.roll_cd if sim.roll_cd>0 else ""
-   cooldowns.heal.text=str(sim.potion)
-   cooldowns.skill.disabled=sim.skill_cd>0 or sim.hero.hp<=0;cooldowns.roll.disabled=sim.roll_cd>0 or sim.hero.hp<=0;cooldowns.heal.disabled=sim.potion==0 or sim.hero.hp<=0
-  for kind in ["melee","archers"]:
-   if not deployment_buttons.has(kind):continue
-   var btn:Button=deployment_buttons[kind];btn.get_meta("count").text="×%d"%sim.reserve[kind]
-   btn.disabled=sim.reserve[kind]<=0
-   var chosen=deploying==kind and not btn.disabled
-   btn.add_theme_stylebox_override("normal",style(Color("427d79") if chosen else Color("284854"),GOLD if chosen else Color("587985"),4 if chosen else 2,13))
-   btn.pivot_offset=btn.size/2;btn.scale=Vector2.ONE*(1.06 if chosen else 1.0)
-   if btn.disabled and deploying==kind:deploying=""
+ Hud.update(self)
 func movement() -> Vector2:
  if not stick or build_kind!="" or sim.mode=="scout":return Vector2.ZERO
  var v=stick.value
@@ -264,12 +160,15 @@ func movement() -> Vector2:
  return world.screen_to_direction(v.limit_length(1))
 func _process(dt):
  var frame_tick=Time.get_ticks_usec()
- # Godot also caps its process delta at low FPS; use a monotonic wall clock for raids.
  var elapsed=float(frame_tick-last_frame_tick)/1000000.0 if last_frame_tick>0 else dt
  last_frame_tick=frame_tick
  if not sim:return
  clock+=dt;production_clock+=dt;save_clock+=dt;sound_time=maxf(0,sound_time-dt)
  if production_clock>=1:
+  if OS.has_feature("web"):
+   var imported=JavaScriptBridge.eval("window.__glutwachtImportText || null",true)
+   if imported is String and imported!="":
+    JavaScriptBridge.eval("window.__glutwachtImportText=null",true);prepare_save_import(imported)
   var finished=progress.production();production_clock=0
   if finished:
    save()
@@ -280,6 +179,9 @@ func _process(dt):
     elif old_dialog=="upgrades":open_upgrades()
     toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else "Bau abgeschlossen!")
  if save_clock>=15:save();save_clock=0
+ cloud_clock+=dt
+ if account_active and not cloud_sync_paused and cloud_clock>=45 and not account.busy:
+  cloud_clock=0;sync_cloud()
  if not paused:
   update_gestures(dt)
   var hp=sim.hero.hp
@@ -294,17 +196,18 @@ func _process(dt):
  toast_time=maxf(0,toast_time-dt)
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
- if OS.has_feature("web") and fmod(clock,1.0)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Sonnenhain 0.8","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":qa_deployment_points() if browser_qa else []}))
-# Read-only diagnostics for the exported browser gate; no gameplay controls are exposed.
-func qa_deployment_points() -> Array:
+ if OS.has_feature("web") and fmod(clock,.25)<dt:
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.9","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":deployment_preview_points()}))
+# Read-only visible candidate points used for automated browser input tests.
+# No state mutations or game-rule overrides are exposed to JavaScript.
+func deployment_preview_points() -> Array:
  var points=[]
  if sim.mode!="raid" or paused:return points
  for axis in range(4):
-  for z in range(-21,22,3):
-   var p=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
-   var screen=world.camera.unproject_position(Vector3(p.x,0,p.y))
-   if Rect2(280,160,690,355).has_point(screen) and sim.deployment_valid(p) and p.distance_to(sim.hero.pos)>2 and not blocks_world_at(screen):points.append([screen.x,screen.y])
+  for z in range(-21,22,6):
+   var pos=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
+   var screen=world.camera.unproject_position(Vector3(pos.x,0,pos.y))
+   if Rect2(180,185,690,340).has_point(screen) and sim.deployment_valid(pos) and pos.distance_to(sim.hero.pos)>2 and not blocks_world_at(screen):points.append([screen.x,screen.y])
  return points
 func blocks_world_at(pos:Vector2,node:Node=null) -> bool:
  if is_instance_valid(modal):return true
@@ -460,7 +363,7 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  label(p,heading,Rect2(25,12,rect.size.x-125,48),27,GOLD)
  if sub!="":label(p,sub,Rect2(27,82,rect.size.x-60,31),16,CREAM)
  if name!="result" and not (name=="heroes" and progress.data.hero==""):
-  var close=icon_button(p,"close","",Rect2(rect.size.x-78,9,66,57),func():close_dialog());close.name="CloseDialog";close.z_index=10
+  var close=icon_button(p,"close","",Rect2(rect.size.x-87,6,77,67),func():close_dialog());close.name="CloseDialog";close.z_index=10
  return p
 func close_dialog():
  if is_inside_tree():get_viewport().set_input_as_handled()
@@ -668,6 +571,155 @@ func open_menu():
  var rows=[["hero","WASD / Stick","Held bewegen"],["move","Ziehen / zwei Finger","Kamera / Zoom"],["attack","J / Angriff halten","Schlagen"],["skill","K · Leertaste · H","Fähigkeit · Rolle · Trank"]]
  for i in range(rows.size()):
   var y=191+i*53;icon(p,rows[i][0],Rect2(34,y,38,38));label(p,rows[i][1],Rect2(88,y,336,40),19,GOLD);label(p,rows[i][2],Rect2(450,y,356,40),18)
- label(p,"Spielstand lokal gespeichert · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
+ label(p,"Lokaler Spielstand · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
+ button(p,"Spielstand sichern / laden",Rect2(28,459,441,59),func():open_save_tools())
  if sim.active():button(p,"Angriff beenden",Rect2(500,459,328,59),func():close_dialog();end_raid())
  elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(500,459,328,59),func():return_home())
+
+func open_local_overview(status:bool=false):
+ var p=open_dialog("local_status" if status else "tasks","Dorfstatus" if status else "Nächste Schritte","")
+ var rows=[]
+ if status:
+  rows=[["worker","Bauarbeiter","%d frei von %d"%[progress.free_builders(),progress.builders()]], ["collect","Lager","%d Kapazität je Rohstoff"%progress.storage()], ["star","Siege",str(progress.data.wins)]]
+ else:
+  rows=[["upgrade","Dorf erweitern","Gebäude antippen und Ausbau prüfen"], ["army","Armee vorbereiten","%d / %d Armeeplätze belegt"%[progress.data.melee+progress.data.archers,progress.capacity()]], ["attack","Beute sammeln","Gegner ansehen und gezielt angreifen"]]
+ for i in range(rows.size()):
+  var y=106+i*104;panel(p,Rect2(28,y,804,91));icon(p,rows[i][0],Rect2(45,y+17,53,53));label(p,rows[i][1],Rect2(117,y+9,655,32),24,GOLD);label(p,rows[i][2],Rect2(118,y+49,660,30),20)
+ label(p,"Lokaler Spielstand · kein Online-Postfach",Rect2(29,437,803,28),18,CREAM,true)
+ button(p,"Weiter",Rect2(543,474,279,51),func():close_dialog(),true)
+
+func open_save_tools():
+ var p=open_dialog("saves","Dein lokaler Spielstand","")
+ label(p,"Held, Gebäude, Training und Bauzeiten bleiben bei Updates erhalten.",Rect2(29,102,800,59),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Ein anderer Browser oder eine andere Website hat einen eigenen Speicher.\nSichere dein Dorf als Datei, bevor du den Ort wechselst.",Rect2(29,183,800,103),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,progress.warning if progress.write_blocked else ("Kontostand · "+account.status if account_active else "Du spielst lokal. Konto und Cloud findest du im Dorfprofil."),Rect2(29,317,800,60),20,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Sicherung speichern",Rect2(28,427,394,72),func():export_save(),true)
+ button(p,"Sicherung laden",Rect2(442,427,390,72),func():request_save_import())
+func export_save():
+ if OS.has_feature("web"):
+  var text=FileAccess.get_file_as_string(save_path) if progress.write_blocked else JSON.stringify(progress.data,"  ")
+  JavaScriptBridge.eval("(()=>{const b=new Blob(["+JSON.stringify(text)+"],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='Glutwacht-Spielstand.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);})();",true)
+  toast("Sicherungsdatei wurde angefordert.")
+ else:
+  var path="user://Glutwacht-Spielstand.json";var f=FileAccess.open(path,FileAccess.WRITE)
+  if f:f.store_string(FileAccess.get_file_as_string(save_path) if progress.write_blocked else JSON.stringify(progress.data,"  "));f.close();toast("Sicherung: "+ProjectSettings.globalize_path(path))
+func request_save_import():
+ if OS.has_feature("web"):
+  JavaScriptBridge.eval("(()=>{const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{const f=i.files[0];if(f&&f.size<1048576)window.__glutwachtImportText=await f.text();};i.click();})();",true)
+ else:toast("Sicherungsimport im Browser öffnen.")
+func prepare_save_import(text:String):
+ if text.length()>1048576:toast("Datei ist zu groß.");return
+ var parser=JSON.new();var status=parser.parse(text)
+ var raw=parser.data if status==OK else null
+ if not Progress.validate_save(raw).is_empty():toast("Ungültige oder neuere Sicherung; nichts wurde verändert.");return
+ var temp="user://import-validation.json";var f=FileAccess.open(temp,FileAccess.WRITE)
+ if f==null:toast("Datei konnte nicht geprüft werden.");return
+ f.store_string(text);f.close();var probe=Progress.new();var valid=probe.load_file(temp);DirAccess.remove_absolute(temp)
+ if not valid:toast("Sicherung unlesbar; nichts wurde verändert.");return
+ pending_import=probe
+ var p=open_dialog("import_confirm","Sicherung wiederherstellen?","")
+ label(p,"Haupthaus %d · %s\nHolz %d · Stein %d · Gold %d"%[probe.data.hall,Catalog.hero(probe.data.hero).name,probe.data.wood,probe.data.stone,probe.data.gold],Rect2(32,121,790,128),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Die Datei ersetzt das lokale Dorf an dieser Adresse.\nDer bisherige Stand wird vorher als Sicherheitskopie behalten.",Rect2(32,283,790,87),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Abbrechen",Rect2(28,427,386,71),func():pending_import=null;close_dialog())
+ button(p,"Wiederherstellen",Rect2(437,427,391,71),func():confirm_save_import(),true)
+func confirm_save_import():
+ if pending_import==null:return
+ if FileAccess.file_exists(save_path) and DirAccess.copy_absolute(save_path,save_path+".before-import")!=OK:toast("Backup fehlgeschlagen; Import wurde abgebrochen.");return
+ if not pending_import.store_file(save_path):toast("Speichern fehlgeschlagen; Import abgebrochen.");return
+ progress=pending_import;pending_import=null;sim=Battle.new(progress.data);return_home();toast("Sicherung geladen.")
+
+func open_profile():
+ var p=open_dialog("profile","Dein Dorf","")
+ label(p,"Dorfname",Rect2(32,102,790,40),27,GOLD)
+ var field=LineEdit.new();field.position=Vector2(32,156);field.size=Vector2(790,64);field.max_length=24;field.text=progress.data.get("player_name","Mein Dorf");p.add_child(field)
+ label(p,"Dein lokaler Fortschritt wird automatisch gespeichert.",Rect2(32,247,790,70),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Namen speichern",Rect2(32,345,790,65),func():
+  var value=field.text.strip_edges()
+  if value.is_empty():toast("Bitte einen Dorfnamen eingeben.");return
+  progress.data.player_name=value;save();close_dialog();build_hud(),true)
+ button(p,"Konto / Cloud",Rect2(32,430,380,65),func():open_account())
+ button(p,"Sicherung",Rect2(430,430,392,65),func():open_save_tools())
+func open_tasks():
+ var p=open_dialog("tasks","Deine ersten Ziele","Belohnungen können einmalig abgeholt werden.")
+ var tasks=progress.tasks()
+ for i in range(tasks.size()):
+  var task=tasks[i];var y=107+i*94
+  label(p,task.title,Rect2(28,y,535,38),25)
+  label(p,"+%d Gold"%task.gold,Rect2(28,y+38,400,32),21,GOLD)
+  var claimed=task.id in progress.data.claimed_tasks
+  var claim=button(p,"Erledigt" if claimed else ("Abholen" if task.done else "Offen"),Rect2(600,y+4,226,67),func():
+   if progress.claim_task(task.id):save();open_tasks()
+   else:toast("Erst Gold ausgeben: Dein Lager ist voll."),task.done and not claimed)
+  claim.disabled=claimed or not task.done
+func open_inbox():
+ var p=open_dialog("inbox","Dorfchronik","")
+ label(p,"%s · %d Siege"%[progress.data.get("player_name","Mein Dorf"),progress.data.wins],Rect2(32,108,790,60),29,GOLD)
+ label(p,"%d abgeschlossene Ziele\n%d Gebäude im Dorf\n%d freie Bauarbeiter"%[progress.data.claimed_tasks.size(),progress.all_buildings().size(),progress.free_builders()],Rect2(32,194,790,148),27)
+ label(p,"Hier siehst du deinen Dorfstatus. Nachrichten anderer Spieler sind noch nicht verfügbar.",Rect2(32,374,790,100),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+
+func open_account():
+ var p=open_dialog("account","Konto und Cloud","")
+ if not account.configured():
+  label(p,"Die Konten-Anbindung ist für diesen Build noch nicht eingerichtet. Dein lokales Dorf bleibt spielbar und gespeichert.",Rect2(32,125,790,185),27).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+  button(p,"Lokale Sicherung",Rect2(32,415,790,70),func():open_save_tools());return
+ if account.signed_in():
+  label(p,account.status+"\nPrivates Dorf · ohne Rangliste",Rect2(32,110,790,95),26,GOLD)
+  button(p,"Cloud-Stand laden",Rect2(32,231,790,67),func():load_cloud())
+  var upload=button(p,"Jetzt sichern",Rect2(32,318,790,67),func():sync_cloud(),true);upload.disabled=not account_active
+  button(p,"Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
+ var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
+ var password=LineEdit.new();password.placeholder_text="Passwort";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
+ label(p,"Jedes Konto hat sein eigenes Dorf. Dein bisheriges lokales Dorf bleibt separat erhalten.",Rect2(32,291,790,100),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Anmelden",Rect2(32,420,380,65),func():authenticate(email.text,password.text,false),true)
+ button(p,"Registrieren",Rect2(434,420,388,65),func():authenticate(email.text,password.text,true))
+func authenticate(email:String,password:String,register:bool):
+ if account.busy:return
+ if email.strip_edges().is_empty() or password.is_empty():toast("E-Mail und Passwort eingeben.");return
+ close_dialog();toast("Verbindung wird hergestellt …")
+ var result=await account.login(email,password,register)
+ if not result.ok:toast(result.get("message","Anmeldung fehlgeschlagen."));open_account();return
+ await load_cloud()
+func load_cloud():
+ if account.busy:return
+ cloud_sync_paused=true
+ var result=await account.fetch_save()
+ if not result.ok:toast(result.message);return
+ if not result.empty and not Progress.validate_save(result.snapshot).is_empty():toast("Cloud-Stand ungültig; dein Dorf bleibt unverändert.");return
+ var p=open_dialog("cloud_confirm","Kontodorf öffnen?","")
+ label(p,"Neues Kontodorf erstellen." if result.empty else "Gespeichertes Kontodorf von der Cloud laden.",Rect2(32,110,790,80),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Der aktuelle Stand bleibt als lokale Datei erhalten. Eine vorhandene lokale Kontosicherung wird vor dem Laden zusätzlich gesichert.",Rect2(32,229,790,128),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Abbrechen",Rect2(32,420,380,65),func():close_dialog())
+ button(p,"Dorf öffnen",Rect2(434,420,388,65),func():activate_cloud(result),true)
+func activate_cloud(result:Dictionary):
+ if not account.signed_in() or account.busy:return
+ var uid=account.user_id
+ if uid.length()!=36 or uid.replace("-","").length()!=32 or not uid.replace("-","").is_valid_hex_number():toast("Ungültige Konto-ID.");return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ var path="user://account-"+uid+".json"
+ if FileAccess.file_exists(path) and DirAccess.copy_absolute(path,path+".before-cloud")!=OK:toast("Sicherheitskopie fehlgeschlagen.");return
+ var candidate=Progress.new()
+ if not result.empty:
+  var temp="user://cloud-validation.json";var file=FileAccess.open(temp,FileAccess.WRITE)
+  if file==null:toast("Cloud-Stand konnte nicht geprüft werden.");return
+  file.store_string(JSON.stringify(result.snapshot));file.close()
+  var valid=candidate.load_file(temp);DirAccess.remove_absolute(temp)
+  if not valid:toast("Cloud-Stand konnte nicht geladen werden.");return
+ if not candidate.store_file(path):toast(candidate.warning);return
+ account.revision=int(result.revision);account.loaded=true;account.pending.clear();cloud_sync_paused=false
+ progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
+ if progress.data.hero=="":open_heroes()
+ sync_cloud()
+func sync_cloud():
+ if not account_active or account.busy or progress.write_blocked:return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ var result=await account.upload(progress.data)
+ if not result.ok:
+  # Stop automated retries on conflicts; the user chooses which local backup to keep.
+  cloud_sync_paused=true;toast(result.get("message","Cloud-Sicherung fehlgeschlagen. Lokale Datei bleibt erhalten."))
+ else:cloud_sync_paused=false;toast("Kontodorf in der Cloud gesichert.")
+func leave_account():
+ if account.busy:toast("Bitte die laufende Sicherung abwarten.");return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ account.logout();account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
+ if progress.write_blocked:open_save_tools()
+ elif progress.data.hero=="":open_heroes()
