@@ -22,6 +22,7 @@ var facing=Vector2(0,-1)
 var serial=0
 var notices=""
 var selected_village=0
+var campaign_index=-1
 var village:Dictionary
 var wave=0
 var next_wave=0.0
@@ -55,6 +56,7 @@ func make_hero(pos:Vector2):
  hero=unit("hero",pos,c.hp+35*(int(profile.hall)-1)+20*(level-1)+25*training("vitality"),c.damage+8*(int(profile.smithy)-1)+4*(level-1)+6*training("power")+(12 if profile.sword else 0),"ally")
  hero.class_key=hero_key()
 func home():
+ campaign_index=-1
  mode="home";time=0;pending_hits.clear();pending_skills.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
 func soldier(kind:String,pos:Vector2) -> Dictionary:
  var rank=int(profile.get("training",{}).get("troops",{}).get("archers" if kind=="archer" else "melee",0))
@@ -103,7 +105,7 @@ func reset_battle():
  time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0}
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
 func layout(index:int):
- selected_village=maxi(0,index);village=Catalog.matched_village(selected_village,profile)
+ selected_village=maxi(0,index);village=Catalog.campaign(campaign_index) if campaign_index>=0 else Catalog.matched_village(selected_village,profile)
  buildings.clear();enemies.clear();var level=int(village.level)
  var layout_rng=RandomNumberGenerator.new();layout_rng.seed=int(village.seed)
  var shift=layout_rng.randf_range(-4.0,4.0)
@@ -174,7 +176,11 @@ func update_hits(dt:float):
   pending_hits.remove_at(i)
 func scout(index:int):
  mode="scout";reset_battle();layout(index);first_target="";make_hero(entry_position());allies.clear()
+func scout_campaign(index:int) -> bool:
+ if not Catalog.campaign_unlocked(profile,index):return false
+ campaign_index=index;scout(index);return true
 func start(index:int=-1,manual:bool=false) -> bool:
+ if campaign_index>=0 and not Catalog.campaign_unlocked(profile,campaign_index):return false
  if int(profile.melee)+int(profile.archers)==0:return false
  if index<0:index=selected_village
  mode="raid";reset_battle();layout(index);make_hero(entry_position());manual_deployment=manual
@@ -452,6 +458,11 @@ func settle() -> Dictionary:
  for k in ["wood","stone","gold"]:
   var available=int(looted[k])
   reward[k]=mini(available,maxi(0,1200*int(profile.hall)-int(profile[k])));profile[k]+=reward[k]
+ if campaign_index>=0:
+  if not profile.has("campaign_stars"):profile.campaign_stars={}
+  var previous=int(profile.campaign_stars.get(str(campaign_index),0))
+  profile.campaign_stars[str(campaign_index)]=maxi(previous,int(reward.stars))
+  reward.campaign_index=campaign_index;reward.campaign_best=profile.campaign_stars[str(campaign_index)]
  if int(reward.stars)>0:profile.wins+=1
  profile.xp[hero_key()]+=reward.xp
  return reward

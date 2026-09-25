@@ -19,3 +19,8 @@ CI-Nachtrag: Beide Workflows auf 1efa2fe erfolgreich (Spiel 36186155713, Datenba
 ## SMTP-Test 2026-09-25, 23:30 Europe/Berlin
 Nutzer hat Testmail an seine Adresse ausdrücklich erlaubt. Erster Versuch: SMTP 535 (Credentials). Nach vom Nutzer erneuertem Schlüssel: SMTP 525 (IP-Sperre). Die beim Test erfasste IP 52.48.43.176 wurde mit konkreter Nutzerfreigabe in Brevo autorisiert; sonstige IP-Sperre bleibt aktiv. Danach Supabase /auth/v1/otp HTTP 200. Für die Nutzeradresse wurde ein unbestätigter Auth-Eintrag angelegt; confirmation_sent_at gesetzt. Keine Tokens/Schlüssel gelesen. Kein Dorf überschrieben.
 Brevo-Logliste zeigte unmittelbar danach noch keine Einträge; tatsächlicher Empfang und Link-Bestätigung bleiben offen. Keine erneuten SMTP-Schlüssel verlangen, solange kein neuer entsprechender Fehler vorliegt. IP kann bei Infrastrukturänderungen wechseln; bei erneutem 525 konkrete neue Adresse prüfen, nicht pauschal Schutz abschalten.
+
+## Aktuelle Fortsetzung
+Nutzer bestätigte Mail-Empfang und Klick. Auth-Datenbank: email_confirmed_at vorhanden. SMTP nicht erneut einrichten.
+Neu implementiert: sichere E-Mail-Callback-Übernahme (tools/auth_callback.js + account.gd + main.gd), zehn feste Kampagnenlager mit kompatibler Sternspeicherung, gemeinsame Heerlagerkapazität, Glutwacht-Ladeanzeige. Lokal Account 37/37, Kampagne 68/68, Regeltest 187/187, Geometrie 135/135, Callback-JS bestanden. Neue grafische CI-Artefakte prüfen. Lokales Xvfb kann keine Unix-Sockets öffnen; keine weitere Retry-Schleife.
+Nächste offene Risiken: reale Cloud-Anmeldung und Zwei-Geräte-Abnahme, responsive Handyoberfläche, serverautorisierte Wirtschaft. Keine Veröffentlichung oder vollständig erledigten Masterplan behaupten.

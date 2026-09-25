@@ -26,7 +26,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"player_name":"Mein Dorf","claimed_tasks":[],"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"player_name":"Mein Dorf","claimed_tasks":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -60,13 +60,7 @@ func train(group:String,key:String,attribute:String="") -> bool:
  if group=="heroes":data.training.heroes[key][attribute]+=1
  else:data.training.troops[key]+=1
  return true
-func capacity() -> int:
- var camps=count_kind("camp")
- if camps==0:return mini(10,4+int(data.hall)*2)
- var total=8
- for b in all_buildings():
-  if b.kind=="camp":total+=2+int(b.level)*2
- return total
+func capacity() -> int:return Catalog.army_capacity(data)
 func storage() -> int:return 1200*int(data.hall)
 func all_buildings() -> Array:
  var out:Array=[]
@@ -286,6 +280,7 @@ func load_file(path:String=SAVE) -> bool:
  if clean.player_name.is_empty():clean.player_name="Mein Dorf"
  for task in parsed.get("claimed_tasks",[]):
   if task in ["hero","hall2","training","victory"] and task not in clean.claimed_tasks:clean.claimed_tasks.append(task)
+ for stage in parsed.get("campaign_stars",{}):clean.campaign_stars[stage]=int(parsed.campaign_stars[stage])
  for k in ["wood","stone","gold","wins"]:clean[k]=clampi(int(parsed.get(k,clean[k])),0,999999)
  clean.gems=clampi(int(parsed.get("gems",clean.gems)),0,999999)
  clean.builder_bonus=clampi(int(parsed.get("builder_bonus",0)),0,1)
@@ -367,6 +362,11 @@ static func validate_save(raw) -> String:
  if int(raw.version) not in [2,3,4,5,6,7]:return "Unbekannte Spielstandversion."
  for key in ["wood","stone","gold","gems","hall","barracks","smithy","melee","archers","wins","builder_bonus","next_uid","last_production"]:
   if raw.has(key) and (not numeric(raw[key]) or float(raw[key])<0):return "Ungültiges Zahlenfeld: "+key
+ if not raw.get("campaign_stars",{}) is Dictionary:return "Ungültige Kampagne."
+ for stage in raw.get("campaign_stars",{}):
+  if not stage is String or stage not in ["0","1","2","3","4","5","6","7","8","9"]:return "Ungültiges Kampagnenlager."
+  var stars=raw.campaign_stars[stage]
+  if not numeric(stars) or float(stars)!=int(stars) or int(stars)<0 or int(stars)>3:return "Ungültige Kampagnensterne."
  if raw.has("claimed_tasks") and not raw.claimed_tasks is Array:return "Ungültige Aufgaben."
  for key in ["hero","hero_id","player_name"]:
   if raw.has(key) and not raw[key] is String:return "Ungültiger Held."

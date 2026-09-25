@@ -6,7 +6,10 @@ var failures=0
 class MockAccount extends Account:
  var response:Dictionary={}
  var sent:Dictionary={}
+ var calls=0
+ var path=""
  func call_api(_path:String,_method:int,body:Dictionary={}) -> Dictionary:
+  calls+=1;path=_path
   sent=body.duplicate(true)
   return response
 func check(value:bool,title:String):
@@ -68,6 +71,28 @@ func run():
  check(changed.ok and not a.recovering,"password change finishes recovery")
  await a.sign_out()
  check(a.token.is_empty() and a.refresh_token.is_empty(),"signout clears access and refresh tokens")
+ a.response={"ok":true,"data":{"id":"verified-user"}}
+ var linked=await a.accept_email_link({"type":"signup","access_token":"link-token","user":{"id":"forged-user"}})
+ check(linked.ok and a.user_id=="verified-user","email link identity comes from server, never URL claims")
+ check(not a.loaded and not a.recovering and a.revision==0,"signup link never activates or overwrites a village")
+ var calls=a.calls
+ linked=await a.accept_email_link({"type":"magiclink","access_token":"other-token"})
+ check(not linked.ok and a.calls==calls and a.user_id=="verified-user","link cannot switch an active account")
+ a.logout();a.busy=true
+ linked=await a.accept_email_link({"type":"signup","access_token":"busy-token"})
+ check(not linked.ok and a.token.is_empty(),"busy request cannot be given an unverified link token")
+ a.busy=false;a.response={"ok":false,"message":"expired"}
+ linked=await a.accept_email_link({"type":"magiclink","access_token":"expired"})
+ check(not linked.ok and not a.signed_in() and a.token.is_empty(),"expired magic link leaves no credentials")
+ calls=a.calls
+ linked=await a.accept_email_link({"type":"unknown","access_token":"test"})
+ check(not linked.ok and a.calls==calls,"unsupported link never calls Auth")
+ check(not a.accept_session({"access_token":"test","user":"malformed"}),"malformed session user rejected safely")
+ var registered=await a.login("test@example.invalid","short",true)
+ check(not registered.ok and a.calls==calls,"registration rejects weak password before requesting email")
+ a.response={"ok":true,"data":{"id":"verified-user"}}
+ linked=await a.accept_email_link({"type":"magiclink","access_token":"valid-link"})
+ check(linked.ok and a.signed_in() and not a.loaded,"valid magic link waits for explicit village activation")
  a.queue_free()
  for suffix in ["",".before-hud",".unreadable"]:DirAccess.remove_absolute(path+suffix)
  print("ACCOUNT_SAVE_TESTS ",checks-failures,"/",checks)

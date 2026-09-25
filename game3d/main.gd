@@ -80,7 +80,7 @@ func _ready():
  if not progress.warning.is_empty():toast(progress.warning)
  if progress.write_blocked:call_deferred("open_save_tools")
  elif progress.data.hero=="":call_deferred("open_heroes")
- call_deferred("check_recovery_link")
+ call_deferred("check_email_link")
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
  var s=StyleBoxFlat.new()
  s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
@@ -537,7 +537,20 @@ func open_heroes():
   var choose=button(p,"WÄHLEN",Rect2(x+12,482,215, 60),func():
    if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud(),true)
 func open_raid():
+ sim.campaign_index=-1
  close_dialog();build_kind="";selected_building="";world.build_focus=false;sim.scout(sim.selected_village);world.setup(sim);build_hud()
+func open_campaign():
+ var p=open_dialog("campaign","Kampagne · 10 Lager","")
+ label(p,"Ein Stern öffnet das nächste Lager. Feste Stärke · beste Sterne bleiben gespeichert.",Rect2(28,78,795,40),19).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ for i in range(10):
+  var stage=i;var camp=Catalog.campaign(stage);var unlocked=Catalog.campaign_unlocked(progress.data,stage)
+  var best=int(progress.data.get("campaign_stars",{}).get(str(stage),0))
+  var caption="%02d  %s\n%s"%[stage+1,camp.name,("★".repeat(best)+"☆".repeat(3-best)) if unlocked else "Vorheriges Lager besiegen"]
+  var b=button(p,caption,Rect2(28+(i%2)*407,126+int(i/2)*76,390,68),func():open_campaign_stage(stage),unlocked)
+  b.add_theme_font_size_override("font_size",21);b.disabled=not unlocked
+func open_campaign_stage(index:int):
+ if not sim.scout_campaign(index):toast("Gewinne zuerst einen Stern im vorherigen Lager.");return
+ close_dialog();build_kind="";selected_building="";world.build_focus=false;world.setup(sim);build_hud()
 func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
 func start_raid():
  if sim.start(-1,true):close_dialog();result_shown=false;deploying="melee" if sim.reserve.melee>0 else "archers";world.setup(sim);build_hud();tone("equip")
@@ -679,7 +692,7 @@ func authenticate(email:String,password:String,register:bool):
  if account.busy:return
  if email.strip_edges().is_empty() or password.is_empty():toast("E-Mail und Passwort eingeben.");return
  close_dialog();toast("Verbindung wird hergestellt …")
- var result=await account.login(email,password,register)
+ var result=await account.login(email,password,register,web_redirect())
  if not result.ok:toast(result.get("message","Anmeldung fehlgeschlagen."));open_account();return
  await load_cloud()
 func load_cloud():
@@ -727,21 +740,24 @@ func leave_account():
  if progress.write_blocked:open_save_tools()
  elif progress.data.hero=="":open_heroes()
 
+func web_redirect() -> String:
+ if OS.has_feature("web"):return String(JavaScriptBridge.eval("window.location.origin+window.location.pathname",true))
+ return ""
 func request_account_recovery(email:String):
  if account.busy:return
- var redirect=""
- if OS.has_feature("web"):redirect=String(JavaScriptBridge.eval("window.location.origin+window.location.pathname",true))
- var result=await account.request_recovery(email,redirect)
+ var result=await account.request_recovery(email,web_redirect())
  toast("Falls ein Konto vorhanden ist, erhältst du einen Wiederherstellungslink." if result.ok else result.message)
-func check_recovery_link():
- if not OS.has_feature("web") or not account.configured():return
- var raw=JavaScriptBridge.eval("(()=>{const p=new URLSearchParams(location.hash.slice(1));if(p.get('type')!=='recovery')return null;const r=JSON.stringify(Object.fromEntries(p));history.replaceState(null,'',location.pathname+location.search);return r;})()",true)
+func check_email_link():
+ if not OS.has_feature("web"):return
+ var raw=JavaScriptBridge.eval("(()=>{const r=window.__glutwachtEmailLink;delete window.__glutwachtEmailLink;return r?JSON.stringify(r):null;})()",true)
  if not raw is String:return
  var payload=JSON.parse_string(raw)
  if not payload is Dictionary:return
- var result=await account.accept_recovery(payload)
- if not result.ok:toast(result.message);return
- open_recovery_password()
+ if not account.configured():toast("Dieser Build ist noch nicht für Konten eingerichtet.");return
+ var result=await account.accept_email_link(payload)
+ if not result.ok:toast(result.message);open_account();return
+ if account.recovering:open_recovery_password()
+ else:await load_cloud()
 func open_recovery_password():
  var p=open_dialog("recovery","Neues Passwort","")
  label(p,"Mindestens 12 Zeichen. Dein Dorf bleibt unverändert.",Rect2(32,103,790,65),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART

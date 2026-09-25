@@ -1,6 +1,6 @@
 # Glutwacht — verbindlicher Masterplan
 
-Version 1.0 · 25.09.2026 · Status: Konzept zur Freigabe, noch keine Umsetzung
+Version 1.0 · 25.09.2026 · Status: vom Nutzer zur Umsetzung freigegeben; Fortschritt siehe PROJECT_STATE.md
 
 ## Verwendung
 
@@ -439,4 +439,4 @@ Am 25.09.2026 zusätzlich abgerufene offizielle Grundlagen:
 - [Supabase Database Functions](https://supabase.com/docs/guides/database/functions): Datenbankfunktionen als technischer Baustein; die beschriebene Spielarchitektur ist unser Vorschlag.
 - [Godot HTTP Requests](https://docs.godotengine.org/en/stable/tutorials/networking/http_request_class.html): HTTP für Login und Webdienste, nicht als geeigneter Transport für häufige Echtzeit-Spielupdates.
 
-**Nächste Aktion nach Planfreigabe: M0 am tatsächlichen aktuellen Projektstand beginnen.**
+**Fortsetzung: ersten offenen Punkt anhand von PROJECT_STATE.md und docs/NEXT_SESSION.md bearbeiten.**

@@ -20,7 +20,7 @@ Aktiver Einstieg game3d/main.tscn. Root-main.gd ist der historische 2D-Prototyp.
 ## Wichtige Grenzen
 Supabase-Projekt `totszgelioskmbmkmetd` (Glutwacht, Free, eu-west-1) ist aktiv. Migration für private Saves sowie Einschränkung der automatisch angelegten RLS-Triggerfunktion live angewandt. Öffentliche URL/publishable key in config.json gesetzt; keine privilegierten Schlüssel im Client.
 Site-URL und erlaubte Recovery-Weiterleitung: https://alltagsprinzip-prog.github.io/glutwacht/v08/
-Live-SQL-Prüfung mit drei temporären Nutzeridentitäten und anschließendem ROLLBACK bestanden; anonyme HTTP-Zugriffe verweigert. Sicherheitsberater ohne Befunde. Keine echten Login-Konten getestet. Brevo Free ist angelegt und Custom SMTP nach Neuladen dauerhaft aktiviert (Host smtp-relay.brevo.com, Port 465, gespeicherter Schlüssel verborgen). Echte Zustellung, öffentliche Registrierung und Recovery sind noch nicht abgenommen.
+Live-SQL-Prüfung mit drei temporären Nutzeridentitäten und anschließendem ROLLBACK bestanden; anonyme HTTP-Zugriffe verweigert. Sicherheitsberater ohne Befunde. Nutzer hat die Testmail empfangen und bestätigt; email_confirmed_at serverseitig geprüft. Mehrgeräte-Anmeldung bleibt offen. Brevo Free ist angelegt und Custom SMTP nach Neuladen dauerhaft aktiviert (Host smtp-relay.brevo.com, Port 465, gespeicherter Schlüssel verborgen). Zustellung und E-Mail-Bestätigung sind nachgewiesen; Client-Anmeldung, Recovery und mehrere Geräte bleiben offen.
 Cloud-Snapshots sind ausdrücklich privat/unrangiert und vom Client geliefert. Das ist noch KEINE serverautorisierte Spielwirtschaft. Kein PvP/Clans/Mehrspielerbeweis daraus ableiten.
 1280×720-Komposition; vollständiges responsives Safe-Area-Layout und Zieltelefon-Abnahme offen.
 
@@ -28,10 +28,16 @@ Cloud-Snapshots sind ausdrücklich privat/unrangiert und vom Client geliefert. D
 CI für 4bf067c0dd4d396013dc4d572e5da7ed9fc1590e erfolgreich: Spiel-Workflow 36150765747 und Datenbank-Workflow 36150765938. Dies enthält Recovery-/SQL-/Lesbarkeitsänderungen. Neue Live-Konfiguration anschließend ergänzt. Details und Grenzen in docs/TEST_STATUS.md.
 
 ## Nächste Reihenfolge
-1. Echte E-Mail-Zustellung prüfen; Brevo/SMTP sind bereits eingerichtet.
+1. Neuen CI-Lauf mit E-Mail-Callback und Kampagne prüfen; gerenderte neue Ansichten ansehen.
 2. Drei echte Testkonten und zwei Geräte: Registrierung, Bestätigung, Recovery, Isolation, Retry, Konflikte, Tokenablauf und Save-Erhalt prüfen.
 3. Zieltelefon/Safe-Area und Last prüfen; erst nach erfüllter Abnahme veröffentlichen.
 4. Serverautorisierte Aktionen/Online-Simulation, Kampagne und soziale Systeme gemäß Masterplan umsetzen; erst danach PvP.
 Weitere Details: docs/REQUIREMENTS.md, docs/TEST_STATUS.md, docs/NEXT_SESSION.md.
 
 CI-Nachtrag: Beide Workflows auf 1efa2fe erfolgreich (Spiel 36186155713, Datenbank 36186155762).
+
+## Neuer Implementierungsstand
+- E-Mail-Links für Signup/Magic Link/Recovery: URL-Fragment vor Engine-Start entfernt, Identität bei Supabase geprüft, Kontodorf erst nach ausdrücklichem Öffnen geladen. Abgelaufene Links und Accountwechsel blockiert.
+- Zehn feste PvE-Kampagnenlager, Freischaltung ab einem Stern, beste Sterne pro Lager im bestehenden Save-Schema 7. Keine Rangliste/Serverautorität behauptet.
+- Gemeinsame Heerlagerkapazität für Armee und Stärkeberechnung; Ladeanzeige heißt Glutwacht.
+- Lokal: Account/Save 37/37, Kampagne 68/68, Regeln 187/187, HUD-Geometrie 135/135; JS-Callback-Prüfung bestanden. Lokale Grafikprüfung durch nicht verfügbare X11-Sockets blockiert; grafische CI-Abnahme ausstehend.

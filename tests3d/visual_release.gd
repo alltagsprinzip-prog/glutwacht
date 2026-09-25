@@ -31,6 +31,12 @@ func run():
  await shot("worker-final")
  game.open_building("hall");await shot("upgrade-final");game.close_dialog();game.open_catalog();await shot("catalog-final");game.close_dialog()
  game.open_army();await shot("army-final");game.close_dialog();game.open_training();await shot("training-final");game.close_dialog();game.open_shop();await shot("shop-final");game.close_dialog()
+ game.open_campaign();await shot("campaign-map")
+ check(game.dialog=="campaign","campaign map opens with ten stages")
+ game.open_campaign_stage(0);await shot("campaign-scout")
+ check(game.sim.campaign_index==0 and game.sim.mode=="scout","campaign card opens fixed scout target")
+ game.start_raid();check(game.sim.campaign_index==0 and game.sim.mode=="raid","campaign starts through ordinary battle controls")
+ game.return_home();game.open_account();await shot("account-entry");game.close_dialog()
  # Render every class and its skill. Fixtures are isolated from real saved profiles.
  for key in game.Catalog.HERO_ORDER:
   game.progress.data.hero=key;game.progress.data.hero_id=key;game.open_raid();game.start_raid();game.sim.hero.pos=Vector2(0,0);game.sim.enemies=[game.sim.unit("guard",Vector2(0,-2),2000,0,"enemy")];game.sim.buildings=[];game.sim.raid_building_total=1;game.world.setup(game.sim)

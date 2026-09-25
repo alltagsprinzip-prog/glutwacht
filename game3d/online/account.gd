@@ -41,14 +41,23 @@ func call_api(path:String,method:int,body:Dictionary={}) -> Dictionary:
  if result[1]<200 or result[1]>=300:
   var message="Anfrage abgelehnt. Bitte Anmeldung und Verbindung prüfen."
   if parsed is Dictionary:
+   match String(parsed.get("error_code",parsed.get("code",""))):
+    "email_not_confirmed":message="Bitte zuerst deine E-Mail-Adresse bestätigen."
+    "invalid_credentials":message="E-Mail oder Passwort stimmen nicht."
+    "over_email_send_rate_limit", "over_request_rate_limit":message="Zu viele Anfragen. Bitte später erneut versuchen."
+    "weak_password":message="Bitte ein stärkeres Passwort mit mindestens 12 Zeichen wählen."
+    "email_address_invalid":message="Bitte eine gültige E-Mail-Adresse eingeben."
    match String(parsed.get("message","")):
     "revision_conflict":message="Neuerer Cloud-Stand vorhanden. Erst laden; nichts wurde überschrieben."
     "other_device_active":message="Ein anderes Gerät spielt gerade. Warte mindestens 90 Sekunden."
   return {"ok":false,"message":message}
  return {"ok":true,"data":parsed}
-func login(email:String,password:String,register:bool=false) -> Dictionary:
+func login(email:String,password:String,register:bool=false,redirect:String="") -> Dictionary:
  if signed_in():return {"ok":false,"message":"Zuerst das aktuelle Konto abmelden."}
- var result=await call_api("/auth/v1/signup" if register else "/auth/v1/token?grant_type=password",HTTPClient.METHOD_POST,{"email":email.strip_edges(),"password":password})
+ if register and password.length()<12:return {"ok":false,"message":"Bitte mindestens 12 Zeichen für dein neues Passwort verwenden."}
+ var path="/auth/v1/signup" if register else "/auth/v1/token?grant_type=password"
+ if register and redirect.begins_with("https://"):path+="?redirect_to="+redirect.uri_encode()
+ var result=await call_api(path,HTTPClient.METHOD_POST,{"email":email.strip_edges(),"password":password})
  if not result.ok:return result
  var payload=result.data
  if not payload is Dictionary:return {"ok":false,"message":"Ungültige Serverantwort."}
@@ -81,6 +90,7 @@ func logout():
 
 func accept_session(payload:Dictionary,expected_user:String="") -> bool:
  var incoming_token=String(payload.get("access_token",""))
+ if not payload.get("user",{}) is Dictionary:return false
  var incoming_user=String(payload.get("user",{}).get("id",""))
  if incoming_token.is_empty() or incoming_user.is_empty():return false
  if not expected_user.is_empty() and incoming_user!=expected_user:return false
@@ -101,16 +111,24 @@ func request_recovery(email:String,redirect:String) -> Dictionary:
  if not redirect.begins_with("https://"):return {"ok":false,"message":"Wiederherstellung bitte in der veröffentlichten HTTPS-Webversion öffnen."}
  return await call_api("/auth/v1/recover?redirect_to="+redirect.uri_encode(),HTTPClient.METHOD_POST,{"email":email.strip_edges()})
 func accept_recovery(payload:Dictionary) -> Dictionary:
+ if payload.get("type","")!="recovery":return {"ok":false,"message":"Ungültiger Wiederherstellungslink."}
+ return await accept_email_link(payload)
+func accept_email_link(payload:Dictionary) -> Dictionary:
+ if busy:return {"ok":false,"message":"Bitte die laufende Anfrage abwarten."}
  if signed_in():return {"ok":false,"message":"Zuerst das aktuelle Konto abmelden."}
+ var link_type=String(payload.get("type",""))
  var incoming=String(payload.get("access_token",""))
- if incoming.is_empty() or payload.get("type","")!="recovery":return {"ok":false,"message":"Ungültiger Wiederherstellungslink."}
+ if incoming.is_empty() or link_type not in ["signup","magiclink","recovery"]:
+  return {"ok":false,"message":"Link ungültig oder abgelaufen. Bitte erneut anmelden oder einen neuen Link anfordern."}
  token=incoming
+ # Never trust identity claims in the URL. Resolve the token against Auth first.
  var result=await call_api("/auth/v1/user",HTTPClient.METHOD_GET)
  if not result.ok or not result.data is Dictionary or String(result.data.get("id","")).is_empty():
   logout();return {"ok":false,"message":"Link ungültig oder abgelaufen. Bitte einen neuen Link anfordern."}
  var session=payload.duplicate();session.user=result.data
- if not accept_session(session):logout();return {"ok":false,"message":"Wiederherstellung fehlgeschlagen."}
- recovering=true;loaded=false;revision=0;pending.clear()
+ if not accept_session(session):logout();return {"ok":false,"message":"Anmeldung fehlgeschlagen."}
+ recovering=link_type=="recovery";loaded=false;revision=0;pending.clear()
+ status="Passwort wiederherstellen" if recovering else "E-Mail bestätigt · angemeldet"
  return {"ok":true}
 func change_recovered_password(password:String) -> Dictionary:
  if not recovering or not signed_in():return {"ok":false,"message":"Bitte zuerst den Wiederherstellungslink öffnen."}

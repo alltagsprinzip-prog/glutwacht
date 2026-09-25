@@ -43,9 +43,7 @@ static func strength(profile:Dictionary) -> int:
  var army=int(profile.get("melee",0))+int(profile.get("archers",0))
  var training=profile.get("training",{}).get("troops",{})
  var hero_training=profile.get("training",{}).get("heroes",{}).get(String(profile.get("hero","warrior")),{})
- var capacity=mini(10,4+int(profile.get("hall",1))*2)
- for b in profile.get("structures",[]):
-  if b is Dictionary and b.get("kind","")=="camp":capacity+=2+int(b.get("level",1))*2
+ var capacity=army_capacity(profile)
  var class_data=hero(String(profile.get("hero","warrior")))
  var power=capacity*4+int(class_data.hp)/20+int(class_data.damage)+int(profile.get("hall",1))*100+int(profile.get("barracks",1))*35+int(profile.get("smithy",1))*30+army*18
  power+=int(training.get("melee",0))*14+int(training.get("archers",0))*14
@@ -90,3 +88,18 @@ static func matched_village(index:int,profile:Dictionary) -> Dictionary:
  base.combat_scale=target_power/maxf(1.0,float(strength_for_village_level(level)))
  base.theme="Gegner deiner Stärke"
  return base
+
+# Fixed PvE camps: independent of player strength, repeatable, no ranked rewards.
+const CAMPAIGN_NAMES=["Moospfad","Waldwacht","Kupferfurt","Dornbrücke","Eisenklamm","Nebelpass","Runenhain","Aschentor","Glutfeste","Kronenwacht"]
+static func campaign(index:int) -> Dictionary:
+ if index<0 or index>=CAMPAIGN_NAMES.size():return {}
+ var level=index+1
+ return {"name":CAMPAIGN_NAMES[index],"level":level,"theme":"Kampagne · Lager %d / 10"%level,"seed":7100+index*137,"tower_count":clampi(1+int(index/2),1,5),"wall_count":index*3,"guards":2+index,"captains":int(index/3),"wood":90+index*65,"stone":65+index*55,"gold":45+index*40,"combat_scale":1.0}
+static func campaign_unlocked(profile:Dictionary,index:int) -> bool:
+ if index<0 or index>=CAMPAIGN_NAMES.size():return false
+ return index==0 or int(profile.get("campaign_stars",{}).get(str(index-1),0))>0
+static func army_capacity(profile:Dictionary) -> int:
+ var camps=0;var extra=0
+ for b in profile.get("structures",[]):
+  if b is Dictionary and b.get("kind","")=="camp":camps+=1;extra+=2+int(b.get("level",1))*2
+ return 8+extra if camps>0 else mini(10,4+int(profile.get("hall",1))*2)

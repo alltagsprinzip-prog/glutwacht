@@ -30,3 +30,6 @@ Projekt totszgelioskmbmkmetd: private Save-Migration und RLS-Triggerhärtung ang
 Echte Supabase-Auth/PostgREST-Sitzungen, drei Live-Konten, zwei Geräte, parallele Sitzungen/Last und echte E-Mail-Wiederherstellung. PGlite besitzt nur eine Verbindung und beweist keine Parallelität. Zieltelefon/Safe-Area-Abnahme sowie Vorher/Nachher-Nutzerprobe offen. Kein serverautorisiertes PvP.
 
 CI-Nachtrag: Beide Workflows auf 1efa2fe erfolgreich (Spiel 36186155713, Datenbank 36186155762).
+
+## E-Mail-Einstieg und Kampagne
+Nutzer bestätigt Zustellung; Auth-Datenbank bestätigt email_confirmed_at. Neuer Code lokal: Account/Save 37/37; Kampagne 68/68; Regeln 187/187; HUD-Geometrie 135/135; Node-Callback-Prüfung bestanden. Legacy-Save ohne Kampagnenfelder bleibt kompatibel. Xvfb scheitert lokal an X11-Sockets, daher neue grafische CI-Artefakte noch prüfen. Keine tatsächliche Mehrgeräte-Abnahme daraus ableiten.
