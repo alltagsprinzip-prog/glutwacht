@@ -10,7 +10,9 @@ static func plate(g,rect:Rect2,color:Color=Color("263e46")):
 static func action(g,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false):
  var b=g.icon_button(g.hud,key,title,rect,func():g.tone("click");callback.call(),primary)
  b.set_meta("hud_action",title)
- if b.get_child_count()>1:b.get_child(1).add_theme_font_size_override("font_size",25)
+ if b.get_child_count()>1:
+  var caption=b.get_child(1);caption.add_theme_font_size_override("font_size",25)
+  caption.position=Vector2(4,rect.size.y-44);caption.size=Vector2(rect.size.x-8,34)
  return b
 static func build(g):
  g.clear_hud();g.hud_widgets={}
@@ -30,7 +32,7 @@ static func top(g):
  var profile=action(g,"badge","",Rect2(20,18,285,90),func():g.open_profile())
  profile.get_child(0).position=Vector2(8,10);profile.get_child(0).size=Vector2(64,64)
  g.label(profile,str(g.Catalog.level(g.progress.data,g.sim.hero_key())),Rect2(18,27,44,34),26,TEXT,true)
- g.label(profile,name,Rect2(82,10,190,36),28,TEXT)
+ var village_name=g.label(profile,name,Rect2(82,10,190,36),28,TEXT);village_name.clip_text=true;village_name.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
  g.label(profile,"Stufe %d"%g.progress.data.hall,Rect2(84,49,185,29),24,GOLD)
  plate(g,Rect2(325,18,244,90))
  g.icon(g.hud,"worker",Rect2(336,29,56,56));g.builder_text=text(g,"",Rect2(399,23,154,37),28,TEXT,true)
@@ -41,7 +43,7 @@ static func top(g):
   plate(g,Rect2(942,y,318,62))
   g.icon(g.hud,key,Rect2(944,y-3,67,67))
   g.resource_labels[key]=text(g,"",Rect2(1018,y+1,228,38),29,TEXT,true)
-  var b=ProgressBar.new();b.position=Vector2(1023,y+43);b.size=Vector2(219,9);b.show_percentage=false;b.mouse_filter=Control.MOUSE_FILTER_IGNORE
+  var b=ProgressBar.new();b.position=Vector2(1023,y+43);b.size=Vector2(219,9);b.show_percentage=false;b.add_theme_font_size_override("font_size",1);b.mouse_filter=Control.MOUSE_FILTER_IGNORE
   b.add_theme_stylebox_override("background",g.style(Color("14262b"),Color.TRANSPARENT,0,4))
   b.add_theme_stylebox_override("fill",g.style([Color("ce9860"),Color("a4c4d3"),GOLD][i],Color.TRANSPARENT,0,4));g.hud.add_child(b);g.resource_bars[key]=b
  action(g,"tasks","ZIELE",Rect2(20,128,110,92),func():g.open_tasks())
@@ -83,8 +85,8 @@ static func combat(g):
  action(g,"menu","",Rect2(1158,18,102,91),func():g.open_menu())
  for i in range(2):
   var key=["melee","archers"][i];var b=action(g,key,"",Rect2(20,185+i*109,130,98),func():g.choose_deploy(key))
-  b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,7);b.get_child(0).size=Vector2(65,65)
-  b.set_meta("count",g.label(b,"",Rect2(65,10,60,48),32,TEXT,true));g.label(b,"Schwert" if i==0 else "Bogen",Rect2(5,67,120,27),24,TEXT,true)
+  b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,7);b.get_child(0).size=Vector2(52,52)
+  b.set_meta("count",g.label(b,"",Rect2(65,10,60,48),32,TEXT,true));g.label(b,"Schwert" if i==0 else "Bogen",Rect2(5,60,120,31),24,TEXT,true)
  g.create_stick()
  plate(g,Rect2(265,617,460,85));g.icon(g.hud,g.sim.hero_key(),Rect2(274,626,67,67))
  text(g,g.sim.stats().name,Rect2(350,620,204,35),27,GOLD)
@@ -92,8 +94,10 @@ static func combat(g):
  g.health=ProgressBar.new();g.health.position=Vector2(352,666);g.health.size=Vector2(355,17);g.health.show_percentage=false;g.health.max_value=g.sim.hero.max_hp;g.health.mouse_filter=Control.MOUSE_FILTER_IGNORE
  g.health.add_theme_stylebox_override("background",g.style(Color("14262b"),Color.TRANSPARENT,0,5));g.health.add_theme_stylebox_override("fill",g.style(Color("80c56c"),Color.TRANSPARENT,0,5));g.hud.add_child(g.health)
  var attack=action(g,"attack","ANGRIFF",Rect2(1106,561,154,143),func():pass,true)
+ attack.get_child(0).position=Vector2(41,12);attack.get_child(0).size=Vector2(72,72)
  attack.button_down.connect(func():g.held=true);attack.button_up.connect(func():g.held=false)
  g.cooldowns.skill=action(g,"super_"+g.sim.hero_key(),"FÄHIGKEIT",Rect2(1088,406,172,139),func():g.sim.skill(),true)
+ g.cooldowns.skill.get_child(0).position=Vector2(50,12);g.cooldowns.skill.get_child(0).size=Vector2(72,72)
  g.cooldowns.roll=action(g,"roll","ROLLE",Rect2(758,608,148,96),func():g.sim.roll(g.movement()))
  g.cooldowns.heal=action(g,"heal","TRANK",Rect2(920,608,148,96),func():g.sim.heal())
  for key in g.cooldowns:

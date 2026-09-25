@@ -5,7 +5,7 @@ Bestehendes Spiel gemäß docs/MASTERPLAN.md weiterentwickeln. Accounts mit getr
 
 ## Basis und Arbeitsbranch
 Basis main: aba21e61f2878c0dbd8be8744af583e4f3103cc1.
-Branch: update/masterplan-online-20260925. Veröffentlichung noch nicht freigegeben: Live-Backend und gerenderte Touch-Prüfung fehlen.
+Branch: update/masterplan-online-20260925. Veröffentlichung noch nicht freigegeben: Live-Backend und abschließende Abnahme der jüngsten Änderungen fehlen.
 Aktiver Einstieg game3d/main.tscn. Root-main.gd ist der historische 2D-Prototyp.
 
 ## Implementiert
@@ -18,16 +18,16 @@ Aktiver Einstieg game3d/main.tscn. Root-main.gd ist der historische 2D-Prototyp.
 - SQL-Migration für eigene Datensätze per RLS, authentifizierte atomare RPC, Revision, Request-ID und 90-Sekunden-Gerätebindung.
 
 ## Wichtige Grenzen
-Supabase-Plugin ist installiert/aktiv. In dieser Sitzung wurden trotzdem keine Supabase-Projekt-/SQL-Aktionen bereitgestellt. Keine Migration live angewandt, kein Projekt erstellt und keine echten Konten getestet. config.json bleibt leer, Konten deshalb im Build gesperrt.
+Supabase-Plugin ist installiert/aktiv. In dieser Sitzung wurden trotzdem keine Supabase-Projekt-/SQL-Aktionen bereitgestellt. Keine Migration live angewandt, kein Projekt erstellt und keine echten Konten getestet. Lokal 27 SQL-Prüfungen bestanden. .mcp.json enthält den offiziellen MCP-Endpunkt ohne Zugangsdaten; das ersetzt keine Authentifizierung. config.json bleibt leer, Konten deshalb im Build gesperrt.
 Cloud-Snapshots sind ausdrücklich privat/unrangiert und vom Client geliefert. Das ist noch KEINE serverautorisierte Spielwirtschaft. Kein PvP/Clans/Mehrspielerbeweis daraus ableiten.
 1280×720-Komposition; vollständiges responsives Safe-Area-Layout und Zieltelefon-Abnahme offen.
 
 ## Tests
-Headless: Release 187/187; HUD-Regeln 70/70; neue Account-/Save-Tests 20/20; Layout/Dialog-Struktur 131/131; vorhandener Release-Gate bestanden. Start und Import ohne Skriptfehler.
-Echte Touch-Suite im Headless-Versuch 18/51; kein erfolgreicher Touch-Nachweis. Xvfb hier nicht lauffähig. Gerenderte Prüfung muss im vorhandenen CI erfolgen. Layout-Suite meldet zwei Objekt-Leaks beim Testende; Ursache offen.
+Vollständiger CI-Lauf 36149121238 auf f93f042 bestanden, einschließlich 51 Touch- und 69 Szenenprüfungen sowie vollständigem WebGL-Angriff/Save-Reload. Screenshots tatsächlich angesehen.
+Danach: Auth-Refresh/Recovery/Signout ergänzt (28 lokale Tests), Datenbank mit PGlite geprüft (27 Tests), sichtbare Beschriftungs-/Balkenprobleme korrigiert (131 Layouttests). Neuer CI-Stand getrennt prüfen. Details in docs/TEST_STATUS.md.
 
 ## Nächste Reihenfolge
-1. CI-Protokolle und gerenderte Touch-/HUD-Bilder prüfen, Fehler beheben; nicht ungeprüft mergen.
+1. Letzten CI-Lauf für Recovery-/SQL-/Lesbarkeitsänderungen prüfen; nicht ungeprüft mergen.
 2. Verfügbare Supabase-Projektaktionen verwenden; passendes bestehendes Projekt prüfen, keine bezahlte Ressource erstellen.
 3. Migration testen/anwenden und ausschließlich öffentliche URL/publishable key konfigurieren.
 4. Drei Testkonten/zwei Geräte: Isolation, Konflikte, Retry, Export, Anmeldung nach Tokenablauf.
@@ -37,3 +37,5 @@ Weitere Details: docs/REQUIREMENTS.md, docs/TEST_STATUS.md, docs/NEXT_SESSION.md
 Web-Release-Export lokal erfolgreich erzeugt (HTML/JS/PCK/WASM); Browserlauf ausstehend.
 
 CI-Nachtrag: Commit 383f51b hat die echte Touch-Prüfung und gerenderte Szenenprüfung bestanden (Run 36148677008). Der fehlgeschlagene Headless-Inputversuch ist damit kein nachgewiesener Spielfehler. Browser-Testkoordinate für den verschobenen Bauknopf korrigiert; Screenshot-Artefakte im Workflow aktiviert. Endgültigen Browserlauf weiterhin prüfen.
+
+Recovery/Refresh: Auth-Tokens nur im Speicher; Passwort-Recovery servergeprüft, eigener Passwortdialog und Session-Refresh ohne Identitätswechsel. Live-E-Mail-Test bleibt offen.

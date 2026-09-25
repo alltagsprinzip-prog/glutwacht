@@ -3,6 +3,9 @@ extends Node
 var url=""
 var public_key=""
 var token=""
+var refresh_token=""
+var expires_at=0.0
+var recovering=false
 var user_id=""
 var revision=0
 var device_id=""
@@ -28,7 +31,7 @@ func call_api(path:String,method:int,body:Dictionary={}) -> Dictionary:
  busy=true
  var http=HTTPRequest.new();add_child(http);http.timeout=15
  var headers=PackedStringArray(["apikey: "+public_key,"Content-Type: application/json"])
- if signed_in():headers.append("Authorization: Bearer "+token)
+ if not token.is_empty():headers.append("Authorization: Bearer "+token)
  var error=http.request(url+path,headers,method,"" if method==HTTPClient.METHOD_GET else JSON.stringify(body))
  if error!=OK:busy=false;http.queue_free();return {"ok":false,"message":"Verbindung konnte nicht gestartet werden."}
  var result=await http.request_completed
@@ -50,11 +53,13 @@ func login(email:String,password:String,register:bool=false) -> Dictionary:
  var payload=result.data
  if not payload is Dictionary:return {"ok":false,"message":"Ungültige Serverantwort."}
  if not payload.has("access_token"):return {"ok":false,"message":"Bitte die Bestätigungs-E-Mail öffnen und danach anmelden."}
- token=String(payload.access_token);user_id=String(payload.get("user",{}).get("id",""));revision=0;loaded=false;pending.clear()
+ if not accept_session(payload):return {"ok":false,"message":"Ungültige Anmeldung."}
+ revision=0;loaded=false;pending.clear()
  status="Angemeldet"
  return {"ok":signed_in()}
 func fetch_save() -> Dictionary:
- if not signed_in():return {"ok":false,"message":"Bitte anmelden."}
+ var session=await ensure_session()
+ if not session.ok:return session
  var result=await call_api("/rest/v1/player_saves?select=revision,snapshot&user_id=eq."+user_id,HTTPClient.METHOD_GET)
  if not result.ok:return result
  if not result.data is Array:return {"ok":false,"message":"Ungültige Serverantwort."}
@@ -62,6 +67,8 @@ func fetch_save() -> Dictionary:
  return {"ok":true,"empty":false,"revision":int(result.data[0].revision),"snapshot":result.data[0].snapshot}
 func upload(snapshot:Dictionary) -> Dictionary:
  if not signed_in() or not loaded:return {"ok":false,"message":"Zuerst den Cloud-Stand prüfen."}
+ var session=await ensure_session()
+ if not session.ok:return session
  if pending.is_empty():pending={"p_snapshot":snapshot.duplicate(true),"p_revision":revision,"p_request":uuid(),"p_device":device_id}
  # Keep the exact request after a timeout: its committed response may have been lost.
  var result=await call_api("/rest/v1/rpc/save_private_village",HTTPClient.METHOD_POST,pending)
@@ -70,4 +77,47 @@ func upload(snapshot:Dictionary) -> Dictionary:
  else:status="Cloud-Sicherung ausstehend"
  return result
 func logout():
- token="";user_id="";revision=0;loaded=false;pending.clear();status="Nicht angemeldet"
+ token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();status="Nicht angemeldet"
+
+func accept_session(payload:Dictionary,expected_user:String="") -> bool:
+ var incoming_token=String(payload.get("access_token",""))
+ var incoming_user=String(payload.get("user",{}).get("id",""))
+ if incoming_token.is_empty() or incoming_user.is_empty():return false
+ if not expected_user.is_empty() and incoming_user!=expected_user:return false
+ token=incoming_token;user_id=incoming_user
+ refresh_token=String(payload.get("refresh_token",""))
+ expires_at=Time.get_unix_time_from_system()+clampf(float(payload.get("expires_in",3600)),1,86400)
+ return true
+func ensure_session() -> Dictionary:
+ if not signed_in():return {"ok":false,"message":"Bitte anmelden."}
+ if expires_at==0 or Time.get_unix_time_from_system()<expires_at-60:return {"ok":true}
+ if refresh_token.is_empty():return {"ok":false,"message":"Sitzung abgelaufen. Bitte erneut anmelden; dein Dorf bleibt lokal erhalten."}
+ var result=await call_api("/auth/v1/token?grant_type=refresh_token",HTTPClient.METHOD_POST,{"refresh_token":refresh_token})
+ if not result.ok:return result
+ if not result.data is Dictionary or not accept_session(result.data,user_id):return {"ok":false,"message":"Sitzung konnte nicht sicher erneuert werden."}
+ return {"ok":true}
+func request_recovery(email:String,redirect:String) -> Dictionary:
+ if email.strip_edges().is_empty():return {"ok":false,"message":"Bitte deine E-Mail eingeben."}
+ if not redirect.begins_with("https://"):return {"ok":false,"message":"Wiederherstellung bitte in der veröffentlichten HTTPS-Webversion öffnen."}
+ return await call_api("/auth/v1/recover?redirect_to="+redirect.uri_encode(),HTTPClient.METHOD_POST,{"email":email.strip_edges()})
+func accept_recovery(payload:Dictionary) -> Dictionary:
+ if signed_in():return {"ok":false,"message":"Zuerst das aktuelle Konto abmelden."}
+ var incoming=String(payload.get("access_token",""))
+ if incoming.is_empty() or payload.get("type","")!="recovery":return {"ok":false,"message":"Ungültiger Wiederherstellungslink."}
+ token=incoming
+ var result=await call_api("/auth/v1/user",HTTPClient.METHOD_GET)
+ if not result.ok or not result.data is Dictionary or String(result.data.get("id","")).is_empty():
+  logout();return {"ok":false,"message":"Link ungültig oder abgelaufen. Bitte einen neuen Link anfordern."}
+ var session=payload.duplicate();session.user=result.data
+ if not accept_session(session):logout();return {"ok":false,"message":"Wiederherstellung fehlgeschlagen."}
+ recovering=true;loaded=false;revision=0;pending.clear()
+ return {"ok":true}
+func change_recovered_password(password:String) -> Dictionary:
+ if not recovering or not signed_in():return {"ok":false,"message":"Bitte zuerst den Wiederherstellungslink öffnen."}
+ if password.length()<12:return {"ok":false,"message":"Bitte mindestens 12 Zeichen verwenden."}
+ var result=await call_api("/auth/v1/user",HTTPClient.METHOD_PUT,{"password":password})
+ if result.ok:recovering=false
+ return result
+func sign_out():
+ if signed_in():await call_api("/auth/v1/logout?scope=local",HTTPClient.METHOD_POST)
+ logout()

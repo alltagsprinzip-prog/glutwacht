@@ -13,19 +13,24 @@ create table if not exists public.player_saves (
 alter table public.player_saves enable row level security;
 revoke all on public.player_saves from anon, authenticated;
 grant select on public.player_saves to authenticated;
-create policy read_own_save on public.player_saves for select to authenticated using (user_id = auth.uid());
+create policy read_own_save on public.player_saves for select to authenticated using (user_id = (select auth.uid()));
 
 -- Every write is serialized per authenticated account. Revision + short lease
 -- prevent a second device from silently overwriting newer progress.
-create or replace function public.save_private_village(
+create schema if not exists glutwacht_private;
+revoke all on schema glutwacht_private from public, anon;
+grant usage on schema glutwacht_private to authenticated;
+
+create or replace function glutwacht_private.save_private_village(
  p_snapshot jsonb, p_revision bigint, p_request uuid, p_device uuid
 ) returns jsonb language plpgsql security definer set search_path = '' as $$
 declare v_uid uuid := auth.uid(); v_row public.player_saves; v_now timestamptz := clock_timestamp();
 begin
  if v_uid is null then raise exception 'authentication_required'; end if;
  if p_request is null or p_device is null or p_revision is null or p_revision < 0 then raise exception 'invalid_request'; end if;
- if p_snapshot is null or jsonb_typeof(p_snapshot) <> 'object' or octet_length(p_snapshot::text)>1048576 or p_snapshot->>'version' <> '7' then raise exception 'invalid_snapshot'; end if;
+ if p_snapshot is null or jsonb_typeof(p_snapshot) <> 'object' or octet_length(p_snapshot::text)>1048576 or p_snapshot->>'version' is distinct from '7' then raise exception 'invalid_snapshot'; end if;
  perform pg_advisory_xact_lock(hashtextextended(v_uid::text,0));
+ v_now := clock_timestamp();
  select * into v_row from public.player_saves where user_id=v_uid for update;
  if found then
   if v_row.last_request=p_request then
@@ -43,5 +48,15 @@ begin
  end if;
  return jsonb_build_object('revision',v_row.revision);
 end; $$;
+revoke all on function glutwacht_private.save_private_village(jsonb,bigint,uuid,uuid) from public,anon;
+grant execute on function glutwacht_private.save_private_village(jsonb,bigint,uuid,uuid) to authenticated;
+
+-- Public entry point stays invoker; the tightly scoped privileged implementation
+-- is not in an exposed schema. Only it can mutate rows, always for auth.uid().
+create or replace function public.save_private_village(
+ p_snapshot jsonb, p_revision bigint, p_request uuid, p_device uuid
+) returns jsonb language sql security invoker set search_path = '' as $$
+ select glutwacht_private.save_private_village(p_snapshot,p_revision,p_request,p_device);
+$$;
 revoke all on function public.save_private_village(jsonb,bigint,uuid,uuid) from public,anon;
 grant execute on function public.save_private_village(jsonb,bigint,uuid,uuid) to authenticated;

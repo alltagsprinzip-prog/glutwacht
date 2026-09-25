@@ -47,6 +47,27 @@ func run():
  check(fetched.revision==9 and a.revision==1,"reading cloud cannot silently advance writable revision")
  a.logout();check(not a.signed_in() and not a.loaded and a.pending.is_empty(),"logout clears in-memory credentials and account state")
  check(not JSON.stringify(p.data).contains("test-memory-only"),"save export never contains session token")
+
+ var current={"access_token":"access-a","refresh_token":"refresh-a","expires_in":1,"user":{"id":"account-a"}}
+ check(a.accept_session(current),"accept complete session")
+ a.response={"ok":true,"data":{"access_token":"foreign-token","refresh_token":"foreign-refresh","user":{"id":"account-b"}}}
+ var renewed=await a.ensure_session()
+ check(not renewed.ok and a.user_id=="account-a" and a.token=="access-a","refresh cannot switch account identity")
+ a.response={"ok":true,"data":{"access_token":"renewed-a","refresh_token":"rotated-a","expires_in":3600,"user":{"id":"account-a"}}}
+ renewed=await a.ensure_session()
+ check(renewed.ok and a.refresh_token=="rotated-a" and a.user_id=="account-a","refresh rotates memory session for same account")
+ a.logout();a.response={"ok":false,"message":"invalid"}
+ var recovery=await a.accept_recovery({"type":"recovery","access_token":"invalid"})
+ check(not recovery.ok and a.token.is_empty() and not a.recovering,"invalid recovery token leaves no session")
+ a.response={"ok":true,"data":{"id":"account-a"}}
+ recovery=await a.accept_recovery({"type":"recovery","access_token":"recovery-a","refresh_token":"recovery-refresh"})
+ check(recovery.ok and a.recovering and not a.loaded,"verified recovery does not load or overwrite a village")
+ var changed=await a.change_recovered_password("short")
+ check(not changed.ok and a.recovering,"short recovery password rejected")
+ changed=await a.change_recovered_password("a-long-test-password")
+ check(changed.ok and not a.recovering,"password change finishes recovery")
+ await a.sign_out()
+ check(a.token.is_empty() and a.refresh_token.is_empty(),"signout clears access and refresh tokens")
  a.queue_free()
  for suffix in ["",".before-hud",".unreadable"]:DirAccess.remove_absolute(path+suffix)
  print("ACCOUNT_SAVE_TESTS ",checks-failures,"/",checks)

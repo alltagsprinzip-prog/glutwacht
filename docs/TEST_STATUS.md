@@ -2,20 +2,21 @@
 
 Engine 4.7.2.stable.official.ed1daf0bf.
 
-| Prüfung | Ergebnis |
-|---|---|
-| Ressourcenimport / Headless-Start | ohne Skriptfehler |
-| release_suite.gd | 187/187 |
-| hud_rules.gd | 70/70 |
-| account_save_suite.gd | 20/20; HTTP-Antworten simuliert |
-| hud_layout_suite.gd | 131/131; zwei Objekt-Leaks bei Testende gemeldet |
-| release_gate.gd | bestanden |
-| input_suite.gd mit --headless | 18/51, fehlgeschlagen; gerenderter Lauf ausstehend |
-| Gerenderte Screenshots / Mobilgerät | offen; lokales Xvfb nicht lauffähig |
-| Supabase-Migration / echte Konten / RLS | nicht ausgeführt |
+## Erfolgreicher vollständiger CI-Lauf
+Commit f93f042376eaa85f5ce929f156a738357cfaa7f1, Run 36149121238:
+https://github.com/alltagsprinzip-prog/glutwacht/actions/runs/36149121238
 
-Die 408 bestandenen Einzelprüfungen beweisen keine fertige Onlineversion. Fehlgeschlagene Touch-Abnahme blockiert Merge/Veröffentlichung. Vorhandene CI führt echte Touch-/Render-/WebGL-Gates aus.
+- Release-Regeln 187/187, HUD/Fähigkeiten 70/70, Account/Save 20/20, Layout 131/131.
+- Echte Touch-Eingaben 51/51, gerenderte Szenen 69/69, bestehender Release-Gate bestanden.
+- WebGL-Browserprüfung komplett bestanden: Erstwahl, Joystick, Dialoge, Reload/Persistenz, fünf Einzelplatzierungen, vollständiger Angriff, Rückkehr, alter URL-Einstieg. Keine Browserfehler in result.json.
+- Tatsächliche Dorf-/Kampf-/Training-Screenshots angesehen. Dabei zu tiefe Aktionsbeschriftungen und zu hohe Ressourcenbalken gefunden; anschließend korrigiert und Trainingsschrift vergrößert.
+- Headless-Inputversuch 18/51 war kein gültiger Ersatz für den erfolgreichen grafischen Lauf.
 
-Web-Release-Export lokal erfolgreich erzeugt (HTML/JS/PCK/WASM); Browserlauf ausstehend.
+## Änderungen nach diesem CI-Lauf
+- Recovery/Refresh/Signout ergänzt: Account-/Save-Suite lokal jetzt 28/28.
+- SQL-Migration: 27/27 mit PGlite 0.5.8, echtem SQL/RLS und simuliertem Auth-Schema. Fehlendes Versionsfeld wird abgelehnt; privilegierte Funktion in privatem Schema.
+- Layoutsuite nach Beschriftungs-/Balkenkorrektur lokal 131/131. Zwei Objekt-Leaks beim Testende bleiben zur Untersuchung dokumentiert.
+- Der vollständige CI-Lauf dieser nachfolgenden Änderungen ist separat zu prüfen.
 
-CI-Nachtrag: Commit 383f51b hat die echte Touch-Prüfung und gerenderte Szenenprüfung bestanden (Run 36148677008). Der fehlgeschlagene Headless-Inputversuch ist damit kein nachgewiesener Spielfehler. Browser-Testkoordinate für den verschobenen Bauknopf korrigiert; Screenshot-Artefakte im Workflow aktiviert. Endgültigen Browserlauf weiterhin prüfen.
+## Noch offen
+Reale Supabase-Auth/PostgREST-Prüfung, drei Live-Konten, zwei Geräte, parallele Sitzungen/Last und echte E-Mail-Wiederherstellung. PGlite besitzt nur eine Verbindung und beweist keine Parallelität. Zieltelefon/Safe-Area-Abnahme sowie Vorher/Nachher-Nutzerprobe offen. Kein serverautorisiertes PvP.

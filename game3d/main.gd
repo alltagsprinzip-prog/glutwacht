@@ -80,6 +80,7 @@ func _ready():
  if not progress.warning.is_empty():toast(progress.warning)
  if progress.write_blocked:call_deferred("open_save_tools")
  elif progress.data.hero=="":call_deferred("open_heroes")
+ call_deferred("check_recovery_link")
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
  var s=StyleBoxFlat.new()
  s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
@@ -493,8 +494,8 @@ func open_training():
  var kinds=["power","vitality","skill","melee","archers"];var names=["Kraft","Leben","Fähigkeit","Schwerter","Bogenschützen"];var effects=["+6 Angriff","+25 Leben","+12% / −0,4s","+20 HP / +4 Angriff","+20 HP / +4 Angriff"]
  for i in range(5):
   var group="heroes" if i<3 else "troops";var who=key if i<3 else kinds[i];var attribute=kinds[i] if i<3 else "";var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=87+i*86
-  panel(p,Rect2(23,y,814,78),Color("34545b"));icon(p,kinds[i],Rect2(31,y+13,46,46));label(p,names[i]+"  %d/5"%rank,Rect2(86,y+7,259,29),19,GOLD);label(p,effects[i],Rect2(86,y+40,260,28),15)
-  costs(p,cost,Vector2(355,y+24),310,15)
+  panel(p,Rect2(23,y,814,78),Color("34545b"));icon(p,kinds[i],Rect2(31,y+13,46,46));label(p,names[i]+"  %d/5"%rank,Rect2(86,y+5,259,33),24,GOLD);label(p,effects[i],Rect2(86,y+40,260,29),22)
+  costs(p,cost,Vector2(355,y+24),310,24)
   var b=icon_button(p,"upgrade","",Rect2(725,y+8,95,61),func():
    if progress.train(group,who,attribute):save();refresh_home();open_training();tone("equip"),true)
   b.disabled=rank>=5 or not progress.affordable(cost) or (group=="troops" and not Catalog.troop_unlocked(who,int(progress.data.hall),int(progress.data.barracks)))
@@ -658,6 +659,7 @@ func open_inbox():
  label(p,"Hier siehst du deinen Dorfstatus. Nachrichten anderer Spieler sind noch nicht verfügbar.",Rect2(32,374,790,100),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 
 func open_account():
+ if account.recovering:open_recovery_password();return
  var p=open_dialog("account","Konto und Cloud","")
  if not account.configured():
   label(p,"Die Konten-Anbindung ist für diesen Build noch nicht eingerichtet. Dein lokales Dorf bleibt spielbar und gespeichert.",Rect2(32,125,790,185),27).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -669,9 +671,10 @@ func open_account():
   button(p,"Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
  var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
  var password=LineEdit.new();password.placeholder_text="Passwort";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
- label(p,"Jedes Konto hat sein eigenes Dorf. Dein bisheriges lokales Dorf bleibt separat erhalten.",Rect2(32,291,790,100),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"Anmelden",Rect2(32,420,380,65),func():authenticate(email.text,password.text,false),true)
- button(p,"Registrieren",Rect2(434,420,388,65),func():authenticate(email.text,password.text,true))
+ label(p,"Jedes Konto hat sein eigenes Dorf. Dein bisheriges lokales Dorf bleibt separat erhalten.",Rect2(32,286,790,82),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Anmelden",Rect2(32,378,380,65),func():authenticate(email.text,password.text,false),true)
+ button(p,"Registrieren",Rect2(434,378,388,65),func():authenticate(email.text,password.text,true))
+ button(p,"Passwort vergessen",Rect2(32,461,790,54),func():request_account_recovery(email.text))
 func authenticate(email:String,password:String,register:bool):
  if account.busy:return
  if email.strip_edges().is_empty() or password.is_empty():toast("E-Mail und Passwort eingeben.");return
@@ -720,6 +723,33 @@ func sync_cloud():
 func leave_account():
  if account.busy:toast("Bitte die laufende Sicherung abwarten.");return
  if not progress.store_file(save_path):toast(progress.warning);return
- account.logout();account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
+ await account.sign_out();account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
  if progress.write_blocked:open_save_tools()
  elif progress.data.hero=="":open_heroes()
+
+func request_account_recovery(email:String):
+ if account.busy:return
+ var redirect=""
+ if OS.has_feature("web"):redirect=String(JavaScriptBridge.eval("window.location.origin+window.location.pathname",true))
+ var result=await account.request_recovery(email,redirect)
+ toast("Falls ein Konto vorhanden ist, erhältst du einen Wiederherstellungslink." if result.ok else result.message)
+func check_recovery_link():
+ if not OS.has_feature("web") or not account.configured():return
+ var raw=JavaScriptBridge.eval("(()=>{const p=new URLSearchParams(location.hash.slice(1));if(p.get('type')!=='recovery')return null;const r=JSON.stringify(Object.fromEntries(p));history.replaceState(null,'',location.pathname+location.search);return r;})()",true)
+ if not raw is String:return
+ var payload=JSON.parse_string(raw)
+ if not payload is Dictionary:return
+ var result=await account.accept_recovery(payload)
+ if not result.ok:toast(result.message);return
+ open_recovery_password()
+func open_recovery_password():
+ var p=open_dialog("recovery","Neues Passwort","")
+ label(p,"Mindestens 12 Zeichen. Dein Dorf bleibt unverändert.",Rect2(32,103,790,65),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var password=LineEdit.new();password.secret=true;password.placeholder_text="Neues Passwort";password.position=Vector2(32,191);password.size=Vector2(790,65);p.add_child(password)
+ var repeated=LineEdit.new();repeated.secret=true;repeated.placeholder_text="Passwort wiederholen";repeated.position=Vector2(32,282);repeated.size=Vector2(790,65);p.add_child(repeated)
+ button(p,"Passwort speichern",Rect2(32,421,790,70),func():
+  if account.busy:return
+  if password.text!=repeated.text:toast("Die Passwörter stimmen nicht überein.");return
+  var result=await account.change_recovered_password(password.text)
+  if result.ok:close_dialog();toast("Passwort geändert.");await load_cloud()
+  else:toast(result.message),true)

@@ -1,0 +1,29 @@
+name: Validate private save database
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/database-tests.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/database-tests.yml'
+permissions:
+  contents: read
+jobs:
+  private-saves:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/tests/package-lock.json
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: backend/tests
+      - run: npm test
+        working-directory: backend/tests

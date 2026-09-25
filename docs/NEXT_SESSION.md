@@ -1,12 +1,11 @@
 # Fortsetzung ohne Kontextverlust
 
-Zuerst PROJECT_STATE.md, REQUIREMENTS.md, DECISIONS.md und TEST_STATUS.md lesen; danach git status und aktuelle CI-Ergebnisse. docs/MASTERPLAN.md bleibt der vollständige Auftrag. Keine neue Architektur oder Recherche ohne konkrete Lücke.
+Zuerst PROJECT_STATE.md, REQUIREMENTS.md, DECISIONS.md und TEST_STATUS.md lesen; danach git status und letzte CI-Ergebnisse. docs/MASTERPLAN.md bleibt verbindlich. Keine neue Komplettanalyse/ZIP-Recherche.
 
-Aktueller Blocker: Supabase installiert/aktiv, aber keine callable Projekt-/SQL-Werkzeuge in letzter Sitzung. Nicht erneut um Installation bitten. Verfügbarkeit prüfen, Projekt identifizieren, Migration im Entwicklungsprojekt testen; keine kostenpflichtige Erstellung.
+CI auf f93f042 vollständig bestanden: echte Touch-/Render-/WebGL-Prüfung einschließlich kompletten Angriffs und Reload. Screenshots angesehen. Anschließend Auth-Refresh/Recovery, private SQL-Funktion und UI-Lesbarkeit korrigiert. Diese jüngsten Änderungen separat in CI prüfen.
 
-Noch vor Veröffentlichung: CI-Touch-Fehler untersuchen, HUD-Screenshots tatsächlich ansehen, Desktop/Telefon testen. Headless-Inputversuch scheiterte, nicht als bestanden umdeuten. SQL nicht getestet. Auth-UI nur bei gültiger öffentlicher Konfiguration aktiv.
+Supabase-Skill verfügbar, Server erreichbar (401 ohne Token), aber Projekt-/SQL-Werkzeuge weiterhin nicht exponiert. Nicht erneut Plugininstallation verlangen. .mcp.json ergänzt den offiziellen Endpunkt ohne Zugangsdaten. Für direkten Supabase-Browser-Fallback ist nach Browser-Zugriffsregeln eine ausdrückliche Nutzerfreigabe erforderlich; danach im vorhandenen Projekt arbeiten, keine bezahlte Ressource erstellen.
 
-Danach drei Accounts/zwei Geräte prüfen. SERVER-01 bleibt offen: Client-Snapshots nie als wirtschaftliche Autorität behandeln. Kampagne, Freundesbesuche, servervalidiertes PvP und Clans erst entsprechend Masterplan implementieren und prüfen.
-Nach jeder Stufe Status/Nachweise aktualisieren; keine wiederholte Komplettanalyse der ZIP.
+Lokale Datenbankprüfung: cd backend/tests && npm ci --ignore-scripts && npm test (27/27). Auth/Save Godot 28/28. Diese Tests ersetzen keine echten Supabase-Konten, E-Mails oder Parallelitätsprüfung.
 
-CI-Nachtrag: Commit 383f51b hat die echte Touch-Prüfung und gerenderte Szenenprüfung bestanden (Run 36148677008). Der fehlgeschlagene Headless-Inputversuch ist damit kein nachgewiesener Spielfehler. Browser-Testkoordinate für den verschobenen Bauknopf korrigiert; Screenshot-Artefakte im Workflow aktiviert. Endgültigen Browserlauf weiterhin prüfen.
+Nach Backend-Zugriff: Projekt prüfen; SQL-Migration validieren/anwenden; öffentliche Konfiguration setzen; Redirect/Site-URL und Mailzustellung prüfen; drei Konten/zwei Geräte sowie Last testen. SERVER-01 bleibt offen: Client-Snapshots nie als wirtschaftliche Autorität behandeln. Serverbestätigte Dorfaktionen, sichere Kampfprüfung, Kampagne/Freunde/PvP/Clans bleiben laut Masterplan abzuarbeiten.
