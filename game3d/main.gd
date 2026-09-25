@@ -96,7 +96,7 @@ func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CR
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",19)
  b.add_theme_color_override("font_color",Color("3c2c17") if primary else Color.WHITE)
- b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("abb7b0"))
+ b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("394b53") if primary else Color("abb7b0"))
  b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
