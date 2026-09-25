@@ -87,6 +87,7 @@ jobs:
       - name: Browser WebGL and actual IndexedDB verification
         run: |
           python3 -m pip install --quiet playwright
+          python3 -m playwright install --with-deps chrome
           python3 tools/browser_review.py dist
       - name: Include render evidence and export code backup
         if: always()
