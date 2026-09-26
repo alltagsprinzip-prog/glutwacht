@@ -1,4 +1,4 @@
-// Real exported Godot game + gzip HTTP responses. No production accounts/data.
+// Real exported Godot game + Fetch-visible decoded gzip responses. No real accounts.
 const {chromium}=require('playwright');
 const {spawn}=require('node:child_process');
 const assert=require('node:assert/strict');
@@ -19,7 +19,9 @@ const cloud=require('./mock_cloud.cjs');
    await page.locator('#gw-email').fill('gzip-player@example.test');
    await page.locator('#gw-password').fill('Test-only-password-123');
    await page.locator('#gw-account button[type=submit]').click();
-   await page.waitForFunction(()=>window.__glutwacht?.dialog==='tutorial',null,{timeout:120000});
+   await page.waitForFunction(()=>window.__glutwacht?.dialog==='tutorial',null,{timeout:60000}).catch(async e=>{
+    console.log('Gzip test diagnostic',JSON.stringify({pass,state:await page.evaluate(()=>window.__glutwacht),notice:await page.locator('#gw-notice').textContent(),errors}));throw e;
+   });
    await page.waitForFunction(()=>document.getElementById('glutwacht-start-watch').hidden);
    const end=Date.now()+30000;
    while(!cloud.saves.size&&Date.now()<end)await page.waitForTimeout(100);
