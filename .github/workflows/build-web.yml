@@ -83,6 +83,8 @@ jobs:
         run: python3 tools/check_godot.py logs/start.log godot --headless --audio-driver Dummy --path . --quit-after 120
       - name: Mandatory login and troop guide
         run: python3 tools/check_godot.py logs/login-gate.log godot --headless --path . --script tests3d/login_gate_suite.gd
+      - name: Squad deployment and contextual troop HUD
+        run: python3 tools/check_godot.py logs/friendly-combat.log godot --headless --path . --script tests3d/friendly_combat_suite.gd
       - name: Gameplay and save regression tests
         run: python3 tools/check_godot.py logs/rules.log godot --headless --path . --script tests3d/release_suite.gd
       - name: HUD ability rules

@@ -97,6 +97,15 @@ func deploy_all():
    var pos=center+along*((n%7)-3)*1.25
    if not deploy(kind,pos):break
    n+=1
+func deploy_squad(kind:String,pos:Vector2) -> int:
+ if mode!="raid" or result!="" or not deployment_valid(pos):return 0
+ var count=int(reserve.get(kind,0));var placed=0
+ for i in range(count):
+  var offset=Vector2(cos(i*2.4),sin(i*2.4))*sqrt(float(i))*.65
+  var target=pos+offset
+  if not deployment_valid(target):target=pos
+  if deploy(kind,target):placed+=1
+ return placed
 func building(kind:String,pos:Vector2,radius:float,hp:float,level:int=1,uid:String="",team:String="enemy",rotation:int=0) -> Dictionary:
  serial+=1
  return {"id":serial,"uid":uid,"kind":kind,"pos":pos,"radius":radius,"hp":hp,"max_hp":hp,"cd":.8,"level":level,"team":team,"rotation":rotation,"objective":false,"flash":0.0,"destroyed":false}

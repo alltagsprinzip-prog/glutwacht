@@ -66,6 +66,9 @@ static func home(g):
  var callbacks=[g.open_catalog,g.open_upgrades,g.open_heroes,g.open_army,g.open_training]
  for i in range(5):
   var tile=action(g,keys[i],titles[i],Rect2(300+i*146,586,132,118),callbacks[i])
+  var accent=["337956","33798c","715185","426d96","956026"][i]
+  for state in ["normal","hover"]:
+   var finish=g.skin("blue");finish.bg_color=Color(accent);tile.add_theme_stylebox_override(state,finish)
   tile.get_child(0).position=Vector2(29,6);tile.get_child(0).size=Vector2(74,74)
  if g.selected_building!="":
   var b=g.progress.find_building(g.selected_building)
@@ -94,9 +97,13 @@ static func combat(g):
  g.objective=text(g,"",Rect2(558,31,280,57),34,TEXT,true)
  action(g,"menu","",Rect2(1158,18,102,91),func():g.open_menu())
  for i in range(4):
-  var key=g.Catalog.TROOP_ORDER[i];var b=action(g,key,"",Rect2(20+(i%2)*112,185+int(i/2)*109,104,98),func():g.choose_deploy(key))
+  var key=g.Catalog.TROOP_ORDER[i];var b=action(g,key,"",Rect2(20+(i%2)*112,185+int(i/2)*77,104,70),func():g.choose_deploy(key))
   b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,7);b.get_child(0).size=Vector2(44,44)
-  b.set_meta("count",g.label(b,"",Rect2(49,10,50,48),32,TEXT,true));g.label(b,["Schwert","Bogen","Schild","Stein"][i],Rect2(3,60,98,31),20,TEXT,true)
+  b.set_meta("count",g.label(b,"",Rect2(49,4,50,43),30,TEXT,true));g.label(b,["Krieger","Bogen","Schild","Stein"][i],Rect2(3,47,98,26),20,TEXT,true)
+ g.hud_widgets.deploy_single=g.button(g.hud,"Einzeln",Rect2(20,338,102,66),func():g.choose_deploy_group(false))
+ g.hud_widgets.deploy_group=g.button(g.hud,"Alle",Rect2(128,338,108,66),func():g.choose_deploy_group(true),true)
+ for key in ["deploy_single","deploy_group"]:g.hud_widgets[key].add_theme_font_size_override("font_size",24)
+ g.hud_widgets.deploy_hint=text(g,"",Rect2(275,110,735,45),22,TEXT,true)
  g.create_stick()
  plate(g,Rect2(265,617,460,85));g.icon(g.hud,g.sim.hero_key(),Rect2(274,626,67,67))
  text(g,g.sim.stats().name,Rect2(350,620,204,35),27,GOLD)
@@ -145,11 +152,21 @@ static func update(g):
   b.get_meta("cooldown").text="%.1f"%cd if cd>0 else (str(g.sim.potion) if key=="heal" else "")
   b.disabled=g.sim.hero.hp<=0 or cd>0 or (key=="heal" and g.sim.potion==0)
   b.get_child(0).modulate=Color(1,1,1,.25) if cd>0 else Color.WHITE
+ var slot=0
  for kind in g.deployment_buttons:
   var b=g.deployment_buttons[kind];b.get_meta("count").text=str(g.sim.reserve[kind]);b.disabled=g.sim.reserve[kind]<=0
+  b.visible=not b.disabled
+  if b.visible:b.position=Vector2(20+(slot%2)*112,185+int(slot/2)*77);slot+=1
   var chosen=g.deploying==kind and not b.disabled
   if b.get_meta("selected",false)!=chosen:b.set_meta("selected",chosen);b.add_theme_stylebox_override("normal",g.skin("selected" if chosen else "blue"))
   if b.disabled and g.deploying==kind:g.deploying=""
+ if g.hud_widgets.has("deploy_group"):
+  var remaining=int(g.sim.reserve.get(g.deploying,0))
+  for key in ["deploy_group","deploy_single"]:g.hud_widgets[key].visible=remaining>0
+  g.hud_widgets.deploy_group.text="Alle %d"%remaining
+  g.hud_widgets.deploy_group.add_theme_stylebox_override("normal",g.skin("selected" if g.deploy_group else "gold"))
+  g.hud_widgets.deploy_single.add_theme_stylebox_override("normal",g.skin("selected" if not g.deploy_group else "blue"))
+  g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf einen freien Randbereich."%remaining if g.deploy_group else "Einzeln einsetzen · oder »Alle %d« wählen."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if slot>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
 static func format_number(value) -> String:
  var s=str(int(value));var parts=[]
  while s.length()>3:parts.push_front(s.right(3));s=s.left(s.length()-3)

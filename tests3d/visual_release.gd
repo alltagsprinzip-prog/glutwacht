@@ -45,6 +45,7 @@ func run():
  game.open_campaign_stage(0);await shot("campaign-scout")
  check(game.sim.campaign_index==0 and game.sim.mode=="scout","campaign card opens fixed scout target")
  game.start_raid();check(game.sim.campaign_index==0 and game.sim.mode=="raid","campaign starts through ordinary battle controls")
+ game.choose_deploy_group(true);await shot("friendly-combat-squad")
  game.return_home();game.open_account();await shot("account-entry");game.close_dialog()
  # Render every class and its skill. Fixtures are isolated from real saved profiles.
  for key in game.Catalog.HERO_ORDER:

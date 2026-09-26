@@ -53,6 +53,7 @@ var resource_labels={}
 var builder_text:Label
 var modal_guard_until=0
 var deploying=""
+var deploy_group=false
 var deploy_drag_last=Vector2(9999,9999)
 var deployment_buttons={}
 var selected_building=""
@@ -116,11 +117,11 @@ func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> S
  s.shadow_color=Color(0,0,0,.22);s.shadow_size=6 if width>0 else 0;s.shadow_offset=Vector2(0,5) if width>0 else Vector2.ZERO
  return s
 func skin(key:String) -> StyleBoxFlat:
- var palette={"panel":["142c46","b88b48"],"blue":["203f60","d5ad65"],"gold":["e97812","ffe2a0"],"pressed":["12283f","ffd982"],"disabled":["344354","6f7982"],"selected":["346d9c","ffe2a0"]}
+ var palette={"panel":["23565e","e0bc7b"],"blue":["286b78","f4d598"],"gold":["c95b20","fff0b6"],"pressed":["214e60","fff0b6"],"disabled":["506a70","a7b7b5"],"selected":["357b55","fff0b6"]}
  var colors=palette.get(key,palette.panel)
  var box=style(Color(colors[0]),Color(colors[1]),2,22)
  box.border_width_bottom=4;box.border_width_top=2
- box.shadow_color=Color("071321a0");box.shadow_size=7;box.shadow_offset=Vector2(0,5)
+ box.shadow_color=Color("163a4260");box.shadow_size=5;box.shadow_offset=Vector2(0,4)
  return box
 func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
  if color.v>.65:color=Color("294953")
@@ -157,9 +158,10 @@ func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Call
  var b=button(parent,"",rect,callback,primary);b.name="Action_"+key;b.tooltip_text=title;b.set_meta("icon_key",key)
  var h=minf(47,rect.size.y-32) if title!="" else minf(46,rect.size.y-12)
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
+ b.button_down.connect(func():var art=b.get_child(0);art.pivot_offset=art.size*.5;art.scale=Vector2.ONE*.92)
+ b.button_up.connect(func():b.get_child(0).create_tween().tween_property(b.get_child(0),"scale",Vector2.ONE,.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
  if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,CREAM,true)
- if art_preview:
-  var finish=load("res://game3d/ui/button_finish.gd").new();finish.size=rect.size;finish.round_button=key=="attack" and sim.mode=="home";b.add_child(finish)
+ var finish=load("res://game3d/ui/button_finish.gd").new();finish.size=rect.size;finish.round_button=key=="attack" and sim.mode=="home";b.add_child(finish)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
  var index=0
@@ -169,7 +171,10 @@ func stat_row(parent:Control,key:String,title:String,current:String,next:String,
  icon(parent,key,Rect2(342,y,34,34));label(parent,title,Rect2(389,y,180,34),22)
  label(parent,current+"  →  "+next,Rect2(585,y,410,34),26,GOLD,true)
 func choose_deploy(kind:String):
- cancel_gestures();deploying=kind;update_hud()
+ if int(sim.reserve.get(kind,0))<=0:return
+ cancel_gestures();deploying=kind;deploy_group=false;update_hud()
+func choose_deploy_group(value:bool):
+ cancel_gestures();deploy_group=value;update_hud()
 func clear_hud():
  if hud:ui.remove_child(hud);hud.queue_free()
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
@@ -311,7 +316,8 @@ func deploy_at_screen(pos:Vector2) -> bool:
  if deploying=="" or paused:return false
  var ground=world.ground_position(pos)
  if ground.distance_to(sim.hero.pos)<1.6:return false
- if sim.deploy(deploying,ground):tone("equip");update_hud();return true
+ var placed=sim.deploy_squad(deploying,ground)>0 if deploy_group else sim.deploy(deploying,ground)
+ if placed:tone("equip");update_hud();return true
  if sim.reserve.get(deploying,0)>0:
   sim.effects.append({"kind":"invalid","pos":ground,"life":.4,"max":.4,"color":Color("ff675e")})
  return false
@@ -655,6 +661,7 @@ func open_campaign_stage(index:int):
  close_dialog();build_kind="";selected_building="";world.build_focus=false;world.setup(sim);build_hud()
 func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
 func start_raid():
+ deploy_group=false
  if sim.start(-1,true):close_dialog();result_shown=false;deploying=Catalog.TROOP_ORDER.filter(func(k):return int(sim.reserve.get(k,0))>0)[0];world.setup(sim);build_hud();tone("equip")
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
