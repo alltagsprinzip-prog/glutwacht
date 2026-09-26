@@ -13,3 +13,5 @@ Nächster konkreter Schritt nach Veröffentlichung: Nutzer mit eigenem Konto auf
 GitHub CLI-Login fehlt; nach Prüfung von Repository-Eigentümer und vorhandener Branch-Autorisierung wurde der vorhandene Connector mit Blob/Tree/Commit/Ref genutzt. Keine Tokens erfragen. Lokales X11-Rendering ist im Sandboxprofil nicht möglich; native Render- und WebGL-Prüfungen laufen im bestehenden GitHub CI. Abgeschlossen: Spiel-/WebGL-CI 36203719934 und Datenbank-CI 36203719893 beide erfolgreich. Browser testet echte Tutorialaktionen, Touch-Steuerung, Neuladen mit Held/Ressourcen und vollständigen Kampf. Echte kontoübergreifende Zwei-Geräte-Abnahme bleibt offen.
 
 Neuester Auftrag: Entwurf 1 (Heroic Pop) anwenden. Siehe letzten Eintrag in PROJECT_STATE. Öffentlicher Link bleibt gleich; Freund registriert sich über Profil → Konto / Cloud → Registrieren mit eigener E-Mail.
+
+Heroic Pop ist veröffentlicht: Sites-Version 5, Build cfe8c7585bd5; beide CI-Läufe bestanden, finale Screenshots geprüft. Spielcode 1840d3f91d8e71b0c76e1482cf9a5d184f9ce027. Kein weiteres Deployment dieser unveränderten Version nötig.

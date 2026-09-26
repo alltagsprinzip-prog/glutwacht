@@ -60,3 +60,8 @@ Verbindlich: docs/CHANGE_2026-09-26_ACCOUNTS.md. Code fd82fa6faf84223cb2508b7f02
 ## Heroic Pop – 26.09.2026
 
 Nutzer wählte Entwurf 1. Umsetzung: kompaktes Navy/Gold-HUD, horizontale Ressourcen, Profil mit eigenem gerenderten Portrait, fünf große Navigationskacheln, runder orangefarbener Angriff rechts, Shop oben rechts, transparenter silberner Joystick, durchgängige dunkle Dialoge. Originalatlas heroic-actions.png enthält sechs neue plastische Icons. Haupthaus mit blauem Dach, Goldfirst und zwei Ecktürmen. Keine Save-/Accountlogik geändert, Schema 7 und /v08/ erhalten. Layouttest 154/154 lokal erfolgreich; finale Render-/Touch-/Browserprüfung und Veröffentlichung folgen. Der Entwurf ist eine künstlerische Referenz; die laufende 3D-Welt wird nicht durch das statische Konzeptbild ersetzt.
+
+### Heroic Pop veröffentlicht
+- Spielcode 1840d3f91d8e71b0c76e1482cf9a5d184f9ce027; CI 36205854564 und Datenbank-CI 36205854550 erfolgreich. Finale Browseransicht und Upgradedialog geprüft.
+- Sites-Version 5, Quellcommit f1a17ec3ef66005c3e9d743f360fb50baabc35e8, Build cfe8c7585bd5, Deployment appgdep_6ab71bdd08848191a4e345b372751a84 erfolgreich, 26.09.2026 01:12 UTC. URL unverändert öffentlich.
+- Freund: Profil oben links → Konto / Cloud → Registrieren mit eigener E-Mail. Echte Registrierung und Zwei-Geräte-Abnahme weiterhin offen.
