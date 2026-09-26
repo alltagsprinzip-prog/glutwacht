@@ -1,3 +1,7 @@
+# Current work: 0.13.1 recovery foundation
+
+See docs/DEVELOPMENT_0_13_1.md. This increments save safety before economic migration. Server-authoritative economy, trade, PvP and the full Heroic Pop redesign are still OPEN. Build/publication status must be checked in CI; no physical device test is claimed.
+
 ## Aktuell: 0.13.0 erfolgreich gebaut und an Apple übertragen (26.09.2026, 23:45 Berlin)
 
 - Nutzer bestätigt zuvor: native iPhone-App 0.12 läuft. Neue Weiterentwicklung ausdrücklich autorisiert.

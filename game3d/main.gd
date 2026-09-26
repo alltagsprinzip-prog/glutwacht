@@ -77,8 +77,10 @@ var pending_import
 var art_preview=false
 var require_login=OS.has_feature("web") or OS.has_feature("ios")
 var account_notice=""
+var cloud_versions:Array=[]
+var cloud_version_page=0
 func auth_locked() -> bool:
- return require_login and not art_preview and not account_active
+ return (require_login and not art_preview and not account_active) or (account!=null and not account.pending_restore.is_empty())
 func update_access():
  world.visible=not auth_locked();hud.visible=not auth_locked()
  if auth_locked():paused=true
@@ -844,8 +846,9 @@ func open_account():
   button(p,"Lokale Sicherung",Rect2(32,415,790,70),func():open_save_tools());return
  if account.signed_in():
   label(p,account.status+"\nPrivates Dorf · ohne Rangliste",Rect2(32,110,790,95),26,GOLD)
-  button(p,"Cloud-Stand laden",Rect2(32,231,790,67),func():load_cloud())
-  var upload=button(p,"Jetzt sichern",Rect2(32,318,790,67),func():sync_cloud(),true);upload.disabled=not account_active
+  button(p,"Wiederherstellung fortsetzen" if not account.pending_restore.is_empty() else "Cloud-Stand laden",Rect2(32,217,790,62),func():load_cloud())
+  var upload=button(p,"Jetzt sichern",Rect2(32,289,385,62),func():sync_cloud(),true);upload.disabled=not account_active or not account.pending_restore.is_empty()
+  var history=button(p,"Sicherungsverlauf",Rect2(437,289,385,62),func():open_cloud_versions());history.disabled=not account_active or not account.pending_restore.is_empty()
   button(p,"Abmelden" if require_login else "Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
  if OS.has_feature("web") and bool(JavaScriptBridge.eval("!!window.GlutwachtAccount",true)):
   JavaScriptBridge.eval("window.GlutwachtAccount.show("+JSON.stringify(account_notice)+")");return
@@ -869,9 +872,15 @@ func authenticate(email:String,password:String,register:bool):
 func load_cloud(automatic:bool=false):
  if account.busy:return
  cloud_sync_paused=true
+ if account.pending_restore.is_empty():account.pending_restore=account.read_metadata().get("pending_restore",{})
+ var restoring=not account.pending_restore.is_empty()
+ if restoring:
+  var resumed=await account.restore_version()
+  if not resumed.ok:account.status=resumed.message;open_account();return
  var result=await account.fetch_save()
  if not result.ok:account.status=result.message;open_account();return
  if not result.empty and not Progress.validate_save(result.snapshot).is_empty():account.status="Cloud-Stand ungültig; dein Dorf bleibt unverändert.";open_account();return
+ if restoring:activate_cloud(result);return
  var local_path="user://account-"+account.user_id+".json"
  var meta=account.read_metadata()
  var local_exists=FileAccess.file_exists(local_path)
@@ -904,7 +913,7 @@ func activate_cloud(result:Dictionary):
   var valid=candidate.load_file(temp);DirAccess.remove_absolute(temp)
   if not valid:toast("Cloud-Stand konnte nicht geladen werden.");return
  if not candidate.store_file(path):toast(candidate.warning);return
- account.revision=int(result.revision);account.loaded=true;account.pending.clear();cloud_sync_paused=false
+ account.revision=int(result.revision);account.loaded=true;account.pending.clear();account.pending_restore.clear();account.dirty=false;account.save_metadata();cloud_sync_paused=false
  progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
  if progress.data.hero=="":open_tutorial()
  sync_cloud()
@@ -924,6 +933,7 @@ func sync_cloud():
   account.status="Lokal gesichert · Cloud ausstehend" if account.dirty else "Cloud gesichert"
  account.save_metadata()
 func leave_account():
+ if not account.pending_restore.is_empty():toast("Bitte zuerst die Wiederherstellung fortsetzen.");return
  if account.busy:toast("Bitte die laufende Sicherung abwarten.");return
  save()
  if account_active:
@@ -1012,3 +1022,41 @@ func download_snapshot(text:String):
  else:
   var f=FileAccess.open("user://Glutwacht-Kontobackup.json",FileAccess.WRITE)
   if f:f.store_string(text);f.close()
+
+func open_cloud_versions():
+ if account.busy or not account_active:return
+ cloud_sync_paused=true
+ account.status="Sicherungsverlauf wird geladen …"
+ var result=await account.cloud_versions()
+ cloud_sync_paused=false
+ if not result.ok:account.status=result.message;open_account();return
+ cloud_versions=result.data.get("versions",[]);cloud_version_page=0;draw_cloud_versions()
+func draw_cloud_versions():
+ var p=open_dialog("cloud_versions","Cloud-Sicherungsverlauf","Privates PvE · Ursprungsstand und bis zu 48 weitere Sicherungen")
+ var pages=maxi(1,ceili(cloud_versions.size()/4.0));cloud_version_page=clampi(cloud_version_page,0,pages-1)
+ for i in range(4):
+  var index=cloud_version_page*4+i
+  if index>=cloud_versions.size():break
+  var entry:Dictionary=cloud_versions[index];var y=126+i*74
+  var title="Ursprungsstand" if entry.reason=="baseline" else ("Vor Wiederherstellung" if entry.reason=="before_restore" else "Automatische Sicherung")
+  label(p,title+" · Nr. "+str(entry.revision),Rect2(32,y,510,29),21,GOLD)
+  label(p,String(entry.created_at).left(19).replace("T"," ")+" UTC · Haupthaus "+str(entry.get("hall",1)),Rect2(32,y+30,510,26),17)
+  button(p,"Auswählen",Rect2(575,y+3,245,58),func():confirm_cloud_version(entry))
+ if cloud_versions.is_empty():label(p,"Noch keine Cloud-Sicherung vorhanden.",Rect2(32,160,790,70),24)
+ button(p,"Zurück",Rect2(32,452,220,58),func():cloud_version_page-=1;draw_cloud_versions()).disabled=cloud_version_page==0
+ label(p,"%d / %d"%[cloud_version_page+1,pages],Rect2(280,465,280,36),23,CREAM,true)
+ button(p,"Weiter",Rect2(600,452,220,58),func():cloud_version_page+=1;draw_cloud_versions()).disabled=cloud_version_page+1>=pages
+func confirm_cloud_version(entry:Dictionary):
+ var p=open_dialog("cloud_restore_confirm","Früheren Dorfstand wiederherstellen?","")
+ label(p,"Sicherung Nr. %s · Haupthaus %s"%[entry.revision,entry.get("hall",1)],Rect2(32,110,790,60),26,GOLD)
+ label(p,"Dein aktuelles Dorf wird vorher gesichert. Danach wird der gewählte frühere Stand aktiv. Freunde, Clan und Konto bleiben unverändert. Die Wiederherstellung braucht eine Verbindung.",Rect2(32,190,790,185),25).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Abbrechen",Rect2(32,420,380,68),func():draw_cloud_versions())
+ button(p,"Wiederherstellen",Rect2(434,420,388,68),func():restore_cloud_version(int(entry.revision)),true)
+func restore_cloud_version(target:int):
+ if account.busy or not account_active:return
+ await sync_cloud()
+ if account.dirty or not account.pending.is_empty():toast("Aktuellen Stand zuerst vollständig sichern.");open_account();return
+ cloud_sync_paused=true
+ var result=await account.restore_version(target)
+ if not result.ok:account.status=result.message;open_account();return
+ await load_cloud(true)

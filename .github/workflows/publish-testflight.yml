@@ -23,13 +23,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Verify social authorization and private save isolation
+      - name: Verify account isolation, recovery and social authorization
         run: npm ci --ignore-scripts --no-audit --no-fund && npm test
         working-directory: backend/tests
       - run: |
           python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
           python3 tools/check_godot.py logs/native-account.log godot --headless --path . --script tests3d/native_account_suite.gd
           python3 tools/check_godot.py logs/account-save.log godot --headless --path . --script tests3d/account_save_suite.gd
+      - name: Cloud recovery and retry safety
+        run: python3 tools/check_godot.py logs/cloud-recovery.log godot --headless --path . --script tests3d/cloud_recovery_suite.gd
       - name: Quest progression and battle reports
         run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd
       - name: Campaign and tutorial migration
@@ -107,6 +109,6 @@ jobs:
           python3 tools/check_godot.py logs/windows-export.log godot --headless --path . --export-release Windows builds/windows/Glutwacht.exe
       - uses: actions/upload-artifact@v4
         with:
-          name: Glutwacht-Windows-0.13
+          name: Glutwacht-Windows-0.13.1
           path: builds/windows
           retention-days: 30

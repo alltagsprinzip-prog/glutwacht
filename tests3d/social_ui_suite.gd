@@ -31,6 +31,9 @@ func run():
  var before=JSON.stringify(g.progress.data)
  social.visit({"name":"Freund","village":{"version":7,"hall":2,"barracks":1,"smithy":1,"hero":"warrior","hero_id":"warrior","structures":[],"core_positions":{}}})
  check(g.dialog=="social_visit" and JSON.stringify(g.progress.data)==before,"village preview cannot mutate own save");await shot("village-visit")
+ g.cloud_versions=[{"revision":1,"created_at":"2026-09-26T21:30:00Z","reason":"baseline","hall":3},{"revision":8,"created_at":"2026-09-26T22:00:00Z","reason":"checkpoint","hall":4}]
+ g.draw_cloud_versions();check(g.dialog=="cloud_versions","cloud history opens");await shot("cloud-history")
+ g.confirm_cloud_version(g.cloud_versions[0]);check(g.dialog=="cloud_restore_confirm","restore requires explicit confirmation");await shot("cloud-restore-confirm")
  social.clear();check(social.state.is_empty() and social.pending_chat.is_empty(),"account sign-out clears social data")
  g.queue_free();await process_frame
  for suffix in ["",".before-hud"]:DirAccess.remove_absolute("user://qa-social-ui.json"+suffix)

@@ -13,6 +13,7 @@ var busy=false
 var loaded=false
 var status="Nicht angemeldet"
 var pending:Dictionary={}
+var pending_restore:Dictionary={}
 var dirty=false
 var storage_enabled=true
 func persist_session():
@@ -34,10 +35,16 @@ func restore_session() -> Dictionary:
   logout();return {"ok":false,"message":"Bitte erneut anmelden."}
  return {"ok":true}
 func metadata_path() -> String:return "user://account-"+user_id+".sync.json"
-func save_metadata():
- if not storage_enabled or not signed_in():return
- var f=FileAccess.open(metadata_path(),FileAccess.WRITE)
- if f:f.store_string(JSON.stringify({"revision":revision,"dirty":dirty,"pending":pending}));f.close()
+func save_metadata() -> bool:
+ if not storage_enabled:return true
+ if not signed_in():return false
+ var path=metadata_path();var temp=path+".tmp"
+ var f=FileAccess.open(temp,FileAccess.WRITE)
+ if not f:return false
+ f.store_string(JSON.stringify({"revision":revision,"dirty":dirty,"pending":pending,"pending_restore":pending_restore}))
+ f.flush();var error=f.get_error();f.close()
+ if error!=OK:return false
+ return DirAccess.rename_absolute(temp,path)==OK
 func read_metadata() -> Dictionary:
  if not FileAccess.file_exists(metadata_path()):return {}
  var value=JSON.parse_string(FileAccess.get_file_as_string(metadata_path()))
@@ -110,21 +117,25 @@ func fetch_save() -> Dictionary:
  if result.data.is_empty():return {"ok":true,"empty":true,"revision":0}
  return {"ok":true,"empty":false,"revision":int(result.data[0].revision),"snapshot":result.data[0].snapshot}
 func upload(snapshot:Dictionary) -> Dictionary:
+ if not pending_restore.is_empty():return {"ok":false,"message":"Wiederherstellung zuerst abschließen.","code":"restore_pending"}
  if not signed_in() or not loaded:return {"ok":false,"message":"Zuerst den Cloud-Stand prüfen."}
  var session=await ensure_session()
  if not session.ok:return session
  if pending.is_empty():pending={"p_snapshot":snapshot.duplicate(true),"p_revision":revision,"p_request":uuid(),"p_device":device_id}
- save_metadata()
+ if not save_metadata():return {"ok":false,"message":"Sicherungsauftrag konnte lokal nicht gespeichert werden."}
  # Keep the exact request after a timeout: its committed response may have been lost.
  var result=await call_api("/rest/v1/rpc/save_private_village",HTTPClient.METHOD_POST,pending)
  if result.ok and result.data is Dictionary and result.data.has("revision"):
+  if int(result.data.get("head_revision",result.data.revision))>int(result.data.revision):
+   pending.clear();dirty=true;save_metadata()
+   return {"ok":false,"code":"revision_conflict","message":"Die Anfrage war bereits gesichert. Inzwischen liegt ein neuerer Cloud-Stand vor; bitte laden."}
   result.saved_snapshot=pending.p_snapshot.duplicate(true)
   revision=int(result.data.revision);pending.clear();status="Cloud gesichert"
  else:status="Cloud-Sicherung ausstehend"
  return result
 func logout():
  if storage_enabled and OS.has_feature("web"):JavaScriptBridge.eval("try{localStorage.removeItem('glutwacht.auth.v1')}catch(e){}")
- token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();status="Nicht angemeldet"
+ token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();pending_restore.clear();status="Nicht angemeldet"
 
 func accept_session(payload:Dictionary,expected_user:String="") -> bool:
  var incoming_token=String(payload.get("access_token",""))
@@ -178,3 +189,23 @@ func change_recovered_password(password:String) -> Dictionary:
 func sign_out():
  if signed_in():await call_api("/auth/v1/logout?scope=local",HTTPClient.METHOD_POST)
  logout()
+
+func cloud_versions() -> Dictionary:
+ var session=await ensure_session()
+ if not session.ok:return session
+ return await call_api("/rest/v1/rpc/private_save_history",HTTPClient.METHOD_POST,{"p_action":"list"})
+func restore_version(target:int=-1) -> Dictionary:
+ if not signed_in():return {"ok":false,"message":"Bitte anmelden."}
+ var session=await ensure_session()
+ if not session.ok:return session
+ if pending_restore.is_empty():
+  if target<0 or dirty or not pending.is_empty():return {"ok":false,"message":"Bitte zuerst den aktuellen Stand sichern."}
+  pending_restore={"p_action":"restore","p_revision":target,"p_expected":revision,"p_request":uuid(),"p_device":device_id}
+  if not save_metadata():
+   pending_restore.clear();return {"ok":false,"message":"Wiederherstellungsauftrag konnte nicht sicher gespeichert werden."}
+ # Always replay the original ID/device after an uncertain transport outcome.
+ var result=await call_api("/rest/v1/rpc/private_save_history",HTTPClient.METHOD_POST,pending_restore)
+ if not result.ok and String(result.get("code","")) in ["revision_conflict","other_device_active","version_not_found","invalid_request"]:
+  pending_restore.clear();save_metadata()
+ # Keep it after success until the downloaded replacement is durable locally.
+ return result
