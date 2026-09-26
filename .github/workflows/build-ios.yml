@@ -14,6 +14,7 @@ on:
       apple_team_id:
         description: Actual 10-character Apple Developer Team ID
         required: true
+        default: ZYCVLZJMPG
         type: string
 permissions:
   contents: read

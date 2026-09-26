@@ -1,7 +1,7 @@
 # Glutwacht: iPhone-App auf Basis des bestehenden Projekts
 
 ## Build-Nachweis – 26.09.2026
-- Team-ID: `B6VJUWV5CH`, vom Nutzer geliefert.
+- Historischer Build mit irrtuemlich eingetragener Enrollment-ID. Korrekte, am 26.09.2026 vom Nutzer bestaetigte Team-ID: `ZYCVLZJMPG`. Ein unsignierter Build validiert keine Apple-Mitgliedschaft oder Signierungsrechte.
 - Commit: `bf20534cc03e15ea75f185e9a589be16d53e05bb`.
 - GitHub Actions: https://github.com/alltagsprinzip-prog/glutwacht/actions/runs/36238792604
 - Native Konto-/Save-Vorprüfung erfolgreich; Xcode-Projektexport und unsigniertes arm64-Archiv mit Xcode 26.3 erfolgreich kompiliert.
@@ -21,7 +21,13 @@
 
 ## Apple-Schritt
 Morat registriert sich selbst im Apple Developer Program (Identitätsprüfung, Vertrag, Jahresgebühr). Danach echte 10-stellige Team-ID unter Membership details übernehmen. Kein Apple-Passwort oder 2FA-Code im Chat nötig.
-Team-ID `B6VJUWV5CH` wurde vom Nutzer übermittelt und im Export hinterlegt; dies bestätigt weder Mitgliedschaft noch Signierungszugriff. Workflow verwendet diese Team-ID oder eine manuelle Eingabe; `prepare_ios.gd` prüft Format vor jeder Änderung. Signierung, Bundle-Registrierung, App-Store-Connect-Datensatz und TestFlight-Einladung sind noch nicht eingerichtet. Zertifikat/Provisioning Profile bzw. App-Store-Connect-Schlüssel ausschließlich über sichere Secret-Eingabe einrichten, niemals im Repository oder Chat speichern.
+Team-ID `ZYCVLZJMPG` ist im Export hinterlegt. Die vorherige Angabe war eine Enrollment-ID, keine Team-ID. Die korrekte ID bestaetigt allein keinen Signierungszugriff. Workflow verwendet diese Team-ID oder eine manuelle Eingabe; `prepare_ios.gd` prueft das Format und weist die bekannte Enrollment-ID zurueck. Signierung, Bundle-Registrierung, App-Store-Connect-Datensatz und TestFlight-Einladung sind noch nicht eingerichtet. Zertifikat/Provisioning Profile bzw. App-Store-Connect-Schluessel ausschliesslich ueber sichere Secret-Eingabe einrichten, niemals im Repository oder Chat speichern.
+
+## Vorbereitung nach Team-ID-Korrektur
+- 3D-/Blender-Arbeit auf Nutzerwunsch pausiert; vorhandene Spielgrafik bleibt erhalten.
+- TestFlight-Uebergabe und Beta-Testtext: `docs/TESTFLIGHT_SETUP.md`.
+- Diese Aenderung betrifft Buildkonfiguration und Dokumentation, nicht Saves oder Spielcode.
+- Noch kein signierter Build oder TestFlight-Link. Keine App-Store-Veroeffentlichung ausgeloest.
 
 ## Vor erstem TestFlight-Test
 1. Export auf macOS mit echter Team-ID ausführen und Xcode-Build prüfen.
