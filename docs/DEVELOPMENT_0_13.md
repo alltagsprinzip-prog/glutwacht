@@ -35,3 +35,8 @@ Stand: 26.09.2026. Bestehender Branch, kein Neustart. Schema 7 bleibt lesbar.
 - Chat-Aktualisierung manuell; kein Push. Neuer sozialer Profilname unabhängig vom Dorfnamen.
 - Touch/Render werden in CI mit Grafikfenster geprüft. Die lokale Containerumgebung unterstützt das X11-Fenster nicht; headless Eingabesimulation ist daher kein Touch-Nachweis.
 - Noch NICHT enthalten: serverautorisierte Spielwirtschaft, Clan-Spenden/-Quests/-Fortschritt, PvP, Ausrüstung, zusätzliche Heldenfreischaltung, Tages-/Wochenquests, neue Gebiete/Produktionsketten und vollständiger Grafikumbau. Keine leeren Menüs dafür eingebaut.
+
+
+## Buildabschluss 26.09.2026, 23:45 Berlin
+Workflow 36273697813 vollständig grün. iOS 0.13.0 (3.0.0) erfolgreich signiert/hochgeladen, Apple-Delivery 15530707-1d0a-48ae-a498-ba59258f4c95. Apple-Verarbeitung/Gruppenzuweisung noch unbestätigt. Windows-Artefakt 10915619953 erfolgreich exportiert, nicht auf echtem Windows ausgeführt.
+Grafische Touchprüfung 54/54, Social-UI 12/12, Questprüfung 16/16 bestanden. Neue Dialoge als gerenderte Bilder kontrolliert. Die Backend-Nachbesserung verhindert Moderationsumgehung per Blockierung und verwendet eine ausdrückliche Feldliste für Dorfbesuche; 36/36 soziale SQL-Prüfungen weiterhin grün. Live-REST verweigert anonymen Zugriff (401/42501).

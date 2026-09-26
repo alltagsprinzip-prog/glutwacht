@@ -1,3 +1,19 @@
+## Aktuell: 0.13.0 erfolgreich gebaut und an Apple übertragen (26.09.2026, 23:45 Berlin)
+
+- Nutzer bestätigt zuvor: native iPhone-App 0.12 läuft. Neue Weiterentwicklung ausdrücklich autorisiert.
+- App-Code `a580db1e07e322e03d8e575eeb08a5c0c25c7c8b`; Backend-Nachbesserung `c2d14279594681cc311268f5efcc431dd396f41e` bereits live und kompatibel mit demselben App-Build.
+- TestFlight-Workflow **36273697813** vollständig erfolgreich: native-preflight, xcode-project, windows-build. Apple bestätigt `UPLOAD SUCCEEDED with no errors`, Delivery UUID `15530707-1d0a-48ae-a498-ba59258f4c95`.
+- iOS **0.13.0 (3.0.0)** signiert und hochgeladen. Apple-Verarbeitung und Zuordnung zur internen Gruppe „Glutwacht test“ noch nicht überprüft; nicht behaupten, dass der neue Build schon auf dem Gerät läuft.
+- Windows-Artefakt `Glutwacht-Windows-0.13`, ID `10915619953`, im selben Lauf, 30 Tage verfügbar. Export erfolgreich; tatsächlicher Windows-Start noch nicht geprüft.
+- Neue Funktionen: 20 PvE-Ziele, letzte 20 Kampfberichte, überspringbarer Heldenaufstieg; Spielerkennung, Freundschaften, Clans/Rollen/Einladungen, Chat/Blockieren/Melden, freigegebene Dorfbesuche.
+- Nachweise: 54/54 grafische Touchtests, 12/12 Social-UI-Tests, 16/16 Questtests, 36/36 soziale SQL-Tests (simulierte Auth-Identitäten), 27/27 private SQL-Saves; bisherige Spielregeln 187/187, Account-Saves 37/37, Kampagne 68/68, Fortschritt 106/106, Einführung 19/19, HUD-Layout 190/190, Fähigkeiten 73/73 lokal erfolgreich. Screenshots tatsächlicher neuer Dialoge im CI-Artefakt `testflight-preflight` ID `10916940205` geprüft.
+- Live-REST lehnt anonymen sozialen Zugriff mit HTTP 401 / SQL 42501 ab. Keine echten Registrierungsmails/Einladungen versandt, kein echter Mehrkonto-/Gerätewechseltest behauptet.
+- Bestehende Saves/Schema 7 erhalten, keine private Save-Zeile geändert. Hauptbranch und Sites-Version 10 bleiben unverändert.
+- Nächster Abschnitt: serverautorisierte Wirtschaft als Voraussetzung für sichere Clan-Spenden, gemeinsame Belohnungen und PvP. Noch offen außerdem Ausrüstung, zusätzliche Helden, periodische Quests, Produktionsketten/Gebiete und vollständige Heroic-Pop-Grafik. Aktueller Plan: docs/DEVELOPMENT_0_13.md.
+
+---
+Die folgenden Abschnitte sind historische Arbeitsstände und können inzwischen überholt sein.
+
 ## Aktuell: Apple-Vorbereitung, 26.09.2026 18:25 Europe/Berlin
 
 - Nutzer pausiert Blender/3D-Arbeit und priorisiert iPhone-App.
