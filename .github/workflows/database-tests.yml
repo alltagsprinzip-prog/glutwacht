@@ -4,11 +4,13 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      - 'supabase/migrations/**'
       - '.github/workflows/database-tests.yml'
   push:
     branches: [main]
     paths:
       - 'backend/**'
+      - 'supabase/migrations/**'
       - '.github/workflows/database-tests.yml'
 permissions:
   contents: read

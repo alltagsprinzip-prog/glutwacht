@@ -119,3 +119,8 @@ Nutzer wählte Entwurf 1. Umsetzung: kompaktes Navy/Gold-HUD, horizontale Ressou
 - Spielcode 1840d3f91d8e71b0c76e1482cf9a5d184f9ce027; CI 36205854564 und Datenbank-CI 36205854550 erfolgreich. Finale Browseransicht und Upgradedialog geprüft.
 - Sites-Version 5, Quellcommit f1a17ec3ef66005c3e9d743f360fb50baabc35e8, Build cfe8c7585bd5, Deployment appgdep_6ab71bdd08848191a4e345b372751a84 erfolgreich, 26.09.2026 01:12 UTC. URL unverändert öffentlich.
 - Freund: Profil oben links → Konto / Cloud → Registrieren mit eigener E-Mail. Echte Registrierung und Zwei-Geräte-Abnahme weiterhin offen.
+
+## Ausbau 0.13.0 nach funktionierender iPhone-App
+Nutzer bestätigt am 26.09.2026: App läuft. Neuer Auftrag: Spieltiefe, Freunde und Clans in sinnvollen Schritten. Verbindlicher aktueller Plan/Abnahmestand: docs/DEVELOPMENT_0_13.md. Bestehende alte Pläne ersetzen diesen Auftrag nicht.
+Implementiert: 20 Ziele, Kampfberichte, Heldenaufstieg, freiwillige soziale Identität, Freundschaften, Clans/Rollen/Einladungen, Chat/Blockieren/Melden, separate Dorfbesuche. Supabase social_foundation additiv live, vorhandene private Saves unverändert. Tests unterscheiden simulierte Rollen von echten Accounts. Kein serverautorisierter Ressourcenhandel/PvP behauptet.
+iOS 0.13.0 und Windows-Export angelegt; tatsächlichen CI-/Uploadstatus im Chat prüfen, noch kein erfolgreicher neuer Build in diesem Dateistand behauptet. Hauptbranch und Sites-Webversion unverändert.

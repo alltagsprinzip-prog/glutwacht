@@ -26,7 +26,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"battle_history":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -280,7 +280,8 @@ func load_file(path:String=SAVE) -> bool:
  clean.player_name=String(parsed.get("player_name","Mein Dorf")).strip_edges().left(24)
  if clean.player_name.is_empty():clean.player_name="Mein Dorf"
  for task in parsed.get("claimed_tasks",[]):
-  if task in ["hero","hall2","training","victory"] and task not in clean.claimed_tasks:clean.claimed_tasks.append(task)
+  if task is String and task in task_ids() and task not in clean.claimed_tasks:clean.claimed_tasks.append(task)
+ clean.battle_history=parsed.get("battle_history",[]).duplicate(true)
  for stage in parsed.get("campaign_stars",{}):clean.campaign_stars[stage]=int(parsed.campaign_stars[stage])
  for k in ["wood","stone","gold","wins"]:clean[k]=clampi(int(parsed.get(k,clean[k])),0,999999)
  clean.gems=clampi(int(parsed.get("gems",clean.gems)),0,999999)
@@ -370,6 +371,13 @@ static func validate_save(raw) -> String:
   if not stage is String or stage not in ["0","1","2","3","4","5","6","7","8","9"]:return "Ungültiges Kampagnenlager."
   var stars=raw.campaign_stars[stage]
   if not numeric(stars) or float(stars)!=int(stars) or int(stars)<0 or int(stars)>3:return "Ungültige Kampagnensterne."
+ if not raw.get("battle_history",[]) is Array or raw.get("battle_history",[]).size()>20:return "Ungültige Kampfberichte."
+ for entry in raw.get("battle_history",[]):
+  if not entry is Dictionary:return "Ungültiger Kampfbericht."
+  if not entry.get("name") is String or entry.name.length()>80:return "Ungültiger Gegnername."
+  for key in ["time","stars","destruction","wood","stone","gold","xp"]:
+   if not numeric(entry.get(key)) or float(entry[key])<0:return "Ungültiger Berichtswert."
+  if int(entry.stars)>3 or float(entry.destruction)>100:return "Ungültiges Kampfergebnis."
  if raw.has("tutorial_done"):
   if not raw.tutorial_done is Array:return "Ungültige Einführung."
   for step in raw.tutorial_done:
@@ -407,19 +415,48 @@ static func validate_save(raw) -> String:
 static func numeric(value) -> bool:
  return (value is int or value is float) and is_finite(float(value))
 
+static func task_ids() -> Array:
+ return ["hero","hall2","training","victory","barracks2","tower","goldmine","campaign3","hall4","camp","shield","wins5","hall5","hero_hall","hero3","campaign6","siege","hall8","campaign10","stars30"]
 func tasks() -> Array:
- var trained=false
+ var trained=0
  for hero in data.training.heroes.values():
-  for value in hero.values():
-   if int(value)>0:trained=true
- for value in data.training.troops.values():
-  if int(value)>0:trained=true
- return [
-  {"id":"hero","title":"Wähle deinen Helden","done":data.hero!="","gold":30},
-  {"id":"hall2","title":"Haupthaus auf Stufe 2","done":int(data.hall)>=2,"gold":60},
-  {"id":"training","title":"Schließe ein Training ab","done":trained,"gold":40},
-  {"id":"victory","title":"Gewinne deinen ersten Angriff","done":int(data.wins)>0,"gold":80}
+  for value in hero.values():trained+=int(value)
+ for value in data.training.troops.values():trained+=int(value)
+ var stages=0;var stars=0
+ for value in data.get("campaign_stars",{}).values():
+  stars+=int(value)
+  if int(value)>0:stages+=1
+ var rows=[
+  ["hero","Dein Gefährte",int(data.hero!=""),1,30,"hero","Wähle deinen dauerhaften Starthelden."],
+  ["hall2","Ein Dorf wächst",int(data.hall),2,60,"hall","Haupthaus 2 öffnet Mauern und Wachtürme."],
+  ["training","Gut vorbereitet",trained,1,40,"training","Verbessere einen Helden- oder Truppenwert."],
+  ["victory","Der erste Sieg",int(data.wins),1,80,"campaign","Hole mindestens einen Stern in einem Angriff."],
+  ["barracks2","Rückendeckung",int(data.barracks),2,75,"barracks","Haupthaus und Kaserne 2 schalten Bogenschützen frei."],
+  ["tower","Sicheres Zuhause",count_completed("tower"),1,65,"build","Baue einen Wachturm fertig."],
+  ["goldmine","Goldene Zeiten",count_completed("goldmine"),1,90,"build","Errichte ab Haupthaus 3 eine Goldmine."],
+  ["campaign3","Über die Kupferfurt",stages,3,100,"campaign","Besiege die ersten drei Kampagnenlager."],
+  ["hall4","Platz für Pläne",int(data.hall),4,120,"hall","Haupthaus 4 öffnet das Heerlager."],
+  ["camp","Eine größere Armee",count_completed("camp"),1,100,"build","Ein fertiges Heerlager erhöht deine Armeeplätze."],
+  ["shield","Schilde nach vorn",int(data.get("shield",0)),1,85,"army","Stelle einen Schildwächter auf; Kaserne und Haupthaus 3 nötig."],
+  ["wins5","Bewährter Anführer",int(data.wins),5,130,"campaign","Gewinne fünf Angriffe mit mindestens einem Stern."],
+  ["hall5","Das Herz des Dorfes",int(data.hall),5,150,"hall","Haupthaus 5 bringt den dritten Bauarbeiter."],
+  ["hero_hall","Heimat der Helden",count_completed("hero_hall"),1,140,"build","Baue die Heldenhalle für zusätzliche Lebenspunkte."],
+  ["hero3","Ein Name wird bekannt",Catalog.level(data,String(data.hero)),3,160,"hero","Sammle Kampf-Erfahrung bis Heldenstufe 3."],
+  ["campaign6","Hinter dem Nebelpass",stages,6,180,"campaign","Besiege sechs Kampagnenlager."],
+  ["siege","Mauerbrecher",int(data.get("siege",0)),1,180,"army","Haupthaus und Kaserne 6 öffnen den Steinwerfer."],
+  ["hall8","Eine blühende Siedlung",int(data.hall),8,220,"hall","Haupthaus 8 bringt den vierten Bauarbeiter."],
+  ["campaign10","Die Krone der Glutwacht",stages,10,300,"campaign","Besiege alle zehn Lager der Kampagne."],
+  ["stars30","Meister der Kampagne",stars,30,400,"campaign","Erreiche drei Sterne in jedem Kampagnenlager."]
  ]
+ var out=[]
+ for row in rows:out.append({"id":row[0],"title":row[1],"current":mini(row[2],row[3]),"target":row[3],"done":row[2]>=row[3],"gold":row[4],"action":row[5],"hint":row[6]})
+ return out
+func count_completed(kind:String) -> int:
+ var total=0
+ for b in all_buildings():
+  if b.kind==kind and not bool(job_for(b.uid).get("new",false)):total+=1
+ return total
+
 func claim_task(id:String) -> bool:
  if id in data.claimed_tasks:return false
  for task in tasks():

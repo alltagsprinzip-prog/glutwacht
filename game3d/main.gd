@@ -30,6 +30,8 @@ var paused=false
 var dialog=""
 var result_shown=false
 var reward:Dictionary={}
+var task_page=0
+var report_page=0
 var toast_time=0.0
 var clock=0.0
 var production_clock=0.0
@@ -67,6 +69,7 @@ var browser_qa=false
 var hud_widgets:Dictionary={}
 var save_import_callback
 var account
+var social_ui
 var account_active=false
 var cloud_clock=0.0
 var cloud_sync_paused=false
@@ -251,7 +254,7 @@ func _process(dt):
   if held or Input.is_physical_key_pressed(KEY_J):
    if sim.attack_cd<=0:sim.strike()
   world.sync(sim,dt)
-  if sim.result!="" and not result_shown:result_shown=true;reward=sim.settle();progress.tutorial_event("battle");save();tone("victory" if sim.result=="victory" else "death");open_result()
+  if sim.result!="" and not result_shown:result_shown=true;reward=sim.settle();progress.tutorial_event("battle");save();tone("victory" if sim.result=="victory" else "death");show_battle_completion()
  else:world.sync(sim,dt)
  toast_time=maxf(0,toast_time-dt)
  if toast_time<=0 and toast_label:toast_label.text=""
@@ -431,7 +434,7 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  var trim=panel(p,Rect2(8,8,rect.size.x-16,67),Color("385962"));trim.mouse_filter=Control.MOUSE_FILTER_IGNORE
  label(p,heading,Rect2(25,12,rect.size.x-125,48),27,GOLD)
  if sub!="":label(p,sub,Rect2(27,82,rect.size.x-60,31),16,CREAM)
- if not auth_locked() and name!="result" and not (name=="heroes" and progress.data.hero==""):
+ if not auth_locked() and name not in ["result","level_up"] and not (name=="heroes" and progress.data.hero==""):
   var close=icon_button(p,"close","",Rect2(rect.size.x-87,6,77,67),func():close_dialog());close.name="CloseDialog";close.z_index=10
  return p
 func close_dialog(force:bool=false):
@@ -610,12 +613,13 @@ func open_training(troops:bool=false):
 func priority_name(key:String) -> String:return {"nearest":"Nächstes Ziel","defenses":"Verteidigung","hall":"Haupthaus","resources":"Rohstoffe"}.get(key,"Nächstes Ziel")
 func open_attack_plan():
  close_dialog()
-func hero_preview(parent:Control,key:String,rect:Rect2):
+func hero_preview(parent:Control,key:String,rect:Rect2,rotate:bool=false):
  var viewport=SubViewport.new();viewport.size=Vector2i(rect.size);viewport.own_world_3d=true;viewport.transparent_bg=true;viewport.msaa_3d=Viewport.MSAA_2X
  var container=SubViewportContainer.new();container.position=rect.position;container.size=rect.size;container.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(container);container.add_child(viewport)
  var scene=Node3D.new();viewport.add_child(scene);var env=WorldEnvironment.new();env.environment=Environment.new();env.environment.background_mode=Environment.BG_COLOR;env.environment.background_color=Color(0,0,0,0);env.environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;env.environment.ambient_light_color=Color("e0edfa");env.environment.ambient_light_energy=.75;scene.add_child(env)
  var sun=DirectionalLight3D.new();sun.rotation_degrees=Vector3(-35,-30,0);sun.light_color=Color("ffdfb0");sun.light_energy=1.0;scene.add_child(sun)
  var model=world.hero_showcase(key,scene);model.rotation.y=-.28
+ if rotate:model.create_tween().set_loops().tween_property(model,"rotation:y",TAU-.28,7.0).from(-.28)
  var camera=Camera3D.new();scene.add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.size=4.6;camera.position=Vector3(2.2,2.7,6);camera.look_at(Vector3(0,1.7,0));camera.current=true;hero_views.append(viewport)
 func open_heroes():
  if progress.data.hero!="":
@@ -671,6 +675,21 @@ func end_raid():
  held=false;deploying=""
  toast("Angriff beendet.")
 
+func show_battle_completion():
+ if int(reward.get("level_after",1))>int(reward.get("level_before",1)):
+  var p=open_dialog("level_up","DEIN HELD IST AUFGESTIEGEN!","")
+  hero_preview(p,String(progress.data.hero),Rect2(55,102,310,355),true)
+  var delta=int(reward.level_after)-int(reward.level_before)
+  var title=label(p,"STUFE %d"%reward.level_after,Rect2(390,150,390,66),46,GOLD,true)
+  title.pivot_offset=title.size*.5;title.scale=Vector2.ONE*.6
+  title.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT).tween_property(title,"scale",Vector2.ONE,.45)
+  label(p,"+%d Leben   ·   +%d Angriff"%[20*delta,4*delta],Rect2(375,244,430,55),25,CREAM,true)
+  label(p,"Deine Erfahrung bleibt dauerhaft erhalten.",Rect2(375,319,430,60),20,CREAM,true).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+  for i in range(8):
+   var spark=icon(p,"star",Rect2(58+i*88,105+(i%3)*95,28,28));spark.mouse_filter=Control.MOUSE_FILTER_IGNORE
+   var tw=spark.create_tween().set_loops();tw.tween_property(spark,"modulate:a",.2,.7+i*.04);tw.tween_property(spark,"modulate:a",1.0,.7)
+  button(p,"WEITER ZUM KAMPFBERICHT",Rect2(365,432,448,68),func():open_result(),true)
+ else:open_result()
 func open_result():
  var p=open_dialog("result","ANGRIFF BEENDET","")
  for i in range(3):
@@ -689,7 +708,7 @@ func return_home():
  close_dialog();build_kind="";selected_building="";deploying="";world.build_focus=false;sim.home();result_shown=false;world.setup(sim);build_hud();save()
 func open_menu():
  var p=open_dialog("menu","Am Lagerfeuer","")
- button(p,"Weiterspielen",Rect2(28,94,396,69),func():close_dialog(),true)
+ button(p,"Kampfberichte",Rect2(28,94,396,69),func():open_battle_reports(),true)
  button(p,"Ton: "+("an" if progress.data.sound else "aus"),Rect2(439,94,393,69),func():progress.data.sound=not progress.data.sound;save();open_menu())
  var rows=[["hero","WASD / Stick","Held bewegen"],["move","Ziehen / zwei Finger","Kamera / Zoom"],["attack","J / Angriff halten","Schlagen"],["skill","K · Leertaste · H","Fähigkeit · Rolle · Trank"]]
  for i in range(rows.size()):
@@ -753,6 +772,10 @@ func confirm_save_import():
  if not pending_import.store_file(save_path):toast("Speichern fehlgeschlagen; Import abgebrochen.");return
  progress=pending_import;pending_import=null;sim=Battle.new(progress.data);return_home();toast("Sicherung geladen.")
 
+func open_social():
+ if social_ui==null:
+  social_ui=load("res://game3d/ui/social.gd").new();add_child(social_ui);social_ui.setup(self)
+ social_ui.open()
 func open_profile():
  var p=open_dialog("profile","Dein Dorf","")
  label(p,"Dorfname",Rect2(32,102,790,40),27,GOLD)
@@ -763,20 +786,49 @@ func open_profile():
   if value.is_empty():toast("Bitte einen Dorfnamen eingeben.");return
   progress.data.player_name=value;save();close_dialog();build_hud(),true)
  button(p,"Konto / Cloud",Rect2(32,430,380,65),func():open_account())
- button(p,"Freunde einladen",Rect2(32,279,790,53),func():share_test_link())
+ button(p,"Freunde & Clans",Rect2(32,279,790,53),func():open_social())
  button(p,"Sicherung",Rect2(430,430,392,65),func():open_save_tools())
+func task_destination(action:String):
+ match action:
+  "hero":open_heroes()
+  "hall":open_building("hall")
+  "barracks":open_building("barracks")
+  "training":open_training()
+  "build":open_catalog()
+  "army":open_army()
+  _:open_campaign()
 func open_tasks():
- var p=open_dialog("tasks","Deine ersten Ziele","Belohnungen können einmalig abgeholt werden.")
- var tasks=progress.tasks()
- for i in range(tasks.size()):
-  var task=tasks[i];var y=107+i*94
-  label(p,task.title,Rect2(28,y,535,38),25)
-  label(p,"+%d Gold"%task.gold,Rect2(28,y+38,400,32),21,GOLD)
-  var claimed=task.id in progress.data.claimed_tasks
-  var claim=button(p,"Erledigt" if claimed else ("Abholen" if task.done else "Offen"),Rect2(600,y+4,226,67),func():
-   if progress.claim_task(task.id):save();open_tasks()
-   else:toast("Erst Gold ausgeben: Dein Lager ist voll."),task.done and not claimed)
-  claim.disabled=claimed or not task.done
+ var p=open_dialog("tasks","Dein Weg durch Glutwacht","Einmalige Ziele · Belohnungen bleiben bis zum Abholen verfügbar.")
+ var tasks=progress.tasks();var pages=ceili(tasks.size()/4.0);task_page=clampi(task_page,0,pages-1)
+ for i in range(4):
+  var index=task_page*4+i
+  if index>=tasks.size():break
+  var task=tasks[index];var y=119+i*82;var claimed=task.id in progress.data.claimed_tasks
+  panel(p,Rect2(22,y,816,76),Color("294f5b"))
+  label(p,task.title+"  %d/%d"%[task.current,task.target],Rect2(35,y+3,590,29),22,GOLD if task.done else CREAM)
+  label(p,task.hint,Rect2(35,y+34,550,37),15).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+  var claim=button(p,"Erledigt" if claimed else ("+%d Gold"%task.gold if task.done else "Los geht’s"),Rect2(629,y+9,194,57),func():
+   if not task.done:task_destination(task.action)
+   elif progress.claim_task(task.id):save();open_tasks()
+   else:toast("Dein Goldlager braucht Platz für die ganze Belohnung."),task.done and not claimed)
+  claim.disabled=claimed
+ button(p,"←",Rect2(28,465,100,54),func():task_page=maxi(0,task_page-1);open_tasks()).disabled=task_page==0
+ label(p,"Kapitel %d / %d"%[task_page+1,pages],Rect2(146,471,550,37),21,CREAM,true)
+ button(p,"→",Rect2(730,465,100,54),func():task_page=mini(pages-1,task_page+1);open_tasks()).disabled=task_page==pages-1
+func open_battle_reports():
+ var history=progress.data.get("battle_history",[])
+ var p=open_dialog("reports","Deine letzten Kämpfe","Die letzten 20 Angriffe bleiben gespeichert.")
+ var pages=maxi(1,ceili(history.size()/4.0));report_page=clampi(report_page,0,pages-1)
+ if history.is_empty():label(p,"Nach deinem nächsten Angriff erscheint hier dein Bericht.",Rect2(40,200,780,120),28,CREAM,true).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ for i in range(4):
+  var index=report_page*4+i
+  if index>=history.size():break
+  var entry=history[index];var y=122+i*80
+  label(p,entry.name+" · "+"★".repeat(int(entry.stars))+"☆".repeat(3-int(entry.stars))+" · %d%%"%entry.destruction,Rect2(35,y,780,33),25,GOLD)
+  label(p,"Holz %d · Stein %d · Gold %d · EP %d"%[entry.wood,entry.stone,entry.gold,entry.xp],Rect2(35,y+34,780,29),21)
+ button(p,"←",Rect2(28,465,100,54),func():report_page-=1;open_battle_reports()).disabled=report_page==0
+ label(p,"Seite %d / %d"%[report_page+1,pages],Rect2(146,471,550,37),21,CREAM,true)
+ button(p,"→",Rect2(730,465,100,54),func():report_page+=1;open_battle_reports()).disabled=report_page==pages-1
 func open_inbox():
  var p=open_dialog("inbox","Dorfchronik","")
  label(p,"%s · %d Siege"%[progress.data.get("player_name","Mein Dorf"),progress.data.wins],Rect2(32,108,790,60),29,GOLD)
@@ -878,7 +930,9 @@ func leave_account():
   await sync_cloud()
   if account.dirty:
    toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
- await account.sign_out();account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
+ await account.sign_out();
+ if social_ui!=null:social_ui.clear()
+ account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
  if auth_locked():update_access();open_account()
  elif progress.write_blocked:open_save_tools()
  elif progress.data.hero=="":open_tutorial()

@@ -51,6 +51,7 @@ static func top(g):
  g.hud_widgets.sync=text(g,"",Rect2(365,94,758,31),18,TEXT)
  g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 static func home(g):
+ g.button(g.hud,"FREUNDE",Rect2(20,286,138,54),func():g.open_social())
  g.create_stick()
  if g.progress.tutorial_step()!="done":
   var next=g.progress.tutorial_step()

@@ -14,16 +14,41 @@ concurrency:
 jobs:
   native-preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: solarlabyrinth/action-setup-godot@v3
         with:
           version: 4.7.2-stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify social authorization and private save isolation
+        run: npm ci --ignore-scripts --no-audit --no-fund && npm test
+        working-directory: backend/tests
       - run: |
-          godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
           python3 tools/check_godot.py logs/native-account.log godot --headless --path . --script tests3d/native_account_suite.gd
           python3 tools/check_godot.py logs/account-save.log godot --headless --path . --script tests3d/account_save_suite.gd
+      - name: Quest progression and battle reports
+        run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd
+      - name: Campaign and tutorial migration
+        run: |
+          python3 tools/check_godot.py logs/campaign.log godot --headless --path . --script tests3d/campaign_suite.gd
+          python3 tools/check_godot.py logs/onboarding.log godot --headless --path . --script tests3d/onboarding_sync_suite.gd
+      - name: Render social screens and verify touch controls
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/social
+        run: |
+          mkdir -p logs/social
+          python3 tools/check_godot.py logs/social-ui.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/social_ui_suite.gd
+          python3 tools/check_godot.py logs/input.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/input_suite.gd
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testflight-preflight
+          path: logs
   xcode-project:
     needs: native-preflight
     runs-on: macos-15
@@ -65,3 +90,23 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           GLUTWACHT: ${{ secrets.GLUTWACHT }}
         run: python3 tools/publish_testflight.py
+  windows-build:
+    needs: native-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: true
+      - name: Export Windows game
+        run: |
+          mkdir -p builds/windows
+          python3 tools/check_godot.py logs/windows-import.log godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/windows-export.log godot --headless --path . --export-release Windows builds/windows/Glutwacht.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Glutwacht-Windows-0.13
+          path: builds/windows
+          retention-days: 30

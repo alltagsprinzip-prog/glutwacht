@@ -485,5 +485,10 @@ func settle() -> Dictionary:
   profile.campaign_stars[str(campaign_index)]=maxi(previous,int(reward.stars))
   reward.campaign_index=campaign_index;reward.campaign_best=profile.campaign_stars[str(campaign_index)]
  if int(reward.stars)>0:profile.wins+=1
- profile.xp[hero_key()]+=reward.xp
+ reward.level_before=Catalog.level(profile,hero_key())
+ profile.xp[hero_key()]=mini(10000,int(profile.xp[hero_key()])+int(reward.xp))
+ reward.level_after=Catalog.level(profile,hero_key())
+ if not profile.has("battle_history"):profile.battle_history=[]
+ profile.battle_history.push_front({"name":String(village.name).left(80),"time":Time.get_unix_time_from_system(),"stars":int(reward.stars),"destruction":destruction_percent(),"wood":reward.wood,"stone":reward.stone,"gold":reward.gold,"xp":reward.xp})
+ while profile.battle_history.size()>20:profile.battle_history.pop_back()
  return reward
