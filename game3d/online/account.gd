@@ -59,13 +59,19 @@ func call_api(path:String,method:int,body:Dictionary={}) -> Dictionary:
  if busy:return {"ok":false,"message":"Bitte die laufende Anfrage abwarten."}
  busy=true
  var http=HTTPRequest.new();add_child(http);http.timeout=15
+ # Fetch has already decompressed browser responses, even when Content-Encoding
+ # remains exposed by CORS. A second inflate fails with err != 0 && err != 1.
+ http.accept_gzip=not OS.has_feature("web")
  var headers=PackedStringArray(["apikey: "+public_key,"Content-Type: application/json"])
  if not token.is_empty():headers.append("Authorization: Bearer "+token)
  var error=http.request(url+path,headers,method,"" if method==HTTPClient.METHOD_GET else JSON.stringify(body))
  if error!=OK:busy=false;http.queue_free();return {"ok":false,"message":"Verbindung konnte nicht gestartet werden."}
  var result=await http.request_completed
  busy=false;http.queue_free()
- if result[0]!=HTTPRequest.RESULT_SUCCESS:return {"ok":false,"message":"Keine Verbindung. Dein lokaler Stand bleibt erhalten."}
+ if result[0]!=HTTPRequest.RESULT_SUCCESS:
+  var message="Keine Verbindung. Dein lokaler Stand bleibt erhalten. Bitte erneut laden."
+  if result[0]==HTTPRequest.RESULT_BODY_DECOMPRESS_FAILED:message="Serverantwort konnte nicht gelesen werden. Dein lokaler Stand bleibt erhalten. Bitte die Spielseite neu laden."
+  return {"ok":false,"message":message,"code":"transport_"+str(result[0])}
  var parsed=JSON.parse_string(result[3].get_string_from_utf8())
  if result[1]<200 or result[1]>=300:
   var message="Anfrage abgelehnt. Bitte Anmeldung und Verbindung prüfen."

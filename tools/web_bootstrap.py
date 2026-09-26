@@ -17,12 +17,20 @@ const gwBox=document.getElementById('glutwacht-start-watch');
 function gwFail(message){
  const text=String(message);
  window.__glutwachtErrors.push(text);
- gwBox.hidden=false;gwBox.textContent='Startfehler: '+text;gwBox.style.background='#783f36';
+ gwBox.hidden=false;gwBox.textContent=(window.__glutwacht?'Spielhinweis: ':'Startfehler: ')+text;gwBox.style.background='#783f36';
+ if(window.__glutwacht){
+  gwBox.style.top='12px';gwBox.style.transform='translateX(-50%)';
+  const dismiss=document.createElement('button');dismiss.textContent='Schließen';
+  dismiss.style.cssText='display:block;margin-top:12px;padding:12px 24px;font:inherit';
+  dismiss.onclick=()=>{gwBox.hidden=true;};gwBox.appendChild(dismiss);
+ }
 }
 window.addEventListener('error',e=>gwFail(e.message));
 window.addEventListener('unhandledrejection',e=>gwFail(e.reason));
 GODOT_CONFIG.onPrintError=(...args)=>{
  const text=args.join(' ');console.error(text);
+ // Handled transport errors belong to the account dialog, not a startup failure.
+ if(/err != 0 && err != 1/.test(text) && window.__glutwacht)return;
  if(/SCRIPT ERROR|Parse Error|Failed to load script|^ERROR:/.test(text))gwFail(text);
 };
 const gwWatch=setInterval(()=>{

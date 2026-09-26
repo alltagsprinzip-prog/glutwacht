@@ -1,11 +1,11 @@
 // Test transport only. Never bundled into the exported game; no real accounts.
 const assert=require('node:assert/strict');
 const users=new Map(), saves=new Map(), requests=new Map();
-async function install(context){
+async function install(context,{compressed=false}={}){
  await context.route('https://*.supabase.co/**',async route=>{
   const req=route.request(),url=new URL(req.url());
   const headers={'access-control-allow-origin':'*','access-control-allow-headers':'*'};
-  const send=(data,status=200)=>route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(data)});
+  const send=(data,status=200)=>route.fulfill({status,headers:compressed?{...headers,'content-encoding':'gzip','access-control-expose-headers':'content-encoding'}:headers,contentType:'application/json',body:compressed?require('node:zlib').gzipSync(JSON.stringify(data)):JSON.stringify(data)});
   if(req.method()==='OPTIONS')return send({});
   const body=req.postDataJSON()||{};
   if(url.pathname==='/auth/v1/token'||url.pathname==='/auth/v1/signup'){
