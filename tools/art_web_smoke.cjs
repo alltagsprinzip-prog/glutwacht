@@ -21,7 +21,7 @@ const assert=require('node:assert/strict');
   await page.waitForFunction(p=>Math.hypot(window.__glutwacht.hero_x-p.hero_x,window.__glutwacht.hero_z-p.hero_z)>.5,start,{timeout:30000});
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.touchscreen.tap(505,645);
-  await page.waitForFunction(()=>window.__glutwacht.dialog==='upgrades');
+  await page.waitForFunction(()=>window.__glutwacht.dialog==='progression');
   await page.touchscreen.tap(1025,129);
   await page.waitForFunction(()=>window.__glutwacht.dialog==='');
   await page.setViewportSize({width:932,height:430});
