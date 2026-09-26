@@ -1,6 +1,6 @@
 extends RefCounted
 # Actual 3D trunk plus alpha-tested leaf cards; two draw calls per tree.
-static var leaf_material:StandardMaterial3D
+static var leaf_material:ShaderMaterial
 static func river_x(z:float) -> float:
  return 39.0+sin(z*.055)*2.1+sin(z*.13)*.65-sin(3*.055)*2.1-sin(3*.13)*.65
 static func river_width(z:float) -> float:return 8.5+sin(z*.087)*.9
@@ -26,7 +26,6 @@ static func tree(parent:Node3D,p:Vector3,height:float,seed_value:int):
   for j in [0,1,2,0,2,3]:
    mesh.set_uv(uvs[j]);mesh.set_normal(normal);mesh.set_color(Color.WHITE.darkened(rng.randf_range(0,.09)));mesh.add_vertex(center+basis*corners[j]*scale)
  if leaf_material==null:
-  leaf_material=StandardMaterial3D.new();leaf_material.albedo_texture=load("res://assets3d/nature/oak-leaves.webp");leaf_material.vertex_color_use_as_albedo=true
-  leaf_material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR;leaf_material.alpha_scissor_threshold=.42;leaf_material.cull_mode=BaseMaterial3D.CULL_DISABLED;leaf_material.roughness=.92
-  leaf_material.albedo_color=Color(.80,.88,.76);leaf_material.metallic_specular=.15
+  leaf_material=ShaderMaterial.new();leaf_material.shader=load("res://game3d/foliage.gdshader")
+  leaf_material.set_shader_parameter("leaves",load("res://assets3d/nature/oak-leaves.webp"))
  var leaves=MeshInstance3D.new();leaves.name="Oak_Leaves";leaves.mesh=mesh.commit();leaves.material_override=leaf_material;holder.add_child(leaves)

@@ -18,6 +18,7 @@ var zoom=42.0
 var target_zoom=42.0
 var focus=Vector3.ZERO
 var pan=Vector2.ZERO
+var follow_hero=true
 var build_focus=false
 var ghost:Node3D
 var shown_buildings:Array=[]
@@ -52,7 +53,7 @@ func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMa
  color.a=roundf(color.a*16.0)/16.0
  var key=str(color)+str(emission)
  if materials.has(key):return materials[key]
- var m=StandardMaterial3D.new();m.albedo_color=color.darkened(.20) if not emission else color;m.roughness=rough
+ var m=StandardMaterial3D.new();m.albedo_color=color.darkened(.06) if not emission else color;m.roughness=rough
  if color.a<1:m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
  if emission:m.emission_enabled=true;m.emission=color;m.emission_energy_multiplier=.7
  materials[key]=m;return m
@@ -89,7 +90,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
     elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("aa7444")
     elif "leaf" in matname:mat.albedo_color=Color("69b53e") if rng.randf()>.25 else Color("97cd52")
     elif "grass" in matname:mat.albedo_color=Color("649447")
-    mat.albedo_color=mat.albedo_color.darkened(.15)
+    mat.albedo_color=mat.albedo_color.darkened(.04)
     n.set_surface_override_material(surface,mat);asset_materials[palette_key]=mat
   var box:AABB=holder.global_transform.affine_inverse()*n.global_transform*n.get_aabb()
   if first:bounds=box;first=false
@@ -197,8 +198,9 @@ func scenery(sim):
   if absf(p.x)<34 and absf(p.z)<35:continue
   if p.x>35 and p.x<44:continue
   var names=["tree_default.glb","tree_fat.glb","tree_tall.glb","tree_pineTallA_detailed.glb"]
-  Nature.tree(landscape,p,rng.randf_range(6,10),i+742)
- for i in range(18):
+  if i%4==0:asset("tree_pineTallA_detailed.glb",landscape,p,rng.randf_range(7,11))
+  else:Nature.tree(landscape,p,rng.randf_range(6,10),i+742)
+ for i in range(48):
   var edge=26.0+rng.randf_range(0,4)
   var p=Vector2(edge*(1 if i%2==0 else -1),rng.randf_range(-27,27)) if i%3 else Vector2(rng.randf_range(-27,27),edge*(1 if i%2==0 else -1))
   var plants=["grass.glb","grass_large.glb","flower_yellowC.glb","flower_purpleA.glb"]
@@ -265,7 +267,7 @@ func create_building(b:Dictionary):
  var bubble=null
  if mode=="home" and Catalog.RESOURCES.has(b.kind):
   bubble=Node3D.new();root.add_child(bubble);bubble.position=Vector3(0,model_height+1.65,0)
-  var img=Sprite3D.new();img.texture=load("res://assets3d/icons/"+Catalog.RESOURCES[b.kind]+".svg");img.pixel_size=.055;img.billboard=BaseMaterial3D.BILLBOARD_ENABLED;img.no_depth_test=true;img.shaded=false;bubble.add_child(img)
+  var marker=load("res://game3d/resource_marker.gd").new();bubble.add_child(marker);marker.build(self,String(Catalog.RESOURCES[b.kind]))
   var full=Label3D.new();full.text="MAX";full.font_size=33;full.pixel_size=.018;full.position=Vector3(0,-1.7,0);full.billboard=BaseMaterial3D.BILLBOARD_ENABLED;full.no_depth_test=true;full.modulate=Color("ffdc79");full.outline_size=7;bubble.add_child(full)
  forts[b.id]={"root":root,"body":body,"label":label,"text":text,"height":model_height,"hpbar":hpbar,"job":job,"ruin":null,"bubble":bubble,"collapse":0.0,"smoke":null}
 func create_worker(b:Dictionary,job:Dictionary):
@@ -309,7 +311,7 @@ func create_actor(u:Dictionary):
  elif u.kind in ["archer","ranger"]:file="Ranger.gltf"
  elif u.kind=="guard":file="Rogue.gltf"
  elif u.kind=="siege":file="Cleric.gltf"
- var size=3.15 if u.kind=="hero" else (3.2 if u.kind in ["captain","shield"] else 2.65)
+ var size=3.8 if u.kind=="hero" else (2.85 if u.kind in ["captain","shield"] else 2.45)
  var holder=asset(file,self,Vector3(u.pos.x,.06,u.pos.y),size)
  if u.kind=="shield":
   var shield=box(holder,Vector3(0,1.35,.6),Vector3(1.45,1.75,.22),Color("398edd"))
@@ -341,6 +343,8 @@ func sync(sim,dt:float):
  for u in ([sim.hero]+sim.allies if mode!="scout" else [])+sim.enemies:
   if not actors.has(u.id):create_actor(u)
   var a:Dictionary=actors[u.id]
+  a.node.visible=u.kind!="hero" or sim.hero_deployed
+  if not a.node.visible:continue
   a.node.position=Vector3(u.pos.x,.06,u.pos.y)
   if u.hp<=0:
    a.ring.visible=false;a.bar.visible=false;a.hpbar.root.visible=false
@@ -376,7 +380,7 @@ func sync(sim,dt:float):
     var phase=clampf(1.0-float(u.attack_time)/maxf(.001,float(u.attack_total)),0,.999)
     a.anim.seek(a.anim.get_animation(state).length*phase,true)
    else:
-    a.anim.speed_scale=1.0
+    a.anim.speed_scale=1.08 if u.kind=="hero" else (.78 if u.kind in ["siege","shield"] else (1.16 if u.kind in ["archer","ranger"] else 1.0))
     if a.state!=state or not a.anim.is_playing():a.anim.play(state,.12);a.state=state
   if bool(a.get("flash_on",false))!=(u.flash>0):
    a.flash_on=u.flash>0
@@ -420,10 +424,15 @@ func sync(sim,dt:float):
     if String(sb.get("uid",""))==String(b.uid):stock=float(sb.get("stock",0.0));break
    var cap=140.0*int(b.level);f.bubble.visible=stock>=1 and f.job.is_empty()
    var fraction=clampf(stock/cap,0,1)
-   f.bubble.scale=Vector3.ONE*(1.0+.22*fraction)
-   f.bubble.get_child(1).visible=stock>=cap-1
+   f.bubble.scale=Vector3.ONE*(1.0+.12*fraction+.035*sin(village_clock*2))
+   f.bubble.position.y=f.height+1.9+sin(village_clock*1.8+b.id)*.18
+   f.bubble.get_child(0).rotation.y=sin(village_clock*.8)*.22
+   f.bubble.get_child(1).text=("MAX · " if stock>=cap-1 else "")+str(int(stock))
+   f.bubble.get_child(1).visible=true
   if not f.job.is_empty():
    var remaining=maxf(0,float(f.job.finish)-Time.get_unix_time_from_system())
+   if f.job.get("new",false):
+    var built=clampf(1-remaining/maxf(1,float(f.job.finish)-float(f.job.start)),0,1);f.body.scale=Vector3.ONE*lerpf(.45,1.0,built)
    f.label.text="BAUSTELLE · %d s"%ceili(remaining)
    f.label.visible=true;set_health(f.hpbar,1-remaining/maxf(1,float(f.job.finish)-float(f.job.start)),true)
  for w in workers:
@@ -500,19 +509,23 @@ func update_camera(sim,dt:float):
  if not camera:return
  var goal=Vector3(pan.x,0,pan.y)
  if art_preview and mode=="home":goal.y=2.0
- if false:
-  var factor=clampf((60-target_zoom)/35.0,0,1)
-  goal+=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)*factor
+ if mode=="raid" and follow_hero and sim.hero_deployed:
+  goal=Vector3(sim.hero.pos.x,0,sim.hero.pos.y);pan=Vector2(goal.x,goal.z)
  focus=focus.lerp(goal,minf(1,dt*5));zoom=lerpf(zoom,target_zoom,minf(1,dt*9));camera.size=zoom
  camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
-func change_zoom(amount:float):target_zoom=clampf(target_zoom+amount,17,66)
+func manual_camera():
+ if follow_hero:pan=Vector2(focus.x,focus.z)
+ follow_hero=false
+func change_zoom(amount:float):
+ manual_camera();target_zoom=clampf(target_zoom+amount,17,66)
 func screen_to_direction(v:Vector2) -> Vector2:
  var right=camera.global_basis.x;var forward=-camera.global_basis.z;forward.y=0;forward=forward.normalized()
  var d=right*v.x-forward*v.y;return Vector2(d.x,d.z).limit_length(1)
 func ground_position(screen:Vector2) -> Vector2:
  var hit=Plane(Vector3.UP,0).intersects_ray(camera.project_ray_origin(screen),camera.project_ray_normal(screen))
  return Vector2(hit.x,hit.z) if hit!=null else Vector2.ZERO
-func pan_camera(delta:Vector2):pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(Vector2(-26,-26),Vector2(26,26))
+func pan_camera(delta:Vector2):
+ manual_camera();pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(Vector2(-26,-26),Vector2(26,26))
 func building_at(screen:Vector2):
  var origin=camera.project_ray_origin(screen);var direction=camera.project_ray_normal(screen)
  var chosen=null;var best=INF

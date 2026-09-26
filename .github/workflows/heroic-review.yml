@@ -1,0 +1,30 @@
+name: Heroic playable review
+on:
+  push:
+    branches: [update/masterplan-online-20260925]
+    paths: ['.github/workflows/heroic-review.yml', 'game3d/**', 'tests3d/heroic_suite.gd']
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+      - run: python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
+      - name: Render actual game and exercise responsive layout and combat
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/heroic
+        run: |
+          mkdir -p logs/heroic
+          python3 tools/check_godot.py logs/heroic.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/heroic_suite.gd
+          python3 tools/check_godot.py logs/input.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/input_suite.gd
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: heroic-review
+          path: logs

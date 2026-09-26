@@ -9,9 +9,10 @@ void fragment(){
  float n=noise2(flow)*.65+noise2(flow*2.3+vec2(2.1,TIME*.1))*.35;
  float edge=min(UV.x,1.0-UV.x);
  float shallow=1.0-smoothstep(.0,.23,edge);
- ALBEDO=mix(vec3(.026,.14,.155),vec3(.17,.28,.24),shallow)+vec3(.016,.032,.027)*n;
+ ALBEDO=mix(vec3(.025,.26,.34),vec3(.19,.55,.49),shallow)+vec3(.016,.032,.027)*n;
  float foam=(1.0-smoothstep(.015,.047+n*.026,edge))*.25;
- ALBEDO=mix(ALBEDO,vec3(.59,.67,.58),foam);
+ ALBEDO=mix(ALBEDO,vec3(.79,.94,.85),foam);
  NORMAL_MAP=normalize(vec3((noise2(flow+vec2(.12,0))-n)*.38,(noise2(flow+vec2(0,.12))-n)*.38,1.0))*.5+.5;
+ float caustic=pow(max(0.0,sin(flow.x*3.0+sin(flow.y*2.0))),12.0)*shallow;ALBEDO+=vec3(.07,.13,.10)*caustic;
  ROUGHNESS=.23+shallow*.18;METALLIC=.05;SPECULAR=.75;
 }

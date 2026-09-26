@@ -6,7 +6,7 @@ static func text(g,value:String,rect:Rect2,size:int=28,color:Color=TEXT,center:b
  return g.label(g.hud,value,rect,size,color,center)
 static func plate(g,rect:Rect2,color:Color=Color("263e46")):
  var p=Panel.new();p.position=rect.position;p.size=rect.size;p.mouse_filter=Control.MOUSE_FILTER_STOP
- p.add_theme_stylebox_override("panel",g.skin("panel"));g.hud.add_child(p);return p
+ p.add_theme_stylebox_override("panel",g.skin("panel"));g.hud.add_child(p);g.decorate(p);return p
 static func action(g,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false):
  var b=g.icon_button(g.hud,key,title,rect,func():g.tone("click");callback.call(),primary)
  b.set_meta("hud_action",title)
@@ -47,8 +47,7 @@ static func top(g):
  action(g,"menu","",Rect2(1180,18,80,62),func():g.open_menu())
  action(g,"tasks","ZIELE",Rect2(20,173,86,82),func():g.open_tasks())
  action(g,"shop","SHOP",Rect2(1174,100,86,82),func():g.open_shop())
- var sync_plate=plate(g,Rect2(348,91,790,39));sync_plate.mouse_filter=Control.MOUSE_FILTER_IGNORE
- g.hud_widgets.sync=text(g,"",Rect2(365,94,758,31),18,TEXT)
+ g.hud_widgets.sync=text(g,"",Rect2(22,91,302,22),15,TEXT)
  g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 static func home(g):
  g.button(g.hud,"FREUNDE",Rect2(20,286,138,54),func():g.open_social())
@@ -62,14 +61,11 @@ static func home(g):
   var box=g.skin("pressed" if state=="pressed" else "gold");box.set_corner_radius_all(90);box.set_border_width_all(4);attack.add_theme_stylebox_override(state,box)
  attack.get_child(0).position=Vector2(38,15);attack.get_child(0).size=Vector2(110,110)
  attack.get_child(1).position=Vector2(5,130);attack.get_child(1).size=Vector2(176,36);attack.get_child(1).add_theme_font_size_override("font_size",26)
- var keys=["build","upgrade","hero","army","training"]
- var titles=["BAUEN","AUSBAU","HELD","ARMEE","TRAINING"]
- var callbacks=[g.open_catalog,g.open_upgrades,g.open_heroes,g.open_army,g.open_training]
- for i in range(5):
-  var tile=action(g,keys[i],titles[i],Rect2(300+i*146,586,132,118),callbacks[i])
-  var accent=["337956","33798c","715185","426d96","956026"][i]
-  for state in ["normal","hover"]:
-   var finish=g.skin("blue");finish.bg_color=Color(accent);tile.add_theme_stylebox_override(state,finish)
+ var keys=["build","hero","army","training"]
+ var titles=["BAUEN","HELD","ARMEE","TRAINING"]
+ var callbacks=[g.open_catalog,g.open_heroes,g.open_army,g.open_training]
+ for i in range(4):
+  var tile=action(g,keys[i],titles[i],Rect2(370+i*146,586,132,118),callbacks[i])
   tile.get_child(0).position=Vector2(29,6);tile.get_child(0).size=Vector2(74,74)
  if g.selected_building!="":
   var b=g.progress.find_building(g.selected_building)
@@ -105,6 +101,9 @@ static func combat(g):
  g.hud_widgets.deploy_group=g.button(g.hud,"Alle",Rect2(128,338,108,66),func():g.choose_deploy_group(true),true)
  for key in ["deploy_single","deploy_group"]:g.hud_widgets[key].add_theme_font_size_override("font_size",24)
  g.hud_widgets.deploy_hint=text(g,"",Rect2(275,110,735,45),22,TEXT,true)
+ g.hud_widgets.deploy_hero=g.button(g.hud,"Held einsetzen",Rect2(20,413,216,64),func():g.choose_deploy("hero"),true)
+ g.hud_widgets.follow=g.button(g.hud,"Zum Helden",Rect2(1088,316,172,66),func():g.world.follow_hero=true)
+ g.hud_widgets.follow.add_theme_font_size_override("font_size",22)
  g.create_stick()
  plate(g,Rect2(265,617,460,85));g.icon(g.hud,g.sim.hero_key(),Rect2(274,626,67,67))
  text(g,g.sim.stats().name,Rect2(350,620,204,35),27,GOLD)
@@ -151,16 +150,20 @@ static func update(g):
  for key in g.cooldowns:
   var b=g.cooldowns[key];var cd=float(g.sim.skill_cd if key=="skill" else (g.sim.roll_cd if key=="roll" else 0))
   b.get_meta("cooldown").text="%.1f"%cd if cd>0 else (str(g.sim.potion) if key=="heal" else "")
-  b.disabled=g.sim.hero.hp<=0 or cd>0 or (key=="heal" and g.sim.potion==0)
+  b.disabled=not g.sim.hero_deployed or g.sim.hero.hp<=0 or cd>0 or (key=="heal" and g.sim.potion==0)
   b.get_child(0).modulate=Color(1,1,1,.25) if cd>0 else Color.WHITE
  var slot=0
  for kind in g.deployment_buttons:
   var b=g.deployment_buttons[kind];b.get_meta("count").text=str(g.sim.reserve[kind]);b.disabled=g.sim.reserve[kind]<=0
   b.visible=not b.disabled
-  if b.visible:b.position=Vector2(20+(slot%2)*112,185+int(slot/2)*77);slot+=1
+  if b.visible:
+   b.set_meta("design_position",Vector2(20+(slot%2)*112,185+int(slot/2)*77));b.position=b.get_meta("design_position")+g.safe_rect().position;slot+=1
   var chosen=g.deploying==kind and not b.disabled
   if b.get_meta("selected",false)!=chosen:b.set_meta("selected",chosen);b.add_theme_stylebox_override("normal",g.skin("selected" if chosen else "blue"))
   if b.disabled and g.deploying==kind:g.deploying=""
+ if g.hud_widgets.has("deploy_hero"):
+  g.hud_widgets.deploy_hero.visible=not g.sim.hero_deployed
+  g.hud_widgets.follow.disabled=not g.sim.hero_deployed
  if g.hud_widgets.has("deploy_group"):
   var remaining=int(g.sim.reserve.get(g.deploying,0))
   for key in ["deploy_group","deploy_single"]:g.hud_widgets[key].visible=remaining>0
@@ -168,6 +171,7 @@ static func update(g):
   g.hud_widgets.deploy_group.add_theme_stylebox_override("normal",g.skin("selected" if g.deploy_group else "gold"))
   g.hud_widgets.deploy_single.add_theme_stylebox_override("normal",g.skin("selected" if not g.deploy_group else "blue"))
   g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf einen freien Randbereich."%remaining if g.deploy_group else "Einzeln einsetzen · oder »Alle %d« wählen."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if slot>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
+  if g.deploying=="hero":g.hud_widgets.deploy_hint.text="Held einsetzen: Tippe auf einen freien Randbereich."
 static func format_number(value) -> String:
  var s=str(int(value));var parts=[]
  while s.length()>3:parts.push_front(s.right(3));s=s.left(s.length()-3)

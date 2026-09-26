@@ -102,9 +102,8 @@ func _ready():
  if art_preview:sim.hero.pos=Vector2(2,6)
  world=World.new();world.art_preview=art_preview;add_child(world);world.setup(sim)
  var layer=CanvasLayer.new();add_child(layer);ui=Control.new();ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);ui.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(ui)
- if art_preview or OS.has_feature("ios"):
-  get_window().content_scale_aspect=Window.CONTENT_SCALE_ASPECT_EXPAND
-  get_viewport().size_changed.connect(layout_art_preview);layout_art_preview()
+ get_window().content_scale_aspect=Window.CONTENT_SCALE_ASPECT_EXPAND
+ get_viewport().size_changed.connect(layout_art_preview);layout_art_preview()
  var theme=Theme.new();theme.default_font_size=28;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
  account=load("res://game3d/online/account.gd").new();add_child(account)
  sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
@@ -115,7 +114,29 @@ func _ready():
  if not art_preview:call_deferred("restore_account_start")
 func layout_art_preview():
  ui.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
- ui.size=Vector2(1280,720);ui.position=(get_viewport().get_visible_rect().size-ui.size)*.5
+ ui.position=Vector2.ZERO;ui.size=get_viewport().get_visible_rect().size
+ if is_instance_valid(hud):reflow_hud()
+ if is_instance_valid(modal):
+  modal.size=ui.size;modal.get_child(0).size=ui.size
+  var p=modal.get_child(1);var safe=safe_rect();p.position=safe.position+(safe.size-p.size)*.5
+func safe_rect() -> Rect2:
+ var result=Rect2(Vector2.ZERO,ui.size)
+ if OS.has_feature("ios"):
+  var physical=DisplayServer.get_display_safe_area();var screen=DisplayServer.screen_get_size()
+  if physical.size.x>0 and screen.x>0:
+   var factor=ui.size/Vector2(screen);result=Rect2(Vector2(physical.position)*factor,Vector2(physical.size)*factor)
+ return result
+func reflow_hud():
+ var safe=safe_rect();var delta=safe.size-Vector2(1280,720)
+ for node in hud.get_children():
+  if not node is Control:continue
+  if not node.has_meta("design_position"):node.set_meta("design_position",node.position)
+  var base:Vector2=node.get_meta("design_position")
+  var horizontal=0.0 if base.x<240 else (1.0 if base.x>=1080 or (base.y<100 and base.x>=340 and sim.mode=="home") else .5)
+  if node.name=="Action_attack":horizontal=1.0
+  node.position=base+safe.position+Vector2(delta.x*horizontal,delta.y if base.y>=400 else 0.0)
+func decorate(control:Control):
+ var finish=load("res://game3d/ui/button_finish.gd").new();finish.show_behind_parent=false;finish.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);control.add_child(finish)
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
  var s=StyleBoxFlat.new()
  s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
@@ -123,7 +144,7 @@ func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> S
  s.shadow_color=Color(0,0,0,.22);s.shadow_size=6 if width>0 else 0;s.shadow_offset=Vector2(0,5) if width>0 else Vector2.ZERO
  return s
 func skin(key:String) -> StyleBoxFlat:
- var palette={"panel":["23565e","e0bc7b"],"blue":["286b78","f4d598"],"gold":["c95b20","fff0b6"],"pressed":["214e60","fff0b6"],"disabled":["506a70","a7b7b5"],"selected":["357b55","fff0b6"]}
+ var palette={"panel":["142b46","d8ae61"],"blue":["203f62","e8c477"],"gold":["e97708","ffe4a0"],"pressed":["214e60","fff0b6"],"disabled":["506a70","a7b7b5"],"selected":["357b55","fff0b6"]}
  var colors=palette.get(key,palette.panel)
  var box=style(Color(colors[0]),Color(colors[1]),2,22)
  box.border_width_bottom=4;box.border_width_top=2
@@ -134,7 +155,7 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  elif color.a>.9:color=Color("193943")
  var p=Panel.new();p.position=rect.position;p.size=rect.size
  p.add_theme_stylebox_override("panel",skin("panel"))
- parent.add_child(p);return p
+ parent.add_child(p);decorate(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
  var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
  l.add_theme_color_override("font_shadow_color",Color(0,.03,.07,.8));l.add_theme_constant_override("shadow_offset_y",1)
@@ -148,7 +169,9 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
  b.add_theme_stylebox_override("disabled",skin("disabled"))
- b.pressed.connect(callback);parent.add_child(b);return b
+ b.pressed.connect(callback);parent.add_child(b)
+ if text!="":decorate(b)
+ return b
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
  var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
 func icon_texture(key:String) -> Texture2D:
@@ -177,6 +200,9 @@ func stat_row(parent:Control,key:String,title:String,current:String,next:String,
  icon(parent,key,Rect2(342,y,34,34));label(parent,title,Rect2(389,y,180,34),22)
  label(parent,current+"  →  "+next,Rect2(585,y,410,34),26,GOLD,true)
 func choose_deploy(kind:String):
+ if kind=="hero":
+  if not sim.hero_deployed:cancel_gestures();deploying="hero";deploy_group=false;update_hud()
+  return
  if int(sim.reserve.get(kind,0))<=0:return
  cancel_gestures();deploying=kind;deploy_group=false;update_hud()
 func choose_deploy_group(value:bool):
@@ -186,7 +212,7 @@ func clear_hud():
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
  stick=null;production_text=null;collect_button=null;objective=null;health=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear();loot_labels.clear();stars_view.clear()
 func build_hud():
- Hud.build(self)
+ Hud.build(self);reflow_hud()
 func build_home_hud():
  Hud.home(self)
 func build_combat_hud():
@@ -202,7 +228,7 @@ func build_placement_hud():
  update_ghost()
 func create_stick():
  stick=Stick.new();stick.name="VillageJoystick" if sim.mode=="home" else "CombatJoystick"
- stick.position=Vector2(20,432) if sim.mode=="home" else Vector2(20,409)
+ stick.position=Vector2(20,528) if sim.mode=="home" else Vector2(20,509)
  stick.size=Vector2(172,172) if sim.mode=="home" else Vector2(220,195);hud.add_child(stick)
 func update_hud():
  Hud.update(self)
@@ -289,7 +315,7 @@ func pointer_begin(id:int,pos:Vector2,camera_only:bool=false):
  var ground=world.ground_position(pos)
  var role="pending"
  if camera_only:role="camera"
- elif sim.mode=="raid" and deploying!="" and sim.deployment_valid(ground) and ground.distance_to(sim.hero.pos)>1.6:role="deploy"
+ elif sim.mode=="raid" and deploying!="" and sim.deployment_valid(ground) and (not sim.hero_deployed or ground.distance_to(sim.hero.pos)>1.6):role="deploy"
  gestures[id]={"start":pos,"last":pos,"role":role,"age":0.0,"next":.30,"dragged":false,"placed":false}
  if gestures.size()>1:
   for g in gestures.values():g.role="pinch";g.dragged=true
@@ -299,7 +325,7 @@ func pointer_move(id:int,pos:Vector2):
  var g:Dictionary=gestures[id];var delta:Vector2=pos-g.last;g.last=pos
  if gestures.size()==2:
   var points=gestures.values();var d=points[0].last.distance_to(points[1].last)
-  if pinch_distance>10 and d>10:world.target_zoom=clampf(world.target_zoom*pinch_distance/d,17,66)
+  if pinch_distance>10 and d>10:world.manual_camera();world.target_zoom=clampf(world.target_zoom*pinch_distance/d,17,66)
   pinch_distance=d;return
  if g.role=="pinch":return
  if pos.distance_to(g.start)>10:g.dragged=true
@@ -321,7 +347,11 @@ func update_gestures(dt:float):
 func deploy_at_screen(pos:Vector2) -> bool:
  if deploying=="" or paused:return false
  var ground=world.ground_position(pos)
- if ground.distance_to(sim.hero.pos)<1.6:return false
+ if deploying=="hero":
+  if sim.deploy_hero(ground):
+   deploying="";world.follow_hero=true;tone("equip");update_hud();return true
+  sim.effects.append({"kind":"invalid","pos":ground,"life":.4,"max":.4,"color":Color("ff675e")});return false
+ if sim.hero_deployed and ground.distance_to(sim.hero.pos)<1.6:return false
  var placed=sim.deploy_squad(deploying,ground)>0 if deploy_group else sim.deploy(deploying,ground)
  if placed:tone("equip");update_hud();return true
  if sim.reserve.get(deploying,0)>0:
@@ -346,7 +376,7 @@ func _input(event):
    if gestures.has(-100):get_viewport().set_input_as_handled()
  elif event is InputEventMouseMotion and gestures.has(-100):pointer_move(-100,event.position);get_viewport().set_input_as_handled()
  elif event is InputEventMagnifyGesture and not blocks_world_at(event.position):
-  cancel_gestures();world.target_zoom=clampf(world.target_zoom/event.factor,17,66);get_viewport().set_input_as_handled()
+  cancel_gestures();world.manual_camera();world.target_zoom=clampf(world.target_zoom/event.factor,17,66);get_viewport().set_input_as_handled()
 func _unhandled_input(event):
  if not event is InputEventKey or not event.pressed or event.echo:return
  if event.keycode==KEY_ESCAPE:
@@ -406,9 +436,11 @@ func collect_building_resource(uid:String):
  for i in range(3):
   var key=["wood","stone","gold"][i]
   if r[key]<=0:continue
+  var amount=label(ui,"+%d"%r[key],Rect2(start-Vector2(50,42),Vector2(100,36)),27,GOLD,true);amount.z_index=91
+  var amount_tween=create_tween();amount_tween.tween_property(amount,"position",amount.position-Vector2(0,40),.8);amount_tween.parallel().tween_property(amount,"modulate:a",0.0,.8);amount_tween.tween_callback(amount.queue_free)
   for n in range(5):
    var particle=icon(ui,key,Rect2(start+Vector2(n*9-20,-n*5),Vector2(35,35)));particle.z_index=90
-   var tw=create_tween();tw.tween_interval(n*.06);tw.tween_property(particle,"position",Vector2(1000,18+i*49),.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tw.parallel().tween_property(particle,"scale",Vector2.ONE*.55,.6);tw.tween_callback(particle.queue_free)
+   var tw=create_tween();tw.tween_interval(n*.06);tw.tween_property(particle,"position",resource_labels[key].get_global_rect().get_center()-Vector2(17,17),.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_IN);tw.parallel().tween_property(particle,"scale",Vector2.ONE*.55,.6);tw.tween_callback(particle.queue_free)
  if r.wood+r.stone+r.gold==0:toast("Lager voll")
 func remove_selected_obstacle():
  if selected_obstacle=="" :return
@@ -428,11 +460,12 @@ func open_shop():
 func open_dialog(name:String,heading:String,sub:String) -> Control:
  close_dialog(true);dialog=name;paused=true;held=false;cancel_gestures()
  if stick:stick.release()
- modal=Control.new();modal.size=Vector2(1280,720);modal.z_index=100;ui.add_child(modal)
- var veil=ColorRect.new();veil.color=Color(.025,.065,.09,.58);veil.size=Vector2(1280,720);modal.add_child(veil)
+ modal=Control.new();modal.size=ui.size;modal.z_index=100;ui.add_child(modal)
+ var veil=ColorRect.new();veil.color=Color(.025,.065,.09,.58);veil.size=ui.size;modal.add_child(veil)
  var rect=Rect2(210,92,860,536)
  if name=="building":rect=Rect2(100,48,1080,624)
  if name in ["catalog","heroes"]:rect=Rect2(130,70,1020,580)
+ rect.position=safe_rect().position+(safe_rect().size-rect.size)*.5
  var p=panel(modal,rect,Color("193943"))
  var trim=panel(p,Rect2(8,8,rect.size.x-16,67),Color("385962"));trim.mouse_filter=Control.MOUSE_FILTER_IGNORE
  label(p,heading,Rect2(25,12,rect.size.x-125,48),27,GOLD)
@@ -669,7 +702,7 @@ func open_campaign_stage(index:int):
 func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
 func start_raid():
  deploy_group=false
- if sim.start(-1,true):close_dialog();result_shown=false;deploying=Catalog.TROOP_ORDER.filter(func(k):return int(sim.reserve.get(k,0))>0)[0];world.setup(sim);build_hud();tone("equip")
+ if sim.start(-1,true):close_dialog();result_shown=false;deploying="hero";world.setup(sim);build_hud();tone("equip")
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
 func end_raid():
