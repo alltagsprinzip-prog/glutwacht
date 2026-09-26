@@ -390,8 +390,10 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
  if hero_deployed and input.length()>.1:hero_auto_attack=false
  if hero_auto_attack and hero_deployed and active() and hero.hp>0:
   var target=army_target(hero)
+  if target==null:target=nearest(hero.pos,targets())
   if target!=null:
-   if distance(hero,target)>float(stats().range)*.9:approach(hero,target,float(stats().speed),dt)
+   if distance(hero,target)>float(stats().range)*.9:
+    approach(hero,target,float(stats().speed),dt);facing=hero.facing
    else:strike()
  if hero_deployed and input.length()>.1 and hero.hp>0 and float(hero.get("dash_time",0))<=0:facing=input.normalized();move(hero,input,stats().speed,dt)
  hero.facing=facing

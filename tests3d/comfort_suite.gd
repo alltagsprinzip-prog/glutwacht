@@ -14,7 +14,8 @@ func run():
  check(not b.hero_auto_attack and not b.hero_deployed,"auto combat is off before deployment")
  b.deploy_hero(Vector2(-27,0));b.buildings=[];b.traps=[];b.raid_building_total=1;b.allies=[]
  var enemy=b.unit("guard",Vector2(-20,0),2000,0,"enemy");enemy.cd=999;b.enemies=[enemy]
- b.hero_auto_attack=true
+ b.hero_auto_attack=true;b.step(.05,Vector2.ZERO)
+ check(b.hero.facing.x>0.5,"automatic approach faces the movement direction")
  for i in range(100):b.step(.05,Vector2.ZERO)
  check(enemy.hp<2000 and b.hero.pos.x>-27,"auto hero approaches and damages enemy")
  b.step(.05,Vector2.RIGHT);check(not b.hero_auto_attack,"joystick movement immediately restores manual control")
