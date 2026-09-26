@@ -12,7 +12,9 @@ func run():
  check(game.progress.data.player_name=="Grafikprobe","separate village")
  check(game.dialog=="","preview does not open tutorial")
  var models=game.world.find_children("Atelier_*","MeshInstance3D",true,false)
- check(models.size()>=5,"actual new realtime meshes")
+ # Static scenery is merged for rendering; count the resulting nonempty meshes too.
+ models.append_array(game.world.find_children("StaticLandscapeBatch*","MeshInstance3D",true,false))
+ check(models.filter(func(m):return m.mesh!=null and m.mesh.get_surface_count()>0).size()>=5,"actual realtime geometry survives scenery batching")
  game.save();check(not FileAccess.file_exists(game.save_path),"preview never writes save")
  game.open_account();check(game.dialog=="","account login blocked in preview")
  game.open_save_tools();check(game.dialog=="","save imports blocked in preview")
