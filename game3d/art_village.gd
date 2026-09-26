@@ -124,7 +124,7 @@ func hall(parent:Node3D,level:int):
  # Every real upgrade has a visible ornament, without using the test model as save data.
  for i in range(level):block(Vector3(-2.8+i*.56,.77,2.99),Vector3(.23,.27,.12),GOLD,.04)
  finish(parent,"Atelier_Haupthaus");return 11.2
-func cottage(parent:Node3D,kind:String):
+func cottage(parent:Node3D,kind:String,level:int=1):
  stone_wall(Vector3(0,.50,0),Vector3(5.7,.95,4.5))
  block(Vector3(0,1.94,0),Vector3(5.4,2.0,4.2),PLASTER,.05)
  for x in [-2.62,0,2.62]:block(Vector3(x,1.91,2.18),Vector3(.17,2.35,.17),WOOD,.025)
@@ -141,6 +141,7 @@ func cottage(parent:Node3D,kind:String):
   block(Vector3(1.7,1.1,3.2),Vector3(1.5,.3,.65),Color("455664"),.08)
  else:
   for x in [-2.7,2.7]:banner(Vector3(x,1.0,2.44),1.6)
+ for i in range(level):block(Vector3(-2.4+i*.5,.75,2.36),Vector3(.22,.22,.13),GOLD,.03)
  finish(parent,"Atelier_"+kind);return 5.8
 func tree(p:Vector3,height:float):
  cylinder(p,.22,height*.7,WOOD,9,.09)
