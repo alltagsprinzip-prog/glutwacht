@@ -35,7 +35,7 @@ func run():
  var corrupt=FileAccess.open(path,FileAccess.WRITE);corrupt.store_string("{broken");corrupt.close()
  var blocked=P.new();check(not blocked.load_file(path) and blocked.write_blocked,"corrupt file protects writes")
  check(not blocked.store_file(path) and FileAccess.get_file_as_string(path)=="{broken","corrupt original retained")
- var a=MockAccount.new();root.add_child(a);a.token="test-memory-only";a.user_id="123";a.loaded=true
+ var a=MockAccount.new();a.storage_enabled=false;root.add_child(a);a.token="test-memory-only";a.user_id="123";a.loaded=true
  a.response={"ok":false,"message":"timeout"}
  await a.upload(p.data)
  var first=a.sent.duplicate(true)

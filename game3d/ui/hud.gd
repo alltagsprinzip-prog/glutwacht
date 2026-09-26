@@ -1,7 +1,7 @@
 extends RefCounted
 # One composition for each mode; screen zones never share pointer ownership.
-const TEXT=Color("493826")
-const GOLD=Color("88501d")
+const TEXT=Color("233d59")
+const GOLD=Color("206aa4")
 static func text(g,value:String,rect:Rect2,size:int=28,color:Color=TEXT,center:bool=false):
  return g.label(g.hud,value,rect,size,color,center)
 static func plate(g,rect:Rect2,color:Color=Color("263e46")):
@@ -47,10 +47,14 @@ static func top(g):
   b.add_theme_stylebox_override("background",g.style(Color("14262b"),Color.TRANSPARENT,0,4))
   b.add_theme_stylebox_override("fill",g.style([Color("ce9860"),Color("a4c4d3"),GOLD][i],Color.TRANSPARENT,0,4));g.hud.add_child(b);g.resource_bars[key]=b
  action(g,"tasks","ZIELE",Rect2(20,128,110,92),func():g.open_tasks())
- action(g,"mail","POST",Rect2(20,232,110,92),func():g.open_inbox())
- action(g,"menu","MENÜ",Rect2(20,336,110,92),func():g.open_menu())
+ action(g,"menu","MENÜ",Rect2(20,232,110,92),func():g.open_menu())
+ g.hud_widgets.sync=text(g,"",Rect2(20,111,550,28),18,TEXT)
 static func home(g):
  g.create_stick()
+ if g.progress.tutorial_step()!="done":
+  var next=g.progress.tutorial_step()
+  var captions={"hero":"Helden wählen","build":"Sägewerk bauen","upgrade":"Haupthaus ausbauen","train":"Helden trainieren","battle":"Erstes Lager angreifen"}
+  g.button(g.hud,"Einführung: "+captions[next],Rect2(340,126,550,52),func():g.open_tutorial(),true)
  action(g,"attack","ANGRIFF",Rect2(20,608,198,96),func():g.open_raid(),true)
  var keys=["build","upgrade","hero","army","training"]
  var titles=["BAUEN","AUSBAU","HELD","ARMEE","TRAINING"]
@@ -113,6 +117,7 @@ static func scout(g):
  var b=action(g,"attack","ANGREIFEN",Rect2(991,597,269,107),func():g.start_raid(),true);b.disabled=g.Catalog.army_count(g.progress.data)==0
 static func update(g):
  if not g.stats:return
+ if g.hud_widgets.has("sync"):g.hud_widgets.sync.text=g.account.status if g.account.signed_in() else "Gastdorf · lokal gespeichert"
  for key in g.resource_bars:
   var b=g.resource_bars[key];b.max_value=g.progress.storage();b.value=g.progress.data[key]
   g.resource_labels[key].text=format_number(g.progress.data[key])+" / "+format_number(g.progress.storage())

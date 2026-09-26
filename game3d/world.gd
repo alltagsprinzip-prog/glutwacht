@@ -31,6 +31,8 @@ var effect_nodes:Dictionary={}
 var effect_serial=0
 var selection:MeshInstance3D
 var edges:Node3D
+var boats:Array=[]
+var village_clock=0.0
 func health_bar(parent:Node3D,height:float,width:float,color:Color) -> Dictionary:
  var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height,0)
  var parts=[]
@@ -106,7 +108,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
 func setup(sim):
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
- effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
+ boats.clear();effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
  landscape=Node3D.new();add_child(landscape)
  var env=WorldEnvironment.new();sky_env=Environment.new();env.environment=sky_env;add_child(env)
  sky_env.background_mode=Environment.BG_COLOR;sky_env.background_color=Color("9fdcfa")
@@ -143,9 +145,15 @@ func terrain():
     surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise).srgb_to_linear());surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
  var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
- var water=PlaneMesh.new();water.size=Vector2(6,132)
- mesh_node(water,Vector3(39,.025,0),material(Color("218ba1"),.18),landscape)
- asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),7.2,"width",PI/2)
+ var water=PlaneMesh.new();water.size=Vector2(9,132);water.subdivide_depth=120
+ mesh_node(water,Vector3(39,.025,0),water_material(),landscape)
+ asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),10.2,"width",PI/2)
+ for bank in [33.8,44.2]:
+  for i in range(45):
+   var stone=SphereMesh.new();stone.radius=.36;stone.height=.55;stone.radial_segments=8;stone.rings=4
+   mesh_node(stone,Vector3(bank+sin(i*1.3)*.3,.02,-64+i*2.9),material(Color("c7cbb3")),landscape)
+ if mode=="home":
+  create_boat(-1,Color("eee5bd"));create_boat(1,Color("f2a14b"))
  for i in range(10):
   var m=CylinderMesh.new();m.top_radius=0;m.bottom_radius=rng.randf_range(9,17);m.height=rng.randf_range(13,26);m.radial_segments=7
   mesh_node(m,Vector3(-60+i*14,m.height/2-2,-65),material(Color("637d89")),landscape)
@@ -306,6 +314,12 @@ func create_actor(u:Dictionary):
  var hpbar=health_bar(holder,size+.18,1.7 if u.kind=="hero" else 1.3,Color("f16656") if u.team=="enemy" else Color("4bd887"))
  actors[u.id]={"node":holder,"anim":anim,"bar":bar,"hpbar":hpbar,"ring":ring,"state":"","size":size}
 func sync(sim,dt:float):
+ village_clock+=dt
+ for boat in boats:
+  var t=village_clock*.65+boat.phase
+  boat.root.position=Vector3(39+sin(t*.25)*.5,.24+sin(t*2)*.06,boat.side*(13+fposmod(t,44)))
+  boat.root.rotation=Vector3(sin(t*1.6)*.022,0 if boat.side>0 else PI,sin(t*1.3)*.035)
+
  for u in ([sim.hero]+sim.allies if mode!="scout" else [])+sim.enemies:
   if not actors.has(u.id):create_actor(u)
   var a:Dictionary=actors[u.id]
@@ -519,3 +533,28 @@ func show_ghost(kind:String,pos:Vector2,valid:bool,rotation:int=0):
  var body=Node3D.new();ghost.add_child(body)
  Architecture.draw(self,{"kind":kind,"level":1,"team":"ally","rotation":rotation},body)
  for part in body.find_children("*","GeometryInstance3D",true,false):part.transparency=.35
+
+func water_material() -> ShaderMaterial:
+ var mat=ShaderMaterial.new();mat.shader=load("res://game3d/water.gdshader");return mat
+func create_boat(side:int,color:Color):
+ var boat=Node3D.new();landscape.add_child(boat)
+ # A tapered three-dimensional hull, timber deck, mast and curved cloth sail.
+ var hull=SurfaceTool.new();hull.begin(Mesh.PRIMITIVE_TRIANGLES)
+ var rim=[Vector3(-.85,.35,-1.4),Vector3(.85,.35,-1.4),Vector3(1,.35,.8),Vector3(0,.55,2.1),Vector3(-1,.35,.8)]
+ var keel=Vector3(0,-.22,0)
+ for i in range(rim.size()):
+  hull.add_vertex(rim[i]);hull.add_vertex(rim[(i+1)%rim.size()]);hull.add_vertex(keel)
+ hull.generate_normals();var mat=material(Color("965d39"),.7).duplicate();mat.cull_mode=BaseMaterial3D.CULL_DISABLED
+ mesh_node(hull.commit(),Vector3.ZERO,mat,boat)
+ box(boat,Vector3(0,.3,-.1),Vector3(1.45,.12,2.5),Color("d1a66b"))
+ box(boat,Vector3(0,1.9,0),Vector3(.12,3.2,.12),Color("6a432b"))
+ box(boat,Vector3(0,3.15,0),Vector3(2.3,.1,.1),Color("6a432b"))
+ var sail=SurfaceTool.new();sail.begin(Mesh.PRIMITIVE_TRIANGLES)
+ for x in range(8):
+  for y in range(8):
+   for uv in [Vector2(x,y),Vector2(x+1,y),Vector2(x,y+1),Vector2(x+1,y),Vector2(x+1,y+1),Vector2(x,y+1)]:
+    uv/=8.0;sail.add_vertex(Vector3((uv.x-.5)*2.15,1.1+uv.y*2,.1+sin(uv.x*PI)*sin(uv.y*PI)*.55))
+ sail.generate_normals();var cloth=material(color).duplicate();cloth.cull_mode=BaseMaterial3D.CULL_DISABLED;mesh_node(sail.commit(),Vector3.ZERO,cloth,boat)
+ asset("Barrel.obj",boat,Vector3(-.4,.4,-.8),.65)
+ var wake=disc(1.25,Color(.65,.93,1,.22),Vector3(0,-.1,-2),boat);wake.scale=Vector3(.65,1,2)
+ boats.append({"root":boat,"side":side,"phase":9.0 if side<0 else 0.0})

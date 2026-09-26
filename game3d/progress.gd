@@ -26,7 +26,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"player_name":"Mein Dorf","claimed_tasks":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -116,7 +116,7 @@ func army(kind:String,change:int) -> bool:
 func can_change_hero() -> bool:return data.hero==""
 func choose_hero(key:String) -> bool:
  if not Catalog.HEROES.has(key) or not can_change_hero():return false
- data.hero=key;data.hero_id=key;return true
+ data.hero=key;data.hero_id=key;tutorial_event("hero");return true
 func count_kind(kind:String) -> int:
  var count=0
  for b in all_buildings():
@@ -325,6 +325,7 @@ func load_file(path:String=SAVE) -> bool:
     if uid!="" and clean.obstacles.any(func(o):return o.uid==uid) and not clean.obstacle_jobs.any(func(j):return j.uid==uid) and finish_time>start_time and finish_time-start_time<=15.0:clean.obstacle_jobs.append({"uid":uid,"start":start_time,"finish":finish_time})
  clean.hero=String(parsed.get("hero_id",clean.hero)) if Catalog.HEROES.has(String(parsed.get("hero_id",clean.hero))) else clean.hero
  clean.hero_id=clean.hero
+ clean.tutorial_done=parsed.get("tutorial_done",["hero","build","upgrade","train","battle"] if clean.hero!="" else []).duplicate()
  var positions=parsed.get("core_positions",{})
  if positions is Dictionary:
   for key in TITLES:
@@ -369,6 +370,10 @@ static func validate_save(raw) -> String:
   if not stage is String or stage not in ["0","1","2","3","4","5","6","7","8","9"]:return "Ungültiges Kampagnenlager."
   var stars=raw.campaign_stars[stage]
   if not numeric(stars) or float(stars)!=int(stars) or int(stars)<0 or int(stars)>3:return "Ungültige Kampagnensterne."
+ if raw.has("tutorial_done"):
+  if not raw.tutorial_done is Array:return "Ungültige Einführung."
+  for step in raw.tutorial_done:
+   if step not in ["hero","build","upgrade","train","battle"]:return "Ungültiger Einführungsschritt."
  if raw.has("claimed_tasks") and not raw.claimed_tasks is Array:return "Ungültige Aufgaben."
  for key in ["hero","hero_id","player_name"]:
   if raw.has(key) and not raw[key] is String:return "Ungültiger Held."
@@ -423,3 +428,10 @@ func claim_task(id:String) -> bool:
    if int(data.gold)+int(task.gold)>storage():return false
    data.gold+=int(task.gold);data.claimed_tasks.append(id);return true
  return false
+
+func tutorial_event(step:String):
+ if step in ["hero","build","upgrade","train","battle"] and step not in data.tutorial_done:data.tutorial_done.append(step)
+func tutorial_step() -> String:
+ for step in ["hero","build","upgrade","train","battle"]:
+  if step not in data.tutorial_done:return step
+ return "done"

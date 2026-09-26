@@ -5,8 +5,8 @@ const Progress=preload("res://game3d/progress.gd")
 const Battle=preload("res://game3d/battle.gd")
 const World=preload("res://game3d/world.gd")
 const Stick=preload("res://game3d/stick.gd")
-const CREAM=Color("493826")
-const GOLD=Color("8b501f")
+const CREAM=Color("233d59")
+const GOLD=Color("206aa4")
 var progress
 var save_path=Progress.SAVE
 var sim
@@ -79,18 +79,18 @@ func _ready():
  sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
  if not progress.warning.is_empty():toast(progress.warning)
  if progress.write_blocked:call_deferred("open_save_tools")
- elif progress.data.hero=="":call_deferred("open_heroes")
- call_deferred("check_email_link")
+ call_deferred("restore_account_start")
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
  var s=StyleBoxFlat.new()
  s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
  s.content_margin_left=0;s.content_margin_right=0;s.content_margin_top=0;s.content_margin_bottom=0
  s.shadow_color=Color(0,0,0,.22);s.shadow_size=6 if width>0 else 0;s.shadow_offset=Vector2(0,5) if width>0 else Vector2.ZERO
  return s
-func skin(key:String) -> StyleBoxTexture:
- var box=StyleBoxTexture.new();box.texture=load("res://assets3d/ui/"+key+".svg")
- for side in [SIDE_LEFT,SIDE_RIGHT,SIDE_TOP,SIDE_BOTTOM]:box.set_texture_margin(side,18)
- box.content_margin_left=0;box.content_margin_top=0;box.content_margin_right=0;box.content_margin_bottom=0
+func skin(key:String) -> StyleBoxFlat:
+ var palette={"panel":["f3f7fb","c4d5e5"],"blue":["e0effb","80b5dc"],"gold":["72d99a","38a874"],"pressed":["56a4da","2577b6"],"disabled":["d2dbe4","bac6d1"],"selected":["b5e3ff","328bd5"]}
+ var colors=palette.get(key,palette.panel)
+ var box=style(Color(colors[0]),Color(colors[1]),2,18)
+ box.shadow_color=Color("172f5140");box.shadow_size=8;box.shadow_offset=Vector2(0,4)
  return box
 func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
  if color.v>.65:color=Color("294953")
@@ -113,7 +113,13 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
  b.add_theme_stylebox_override("disabled",skin("disabled"))
  b.pressed.connect(callback);parent.add_child(b);return b
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
- var img=TextureRect.new();img.texture=load("res://assets3d/icons/"+key+".svg");img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
+ var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
+func icon_texture(key:String) -> Texture2D:
+ var mapping={"wood":Vector2(0,0),"stone":Vector2(1,0),"gold":Vector2(0,1),"wall":Vector2(1,1)}
+ if mapping.has(key):
+  var texture=AtlasTexture.new();texture.atlas=load("res://assets3d/icons/resources-modern.png");var cell=texture.atlas.get_width()/2
+  texture.region=Rect2(mapping[key]*cell,Vector2(cell,cell));return texture
+ return load("res://assets3d/icons/"+key+".svg")
 func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=button(parent,"",rect,callback,primary);b.name="Action_"+key;b.tooltip_text=title;b.set_meta("icon_key",key)
  var h=minf(47,rect.size.y-32) if title!="" else minf(46,rect.size.y-12)
@@ -125,8 +131,8 @@ func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_siz
  for key in ["wood","stone","gold"]:
   var x=pos.x+float(index)*width/3;icon(parent,key,Rect2(x,pos.y,30,30));label(parent,str(int(values.get(key,0))),Rect2(x+33,pos.y,width/3-35,30),font_size);index+=1
 func stat_row(parent:Control,key:String,title:String,current:String,next:String,y:float):
- icon(parent,key,Rect2(342,y,28,28));label(parent,title,Rect2(379,y,160,30),17)
- label(parent,current+"  →  "+next,Rect2(540,y,250,30),20,GOLD,true)
+ icon(parent,key,Rect2(342,y,34,34));label(parent,title,Rect2(389,y,180,34),22)
+ label(parent,current+"  →  "+next,Rect2(585,y,410,34),26,GOLD,true)
 func choose_deploy(kind:String):
  cancel_gestures();deploying=kind;update_hud()
 func clear_hud():
@@ -182,7 +188,7 @@ func _process(dt):
     toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else ("NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(int(progress.data.hall),[])) if int(progress.data.hall)>old_hall else "Bau abgeschlossen!"))
  if save_clock>=15:save();save_clock=0
  cloud_clock+=dt
- if account_active and not cloud_sync_paused and cloud_clock>=45 and not account.busy:
+ if account_active and account.dirty and not cloud_sync_paused and cloud_clock>=5 and not account.busy:
   cloud_clock=0;sync_cloud()
  if not paused:
   update_gestures(dt)
@@ -193,13 +199,13 @@ func _process(dt):
   if held or Input.is_physical_key_pressed(KEY_J):
    if sim.attack_cd<=0:sim.strike()
   world.sync(sim,dt)
-  if sim.result!="" and not result_shown:result_shown=true;reward=sim.settle();save();tone("victory" if sim.result=="victory" else "death");open_result()
+  if sim.result!="" and not result_shown:result_shown=true;reward=sim.settle();progress.tutorial_event("battle");save();tone("victory" if sim.result=="victory" else "death");open_result()
  else:world.sync(sim,dt)
  toast_time=maxf(0,toast_time-dt)
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.9","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.10","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
 func deployment_preview_points() -> Array:
@@ -317,9 +323,13 @@ func world_tap(pos:Vector2):
 func _notification(what):
  if what==NOTIFICATION_APPLICATION_FOCUS_OUT and is_inside_tree() and sim:
   save()
+  if account_active and not account.busy and not cloud_sync_paused:sync_cloud()
   if not paused and build_kind=="":open_menu()
 func save():
- if not progress.store_file(save_path):toast(progress.warning)
+ if not progress.store_file(save_path):toast(progress.warning);return
+ if account_active:
+  account.dirty=true;account.save_metadata()
+  if not account.busy:account.status="Lokal gesichert · Cloud ausstehend"
 func tone(kind):
  if sound and progress.data.sound and sound_time<=0:sound_time=.14;sound.play("equip" if kind=="click" else kind)
 func toast(text:String):
@@ -359,6 +369,7 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  modal=Control.new();modal.size=Vector2(1280,720);modal.z_index=100;ui.add_child(modal)
  var veil=ColorRect.new();veil.color=Color(.025,.065,.09,.58);veil.size=Vector2(1280,720);modal.add_child(veil)
  var rect=Rect2(210,92,860,536)
+ if name=="building":rect=Rect2(100,48,1080,624)
  if name in ["catalog","heroes"]:rect=Rect2(130,70,1020,580)
  var p=panel(modal,rect,Color("193943"))
  var trim=panel(p,Rect2(8,8,rect.size.x-16,67),Color("385962"));trim.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -419,6 +430,7 @@ func place_building():
  if move_uid!="":success=progress.relocate(move_uid,build_pos,build_rotation)
  else:success=not progress.build(build_kind,build_pos,build_rotation).is_empty()
  if not success:update_ghost();return
+ if move_uid=="":progress.tutorial_event("build")
  save();tone("equip")
  if build_kind=="wall" and move_uid=="":
   var pos=build_pos;var rot=build_rotation;var pan=world.pan
@@ -427,17 +439,18 @@ func place_building():
 func cancel_build():
  build_kind="";move_uid="";world.build_focus=false;close_dialog();sim.home();world.setup(sim);build_hud()
 func open_upgrades():
- var p=open_dialog("progression","Dein Ausbaupfad","Haupthaus %d · tippe auf Ausbau für Details"%progress.data.hall)
- for i in range(10):
-  var lv=i+1;var col=int(i/5);var y=118+(i%5)*71;var x=28+col*405
-  panel(p,Rect2(x,y,393,70))
-  label(p,str(lv),Rect2(x+8,y+8,40,50),29,GOLD,true)
-  var row=label(p,("FREI · " if lv<=int(progress.data.hall) else "AB STUFE %d · "%lv)+" · ".join(Catalog.HALL_UNLOCKS[lv]),Rect2(x+54,y+4,326,62),17)
-  row.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"HAUPTHAUS AUSBAUEN",Rect2(370,478,457,50),func():open_building("hall"),true)
+ var p=open_dialog("progression","Dein Ausbaupfad","Haupthaus %d · Freischaltungen und Voraussetzungen"%progress.data.hall)
+ var scroll=ScrollContainer.new();scroll.position=Vector2(28,123);scroll.size=Vector2(802,330);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;p.add_child(scroll)
+ var list=VBoxContainer.new();list.size_flags_horizontal=Control.SIZE_EXPAND_FILL;list.add_theme_constant_override("separation",12);scroll.add_child(list)
+ for lv in range(1,11):
+  var row=Panel.new();row.custom_minimum_size=Vector2(776,116);row.add_theme_stylebox_override("panel",skin("blue" if lv==int(progress.data.hall)+1 else "panel"));list.add_child(row)
+  icon(row,"hall",Rect2(12,18,76,76))
+  label(row,"HAUPTHAUS %d · %s"%[lv,"FREIGESCHALTET" if lv<=int(progress.data.hall) else "ALS NÄCHSTES" if lv==int(progress.data.hall)+1 else "SPÄTER"],Rect2(105,6,650,36),24,GOLD)
+  label(row," • ".join(Catalog.HALL_UNLOCKS[lv]),Rect2(105,42,640,68),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"HAUPTHAUS AUSBAUEN",Rect2(245,471,580,52),func():open_building("hall"),true)
 func upgrade_building(uid:String,from:String="detail"):
  if progress.upgrade(uid):
-  save();refresh_home();tone("equip")
+  progress.tutorial_event("upgrade");save();refresh_home();tone("equip")
   if from=="list":open_upgrades()
   else:open_building(uid)
 func open_building(uid:String):
@@ -454,14 +467,25 @@ func open_building(uid:String):
   stat_row(p,"collect","Vorrat",str(140*level),str(140*next),239)
  elif b.kind=="hall":
   stat_row(p,"collect","Lager",str(1200*level),str(1200*next),195)
-  label(p,"NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(next,[])),Rect2(342,238,470,58),15,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+
  elif b.kind=="barracks":
   stat_row(p,"melee","Angriff",str(18+5*level),str(18+5*next),195)
-  label(p,Catalog.upgrade_benefit(b.kind,next),Rect2(344,239,450,60),17,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+
  elif b.kind=="smithy":stat_row(p,"melee","Heldenangriff","+%d"%(8*(level-1)),"+%d"%(8*(next-1)),195)
  elif b.kind=="tower":stat_row(p,"attack","Schaden",str(12+8*level),str(12+8*next),195)
  elif b.kind=="camp":stat_row(p,"army","Plätze",str(2+2*level),str(2+2*next),195)
  elif b.kind=="hero_hall":label(p,"Held: +15 Leben je Hallenstufe",Rect2(346,199,460,48),20,GOLD)
+ label(p,"DAS BRINGT STUFE %d"%next if level<Progress.MAX_LEVEL else "VOLL AUSGEBAUT",Rect2(345,278,660,33),24,GOLD)
+ var benefit_scroll=ScrollContainer.new();benefit_scroll.position=Vector2(345,316);benefit_scroll.size=Vector2(680,111);benefit_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;p.add_child(benefit_scroll)
+ var benefits=VBoxContainer.new();benefits.size_flags_horizontal=Control.SIZE_EXPAND_FILL;benefit_scroll.add_child(benefits)
+ var entries=Catalog.HALL_UNLOCKS.get(next,[]) if b.kind=="hall" else [Catalog.upgrade_benefit(b.kind,next)]
+ if level>=Progress.MAX_LEVEL:entries=["Alle Vorteile dieser Gebäudestufe sind aktiv."]
+ for entry in entries:
+  var row=Control.new();row.custom_minimum_size=Vector2(650,48);benefits.add_child(row)
+  var key="upgrade"
+  for pair in [["Bogen","archers"],["Mauer","wall"],["Wachturm","tower"],["Schild","shield"],["Goldmine","goldmine"],["Heerlager","camp"],["Bauarbeiter","worker"],["Steinwerfer","siege"],["Heldenhalle","hero_hall"]]:
+   if pair[0] in entry:key=pair[1];break
+  icon(row,key,Rect2(0,3,40,40));label(row,entry,Rect2(54,0,586,48),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  var cc=progress.cost(uid);var job=progress.job_for(uid);var reason=""
  if not job.is_empty():reason="Bau läuft: %d s"%ceili(maxf(0,float(job.finish)-Time.get_unix_time_from_system()))
  elif level>=Progress.MAX_LEVEL:reason="MAXIMALE STUFE"
@@ -469,15 +493,15 @@ func open_building(uid:String):
  elif b.kind!="hall" and level>=progress.data.hall+1:reason="Benötigt Haupthaus %d"%level
  elif not progress.affordable(cc):reason="Rohstoffe fehlen"
  if level<Progress.MAX_LEVEL:
-  costs(p,cc,Vector2(344,314),450)
-  icon(p,"clock",Rect2(348,360,30,30));label(p,"%d s"%progress.build_seconds(b.kind,next),Rect2(385,359,110,34),20)
- label(p,reason,Rect2(344,395,470,32),17,Color("f3b080"),true)
- var up=icon_button(p,"upgrade","AUSBAUEN",Rect2(527,441,286,76),func():upgrade_building(uid),true);up.disabled=reason!=""
- if not job.is_empty():icon_button(p,"gems","%d · SOFORT"%progress.speedup_cost(uid),Rect2(35,441,232,76),func():
+  costs(p,cc,Vector2(344,441),680,25)
+  icon(p,"clock",Rect2(348,483,30,30));label(p,"%d s"%progress.build_seconds(b.kind,next),Rect2(390,480,190,34),20)
+ label(p,reason,Rect2(585,478,440,40),22,Color("a84632"),true)
+ var up=icon_button(p,"upgrade","AUSBAUEN",Rect2(695,532,340,76),func():upgrade_building(uid),true);up.disabled=reason!=""
+ if not job.is_empty():icon_button(p,"gems","%d · SOFORT"%progress.speedup_cost(uid),Rect2(35,532,300,76),func():
   if progress.speedup(uid):save();refresh_home();open_building(uid),true)
- elif Catalog.RESOURCES.has(b.kind):icon_button(p,"collect","SAMMELN",Rect2(35,441,232,76),func():collect_building_resource(uid))
- elif b.kind in ["barracks","camp"]:icon_button(p,"army","ARMEE",Rect2(35,441,232,76),func():open_army())
- elif b.kind in ["smithy","hero_hall"]:icon_button(p,"training","TRAINING",Rect2(35,441,232,76),func():open_training())
+ elif Catalog.RESOURCES.has(b.kind):icon_button(p,"collect","SAMMELN",Rect2(35,532,300,76),func():collect_building_resource(uid))
+ elif b.kind in ["barracks","camp"]:icon_button(p,"army","ARMEE",Rect2(35,532,300,76),func():open_army())
+ elif b.kind in ["smithy","hero_hall"]:icon_button(p,"training","TRAINING",Rect2(35,532,300,76),func():open_training())
 func confirm_remove(uid:String):
  var b=progress.find_building(uid)
  var p=open_dialog("remove",Catalog.BUILD[b.kind].name+" abbauen?","Dieser Bauplatz wird frei. Du erhältst keine Rohstoffe zurück.")
@@ -509,7 +533,7 @@ func open_training(troops:bool=false):
   panel(p,Rect2(23,y,814,83));icon(p,kind,Rect2(31,y+17,46,46));label(p,title+"  %d/5"%rank,Rect2(86,y+4,320,32),22,GOLD);label(p,effect,Rect2(86,y+40,310,29),19)
   costs(p,cost,Vector2(410,y+24),280,21)
   var b=icon_button(p,"upgrade","",Rect2(725,y+10,95,61),func():
-   if progress.train(group,who,attribute):save();refresh_home();open_training(troops);tone("equip"),true)
+   if progress.train(group,who,attribute):progress.tutorial_event("train");save();refresh_home();open_training(troops);tone("equip"),true)
   b.disabled=rank>=5 or not progress.affordable(cost) or (troops and not Catalog.troop_unlocked(who,int(progress.data.hall),int(progress.data.barracks)))
 func priority_name(key:String) -> String:return {"nearest":"Nächstes Ziel","defenses":"Verteidigung","hall":"Haupthaus","resources":"Rohstoffe"}.get(key,"Nächstes Ziel")
 func open_attack_plan():
@@ -535,7 +559,7 @@ func open_heroes():
   label(p,"Training ohne Wartezeit",Rect2(368,340,420,34),18,CREAM)
   icon_button(p,"training","TRAINING",Rect2(500,425,300,82),func():open_training(),true)
   return
- var p=open_dialog("heroes","Wähle deinen Helden","Diese Wahl ist dauerhaft.")
+ var p=open_dialog("heroes","Wähle deinen Helden","Dein Startheld begleitet dich. Weitere Helden kommen später.")
  for i in range(4):
   var key=Catalog.HERO_ORDER[i];var cc=Catalog.hero(key);var x=20+i*247
   panel(p,Rect2(x,126,239,430),Color("20323d"))
@@ -547,7 +571,7 @@ func open_heroes():
   var model=world.hero_showcase(key,scene);model.rotation.y=-.28;var camera=Camera3D.new();scene.add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.size=4.6;camera.position=Vector3(2.2,2.7,6);camera.look_at(Vector3(0,1.7,0));camera.current=true;hero_views.append(viewport)
   label(p,cc.title,Rect2(x+10,397,219,52),15,CREAM,true)
   var choose=button(p,"WÄHLEN",Rect2(x+12,482,215, 60),func():
-   if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud(),true)
+   if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud();open_tutorial(),true)
 func open_raid():
  sim.campaign_index=-1
  close_dialog();build_kind="";selected_building="";world.build_focus=false;sim.scout(sim.selected_village);world.setup(sim);build_hud()
@@ -658,12 +682,13 @@ func open_profile():
  var p=open_dialog("profile","Dein Dorf","")
  label(p,"Dorfname",Rect2(32,102,790,40),27,GOLD)
  var field=LineEdit.new();field.position=Vector2(32,156);field.size=Vector2(790,64);field.max_length=24;field.text=progress.data.get("player_name","Mein Dorf");p.add_child(field)
- label(p,"Dein lokaler Fortschritt wird automatisch gespeichert.",Rect2(32,247,790,70),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,account.status if account_active else "Gastdorf · lokal gespeichert",Rect2(32,237,790,35),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  button(p,"Namen speichern",Rect2(32,345,790,65),func():
   var value=field.text.strip_edges()
   if value.is_empty():toast("Bitte einen Dorfnamen eingeben.");return
   progress.data.player_name=value;save();close_dialog();build_hud(),true)
  button(p,"Konto / Cloud",Rect2(32,430,380,65),func():open_account())
+ button(p,"Freunde einladen",Rect2(32,279,790,53),func():share_test_link())
  button(p,"Sicherung",Rect2(430,430,392,65),func():open_save_tools())
 func open_tasks():
  var p=open_dialog("tasks","Deine ersten Ziele","Belohnungen können einmalig abgeholt werden.")
@@ -706,16 +731,28 @@ func authenticate(email:String,password:String,register:bool):
  close_dialog();toast("Verbindung wird hergestellt …")
  var result=await account.login(email,password,register,web_redirect())
  if not result.ok:toast(result.get("message","Anmeldung fehlgeschlagen."));open_account();return
- await load_cloud()
-func load_cloud():
+ await load_cloud(true)
+func load_cloud(automatic:bool=false):
  if account.busy:return
  cloud_sync_paused=true
  var result=await account.fetch_save()
  if not result.ok:toast(result.message);return
  if not result.empty and not Progress.validate_save(result.snapshot).is_empty():toast("Cloud-Stand ungültig; dein Dorf bleibt unverändert.");return
+ var local_path="user://account-"+account.user_id+".json"
+ var meta=account.read_metadata()
+ var local_exists=FileAccess.file_exists(local_path)
+ if automatic and not account_active:
+  if local_exists and bool(meta.get("dirty",true)):
+   if not meta.is_empty() and int(meta.get("revision",-1))==int(result.revision):
+    activate_local_account(meta);return
+   account.status="Speicherkonflikt · Auswahl erforderlich"
+  else:
+   activate_cloud(result);return
  var p=open_dialog("cloud_confirm","Kontodorf öffnen?","")
+ if local_exists and bool(meta.get("dirty",true)):
+  button(p,"Lokalen Kontostand als Datei sichern",Rect2(32,350,790,52),func():download_snapshot(FileAccess.get_file_as_string(local_path)))
  label(p,"Neues Kontodorf erstellen." if result.empty else "Gespeichertes Kontodorf von der Cloud laden.",Rect2(32,110,790,80),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- label(p,"Der aktuelle Stand bleibt als lokale Datei erhalten. Eine vorhandene lokale Kontosicherung wird vor dem Laden zusätzlich gesichert.",Rect2(32,229,790,128),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Auf diesem Gerät liegt ein möglicherweise neuerer Stand. Cloud laden behält vorher eine lokale Sicherheitskopie. Abbrechen verändert nichts." if local_exists and bool(meta.get("dirty",true)) else "Dein Gastdorf bleibt separat erhalten. Dieses Konto lädt ausschließlich sein eigenes Dorf.",Rect2(32,229,790,128),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  button(p,"Abbrechen",Rect2(32,420,380,65),func():close_dialog())
  button(p,"Dorf öffnen",Rect2(434,420,388,65),func():activate_cloud(result),true)
 func activate_cloud(result:Dictionary):
@@ -735,22 +772,51 @@ func activate_cloud(result:Dictionary):
  if not candidate.store_file(path):toast(candidate.warning);return
  account.revision=int(result.revision);account.loaded=true;account.pending.clear();cloud_sync_paused=false
  progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
- if progress.data.hero=="":open_heroes()
+ if progress.data.hero=="":open_tutorial()
  sync_cloud()
 func sync_cloud():
  if not account_active or account.busy or progress.write_blocked:return
  if not progress.store_file(save_path):toast(progress.warning);return
+ account.status="Wird mit Cloud synchronisiert …"
  var result=await account.upload(progress.data)
  if not result.ok:
-  # Stop automated retries on conflicts; the user chooses which local backup to keep.
-  cloud_sync_paused=true;toast(result.get("message","Cloud-Sicherung fehlgeschlagen. Lokale Datei bleibt erhalten."))
- else:cloud_sync_paused=false;toast("Kontodorf in der Cloud gesichert.")
+  cloud_sync_paused=result.get("code","")=="revision_conflict"
+  if result.get("code","")=="other_device_active":cloud_clock=-90
+  account.status=result.get("message","Offline · lokal gesichert, erneuter Versuch folgt")
+  if cloud_sync_paused:toast(account.status)
+ else:
+  cloud_sync_paused=false
+  account.dirty=JSON.stringify(result.get("saved_snapshot",{}))!=JSON.stringify(progress.data)
+  account.status="Lokal gesichert · Cloud ausstehend" if account.dirty else "Cloud gesichert"
+ account.save_metadata()
 func leave_account():
  if account.busy:toast("Bitte die laufende Sicherung abwarten.");return
- if not progress.store_file(save_path):toast(progress.warning);return
+ save()
+ if account_active:
+  await sync_cloud()
+  if account.dirty:
+   toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
  await account.sign_out();account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
  if progress.write_blocked:open_save_tools()
- elif progress.data.hero=="":open_heroes()
+ elif progress.data.hero=="":open_tutorial()
+func activate_local_account(meta:Dictionary):
+ var path="user://account-"+account.user_id+".json"
+ var candidate=Progress.new()
+ if not candidate.load_file(path):toast("Lokale Kontosicherung unlesbar; nichts verändert.");return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ account.revision=int(meta.revision);account.loaded=true;account.pending=meta.get("pending",{});account.dirty=true;cloud_sync_paused=false
+ progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
+ if progress.data.hero=="":open_tutorial()
+ await sync_cloud()
+func restore_account_start():
+ if OS.has_feature("web") and JavaScriptBridge.eval("!!window.__glutwachtEmailLink",true):
+  await check_email_link();return
+ var result=await account.restore_session()
+ if result.ok:
+  await load_cloud(true)
+ elif account.signed_in():
+  account.status="Verbindung fehlt · Konto noch nicht geladen";open_account()
+ elif progress.data.hero=="" and not progress.write_blocked:open_tutorial()
 
 func web_redirect() -> String:
  if OS.has_feature("web"):return String(JavaScriptBridge.eval("window.location.origin+window.location.pathname",true))
@@ -769,7 +835,7 @@ func check_email_link():
  var result=await account.accept_email_link(payload)
  if not result.ok:toast(result.message);open_account();return
  if account.recovering:open_recovery_password()
- else:await load_cloud()
+ else:await load_cloud(true)
 func open_recovery_password():
  var p=open_dialog("recovery","Neues Passwort","")
  label(p,"Mindestens 12 Zeichen. Dein Dorf bleibt unverändert.",Rect2(32,103,790,65),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -779,5 +845,28 @@ func open_recovery_password():
   if account.busy:return
   if password.text!=repeated.text:toast("Die Passwörter stimmen nicht überein.");return
   var result=await account.change_recovered_password(password.text)
-  if result.ok:close_dialog();toast("Passwort geändert.");await load_cloud()
+  if result.ok:close_dialog();toast("Passwort geändert.");await load_cloud(true)
   else:toast(result.message),true)
+
+func open_tutorial():
+ var step=progress.tutorial_step()
+ if step=="done":toast("Einführung abgeschlossen. Dein Dorf wartet auf dich.");return
+ var titles={"hero":"Willkommen in Glutwacht","build":"Dein erstes Bauprojekt","upgrade":"Mache dein Dorf stärker","train":"Bereite deinen Helden vor","battle":"Dein erster Angriff"}
+ var details={"hero":"Wähle deinen Starthelden. Seine Erfahrung und dein Fortschritt bleiben bei deinem Dorf gespeichert.","build":"Öffne Bauen, wähle ein Sägewerk und setze sie auf einen freien Platz. Mit dem Stick bewegst du deinen Helden; durch Ziehen verschiebst du die Kamera.","upgrade":"Werte dein Haupthaus auf. In der Vorschau siehst du Kosten, Bauzeit und neue Freischaltungen. Bauzeiten laufen auch offline weiter.","train":"Öffne Training und verbessere eine Fähigkeit deines Helden. In Armee stellst du deine Truppen zusammen.","battle":"Öffne Angriff → Kampagne und erkunde das erste Lager. Setze deine Truppen ein, bewege deinen Helden und nutze seine Fähigkeiten. Nach dem Kampf kehrst du ins Dorf zurück."}
+ var order=["hero","build","upgrade","train","battle"]
+ var p=open_dialog("tutorial",titles[step],"Einführung · Schritt %d von 5"%(order.find(step)+1))
+ icon(p,"hero" if step=="hero" else ("attack" if step=="battle" else step if step!="train" else "training"),Rect2(355,100,140,140))
+ label(p,details[step],Rect2(52,250,750,145),25).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var callbacks={"hero":open_heroes,"build":func():begin_build("lumber"),"upgrade":func():open_building("hall"),"train":open_training,"battle":open_campaign}
+ button(p,"LOS GEHT’S",Rect2(235,427,380,72),callbacks[step],true)
+func share_test_link():
+ if OS.has_feature("web"):
+  JavaScriptBridge.eval("(()=>{const u=location.origin; if(navigator.share){navigator.share({title:'Glutwacht',url:u}).catch(()=>{});}else{navigator.clipboard.writeText(u).catch(()=>window.prompt('Testlink kopieren',u));}})()")
+  toast("Teile den Link mit deinen Freunden. Jeder erstellt sein eigenes Konto.")
+
+func download_snapshot(text:String):
+ if OS.has_feature("web"):
+  JavaScriptBridge.eval("(()=>{const u=URL.createObjectURL(new Blob(["+JSON.stringify(text)+"],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download='Glutwacht-Kontobackup.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)})()")
+ else:
+  var f=FileAccess.open("user://Glutwacht-Kontobackup.json",FileAccess.WRITE)
+  if f:f.store_string(text);f.close()

@@ -17,6 +17,13 @@ func run():
  game=load("res://game3d/main.tscn").instantiate();game.save_path="user://qa-visual-release.json";root.add_child(game);await frame()
  game.progress.data.hero="warrior";game.progress.data.hero_id="warrior";game.close_dialog();game.refresh_home();game.modal_guard_until=0;await frame(20)
  await shot("home-final")
+ game.open_building("hall");await shot("upgrade-modern");game.close_dialog()
+ game.open_upgrades();await shot("progression-modern");game.close_dialog()
+ game.open_tutorial();await shot("tutorial-modern");game.close_dialog()
+ var prior_pan=game.world.pan;game.world.pan=Vector2(31,15)
+ for i in range(90):game.world.sync(game.sim,1.0/60)
+ await shot("river-modern");game.world.pan=prior_pan
+
  var original_pan=game.world.pan
  game.pointer_begin(7,Vector2(650,410));game.pointer_move(7,Vector2(720,440));game.pointer_end(7,Vector2(720,440));check(game.world.pan!=original_pan,"free-ground drag pans village")
  game.world.pan=Vector2.ZERO;game.world.sync(game.sim,1);game.world.focus=Vector3.ZERO;game.world.sync(game.sim,1)

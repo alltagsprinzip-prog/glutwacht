@@ -1,5 +1,5 @@
 extends Node
-# Credentials stay in memory. No password/session token goes into a village export.
+# Browser session is stored separately from village files and exports. Never store passwords.
 var url=""
 var public_key=""
 var token=""
@@ -13,6 +13,35 @@ var busy=false
 var loaded=false
 var status="Nicht angemeldet"
 var pending:Dictionary={}
+var dirty=false
+var storage_enabled=true
+func persist_session():
+ if not storage_enabled or not OS.has_feature("web"):return
+ var value=JSON.stringify({"access_token":token,"refresh_token":refresh_token,"expires_at":expires_at,"user_id":user_id,"device_id":device_id})
+ JavaScriptBridge.eval("try{localStorage.setItem('glutwacht.auth.v1',"+JSON.stringify(value)+")}catch(e){}")
+func restore_session() -> Dictionary:
+ if not OS.has_feature("web"):return {"ok":false}
+ var raw=JavaScriptBridge.eval("(()=>{try{return localStorage.getItem('glutwacht.auth.v1')}catch(e){return null}})()",true)
+ if not raw is String:return {"ok":false}
+ var saved=JSON.parse_string(raw)
+ if not saved is Dictionary:return {"ok":false}
+ token=String(saved.get("access_token",""));refresh_token=String(saved.get("refresh_token",""));user_id=String(saved.get("user_id",""));expires_at=float(saved.get("expires_at",0));device_id=String(saved.get("device_id",uuid()))
+ var session=await ensure_session()
+ if not session.ok:return session
+ var checked=await call_api("/auth/v1/user",HTTPClient.METHOD_GET)
+ if not checked.ok:return checked
+ if not checked.data is Dictionary or checked.data.get("id","")!=user_id:
+  logout();return {"ok":false,"message":"Bitte erneut anmelden."}
+ return {"ok":true}
+func metadata_path() -> String:return "user://account-"+user_id+".sync.json"
+func save_metadata():
+ if not storage_enabled or not signed_in():return
+ var f=FileAccess.open(metadata_path(),FileAccess.WRITE)
+ if f:f.store_string(JSON.stringify({"revision":revision,"dirty":dirty,"pending":pending}));f.close()
+func read_metadata() -> Dictionary:
+ if not FileAccess.file_exists(metadata_path()):return {}
+ var value=JSON.parse_string(FileAccess.get_file_as_string(metadata_path()))
+ return value if value is Dictionary else {}
 func _ready():
  var config=JSON.parse_string(FileAccess.get_file_as_string("res://game3d/online/config.json"))
  if config is Dictionary:
@@ -50,7 +79,7 @@ func call_api(path:String,method:int,body:Dictionary={}) -> Dictionary:
    match String(parsed.get("message","")):
     "revision_conflict":message="Neuerer Cloud-Stand vorhanden. Erst laden; nichts wurde überschrieben."
     "other_device_active":message="Ein anderes Gerät spielt gerade. Warte mindestens 90 Sekunden."
-  return {"ok":false,"message":message}
+  return {"ok":false,"message":message,"code":String(parsed.get("message","")) if parsed is Dictionary else "http_error"}
  return {"ok":true,"data":parsed}
 func login(email:String,password:String,register:bool=false,redirect:String="") -> Dictionary:
  if signed_in():return {"ok":false,"message":"Zuerst das aktuelle Konto abmelden."}
@@ -79,13 +108,16 @@ func upload(snapshot:Dictionary) -> Dictionary:
  var session=await ensure_session()
  if not session.ok:return session
  if pending.is_empty():pending={"p_snapshot":snapshot.duplicate(true),"p_revision":revision,"p_request":uuid(),"p_device":device_id}
+ save_metadata()
  # Keep the exact request after a timeout: its committed response may have been lost.
  var result=await call_api("/rest/v1/rpc/save_private_village",HTTPClient.METHOD_POST,pending)
  if result.ok and result.data is Dictionary and result.data.has("revision"):
+  result.saved_snapshot=pending.p_snapshot.duplicate(true)
   revision=int(result.data.revision);pending.clear();status="Cloud gesichert"
  else:status="Cloud-Sicherung ausstehend"
  return result
 func logout():
+ if storage_enabled and OS.has_feature("web"):JavaScriptBridge.eval("try{localStorage.removeItem('glutwacht.auth.v1')}catch(e){}")
  token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();status="Nicht angemeldet"
 
 func accept_session(payload:Dictionary,expected_user:String="") -> bool:
@@ -97,6 +129,7 @@ func accept_session(payload:Dictionary,expected_user:String="") -> bool:
  token=incoming_token;user_id=incoming_user
  refresh_token=String(payload.get("refresh_token",""))
  expires_at=Time.get_unix_time_from_system()+clampf(float(payload.get("expires_in",3600)),1,86400)
+ persist_session()
  return true
 func ensure_session() -> Dictionary:
  if not signed_in():return {"ok":false,"message":"Bitte anmelden."}

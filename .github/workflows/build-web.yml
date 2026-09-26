@@ -33,6 +33,8 @@ jobs:
         run: python3 tools/check_godot.py logs/hud_rules.log godot --headless --path . --script tests3d/hud_rules.gd
       - name: Account and save regression tests
         run: python3 tools/check_godot.py logs/account_save_suite.log godot --headless --path . --script tests3d/account_save_suite.gd
+      - name: Onboarding and sync retry tests
+        run: python3 tools/check_godot.py logs/onboarding.log godot --headless --path . --script tests3d/onboarding_sync_suite.gd
       - name: Campaign progression and save tests
         run: python3 tools/check_godot.py logs/campaign.log godot --headless --path . --script tests3d/campaign_suite.gd
       - name: Troop unlock and progression tests
