@@ -1,6 +1,6 @@
 # Current work: 0.13.1 recovery foundation
 
-See docs/DEVELOPMENT_0_13_1.md. This increments save safety before economic migration. Server-authoritative economy, trade, PvP and the full Heroic Pop redesign are still OPEN. Build/publication status must be checked in CI; no physical device test is claimed.
+See docs/DEVELOPMENT_0_13_1.md. This increments save safety before economic migration. Server-authoritative economy, trade, PvP and the full Heroic Pop redesign are still OPEN. Final build 0.13.1 (6.0.0) passed pipeline 36275562938, uploaded and Apple-verified VALID / IN_BETA_TESTING / Glutwacht test. Windows artifact 10916827580. No physical device test is claimed. See docs/DEVELOPMENT_0_13_1.md for exact scope and evidence.
 
 ## Aktuell: 0.13.0 erfolgreich gebaut und an Apple übertragen (26.09.2026, 23:45 Berlin)
 
