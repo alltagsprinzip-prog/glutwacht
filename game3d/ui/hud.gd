@@ -43,18 +43,18 @@ static func top(g):
   plate(g,Rect2(942,y,318,62))
   g.icon(g.hud,key,Rect2(944,y-3,67,67))
   g.resource_labels[key]=text(g,"",Rect2(1018,y+1,228,38),29,TEXT,true)
-  var b=ProgressBar.new();b.position=Vector2(1023,y+43);b.size=Vector2(219,9);b.show_percentage=false;b.add_theme_font_size_override("font_size",1);b.mouse_filter=Control.MOUSE_FILTER_IGNORE
-  b.add_theme_stylebox_override("background",g.style(Color("14262b"),Color.TRANSPARENT,0,4))
-  b.add_theme_stylebox_override("fill",g.style([Color("ce9860"),Color("a4c4d3"),GOLD][i],Color.TRANSPARENT,0,4));g.hud.add_child(b);g.resource_bars[key]=b
+  var track=ColorRect.new();track.position=Vector2(1023,y+43);track.size=Vector2(219,9);track.color=Color("cad8e4");track.mouse_filter=Control.MOUSE_FILTER_IGNORE;g.hud.add_child(track)
+  var meter=ColorRect.new();meter.size=Vector2(0,9);meter.color=[Color("ba8148"),Color("7f9daf"),Color("e7af38")][i];meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;track.add_child(meter);g.resource_bars[key]=meter
  action(g,"tasks","ZIELE",Rect2(20,128,110,92),func():g.open_tasks())
  action(g,"menu","MENÜ",Rect2(20,232,110,92),func():g.open_menu())
- g.hud_widgets.sync=text(g,"",Rect2(20,111,550,28),18,TEXT)
+ g.hud_widgets.sync=text(g,"",Rect2(325,111,550,28),18,TEXT)
+ g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 static func home(g):
  g.create_stick()
  if g.progress.tutorial_step()!="done":
   var next=g.progress.tutorial_step()
   var captions={"hero":"Helden wählen","build":"Sägewerk bauen","upgrade":"Haupthaus ausbauen","train":"Helden trainieren","battle":"Erstes Lager angreifen"}
-  g.button(g.hud,"Einführung: "+captions[next],Rect2(340,126,550,52),func():g.open_tutorial(),true)
+  g.button(g.hud,"Einführung: "+captions[next],Rect2(340,144,550,46),func():g.open_tutorial(),true)
  action(g,"attack","ANGRIFF",Rect2(20,608,198,96),func():g.open_raid(),true)
  var keys=["build","upgrade","hero","army","training"]
  var titles=["BAUEN","AUSBAU","HELD","ARMEE","TRAINING"]
@@ -119,7 +119,7 @@ static func update(g):
  if not g.stats:return
  if g.hud_widgets.has("sync"):g.hud_widgets.sync.text=g.account.status if g.account.signed_in() else "Gastdorf · lokal gespeichert"
  for key in g.resource_bars:
-  var b=g.resource_bars[key];b.max_value=g.progress.storage();b.value=g.progress.data[key]
+  var b=g.resource_bars[key];b.size.x=219.0*clampf(float(g.progress.data[key])/g.progress.storage(),0,1)
   g.resource_labels[key].text=format_number(g.progress.data[key])+" / "+format_number(g.progress.storage())
  if g.resource_labels.has("gems"):g.resource_labels.gems.text=str(g.progress.data.gems)
  if g.builder_text:g.builder_text.text="%d / %d frei"%[g.progress.free_builders(),g.progress.builders()]

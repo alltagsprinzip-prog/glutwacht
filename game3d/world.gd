@@ -146,7 +146,7 @@ func terrain():
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
  var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
  var water=PlaneMesh.new();water.size=Vector2(9,132);water.subdivide_depth=120
- mesh_node(water,Vector3(39,.025,0),water_material(),landscape)
+ mesh_node(water,Vector3(39,.09,0),water_material(),landscape)
  asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),10.2,"width",PI/2)
  for bank in [33.8,44.2]:
   for i in range(45):

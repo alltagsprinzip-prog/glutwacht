@@ -329,7 +329,9 @@ func save():
  if not progress.store_file(save_path):toast(progress.warning);return
  if account_active:
   account.dirty=true;account.save_metadata()
-  if not account.busy:account.status="Lokal gesichert · Cloud ausstehend"
+  if not account.busy:
+   account.status="Lokal gesichert · Cloud ausstehend"
+   if not cloud_sync_paused and cloud_clock>=0:call_deferred("sync_cloud")
 func tone(kind):
  if sound and progress.data.sound and sound_time<=0:sound_time=.14;sound.play("equip" if kind=="click" else kind)
 func toast(text:String):
@@ -481,11 +483,11 @@ func open_building(uid:String):
  var entries=Catalog.HALL_UNLOCKS.get(next,[]) if b.kind=="hall" else [Catalog.upgrade_benefit(b.kind,next)]
  if level>=Progress.MAX_LEVEL:entries=["Alle Vorteile dieser Gebäudestufe sind aktiv."]
  for entry in entries:
-  var row=Control.new();row.custom_minimum_size=Vector2(650,48);benefits.add_child(row)
+  var row=Control.new();row.custom_minimum_size=Vector2(650,64 if entry.length()>50 else 36);benefits.add_child(row)
   var key="upgrade"
   for pair in [["Bogen","archers"],["Mauer","wall"],["Wachturm","tower"],["Schild","shield"],["Goldmine","goldmine"],["Heerlager","camp"],["Bauarbeiter","worker"],["Steinwerfer","siege"],["Heldenhalle","hero_hall"]]:
    if pair[0] in entry:key=pair[1];break
-  icon(row,key,Rect2(0,3,40,40));label(row,entry,Rect2(54,0,586,48),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+  icon(row,key,Rect2(0,2,32,32));label(row,entry,Rect2(48,0,602,64 if entry.length()>50 else 36),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  var cc=progress.cost(uid);var job=progress.job_for(uid);var reason=""
  if not job.is_empty():reason="Bau läuft: %d s"%ceili(maxf(0,float(job.finish)-Time.get_unix_time_from_system()))
  elif level>=Progress.MAX_LEVEL:reason="MAXIMALE STUFE"
