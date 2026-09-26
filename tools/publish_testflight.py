@@ -23,6 +23,16 @@ def run(args, **kwargs):
         raise RuntimeError(f'{args[0]} failed with exit code {result.returncode}')
     return result
 
+def remove_unused_push_entitlement(root):
+    # Glutwacht does not implement remote notifications. Some Godot exports
+    # emit aps-environment even for the legacy empty-string preset value.
+    for path in root.rglob('*.entitlements'):
+        data = plistlib.loads(path.read_bytes())
+        if 'aps-environment' in data:
+            del data['aps-environment']
+            path.write_bytes(plistlib.dumps(data))
+            print('Removed unused push notification entitlement from', path.name)
+
 def main():
     required = ['IOS_DISTRIBUTION_P12_BASE64', 'IOS_DISTRIBUTION_P12_PASSWORD',
                 'IOS_PROVISION_PROFILE_BASE64', 'ASC_KEY_ID', 'ASC_ISSUER_ID', 'GLUTWACHT']
@@ -45,6 +55,7 @@ def main():
     if len(projects) != 1:
         raise RuntimeError('Expected one exported Xcode project')
     project = projects[0]
+    remove_unused_push_entitlement(root)
     info = json.loads(run(['xcodebuild', '-list', '-json', '-project', project], capture_output=True, text=True).stdout)
     schemes = info.get('project', {}).get('schemes', [])
     scheme = 'Glutwacht' if 'Glutwacht' in schemes else (schemes[0] if len(schemes) == 1 else None)
