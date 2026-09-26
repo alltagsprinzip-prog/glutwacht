@@ -30,7 +30,7 @@ func _init():
 
  var p2=Progress.new()
  p2.data.hero="warrior";p2.data.hall=4;p2.data.barracks=4;p2.data.smithy=3;p2.data.melee=1;p2.data.archers=0
- var h=Battle.new(p2.data);check(h.start(0,true),"hit timing raid start")
+ var h=Battle.new(p2.data);check(h.start(0,true),"hit timing raid start");check(h.deploy_hero(h.entry_position()),"hit timing hero deployment")
  var target=null
  for building in h.buildings:
   if building.kind=="hall":target=building;break

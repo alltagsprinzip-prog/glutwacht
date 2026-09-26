@@ -57,7 +57,7 @@ func run():
  root.size=Vector2i(844,390);await snap("07-angriff-handy");root.size=Vector2i(1280,720)
  game.set_process(false)
  for key in game.Catalog.HERO_ORDER:
-  game.progress.data.hero=key;game.progress.data.hero_id=key;game.sim.start(0,true);game.sim.hero.pos=Vector2(0,2);game.sim.buildings=[];game.sim.raid_building_total=1
+  game.progress.data.hero=key;game.progress.data.hero_id=key;game.sim.start(0,true);game.sim.deploy_hero(game.sim.entry_position());game.sim.hero.pos=Vector2(0,2);game.sim.buildings=[];game.sim.raid_building_total=1
   game.sim.enemies=[game.sim.unit("guard",Vector2(0,-1),5000,0,"enemy")];game.sim.enemies[0].cd=999;game.sim.allies=[game.sim.soldier("melee",Vector2(-2,2))];game.sim.allies[0].hp=30;game.sim.hero.hp-=100
   game.world.setup(game.sim);game.build_hud();game.world.target_zoom=20;game.sim.skill()
   var ticks=22 if key=="mage" else (6 if key=="ninja" else 11)

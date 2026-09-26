@@ -49,7 +49,7 @@ func run():
  game.return_home();game.open_account();await shot("account-entry");game.close_dialog()
  # Render every class and its skill. Fixtures are isolated from real saved profiles.
  for key in game.Catalog.HERO_ORDER:
-  game.progress.data.hero=key;game.progress.data.hero_id=key;game.open_raid();game.start_raid();game.sim.hero.pos=Vector2(0,0);game.sim.enemies=[game.sim.unit("guard",Vector2(0,-2),2000,0,"enemy")];game.sim.buildings=[];game.sim.raid_building_total=1;game.world.setup(game.sim)
+  game.progress.data.hero=key;game.progress.data.hero_id=key;game.open_raid();game.start_raid();game.sim.deploy_hero(game.sim.entry_position());game.sim.hero.pos=Vector2(0,0);game.sim.enemies=[game.sim.unit("guard",Vector2(0,-2),2000,0,"enemy")];game.sim.buildings=[];game.sim.raid_building_total=1;game.world.setup(game.sim)
   game.sim.hero.hp-=100;game.sim.skill()
   for i in range(25):game._process(.016)
   await shot("skill-"+key);check(game.world.effect_nodes.size()>0,key+" renders capped skill effects")

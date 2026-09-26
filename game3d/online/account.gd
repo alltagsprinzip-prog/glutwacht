@@ -1,5 +1,5 @@
 extends Node
-# Browser session is stored separately from village files and exports. Never store passwords.
+# Sessions stay separate from village exports. Passwords are never persisted.
 var url=""
 var public_key=""
 var token=""
@@ -16,21 +16,49 @@ var pending:Dictionary={}
 var pending_restore:Dictionary={}
 var dirty=false
 var storage_enabled=true
+var native_store=preload("res://game3d/online/native_session_store.gd").new()
+var email_history_path="user://login-emails.json"
 func persist_session():
- if not storage_enabled or not OS.has_feature("web"):return
- var value=JSON.stringify({"access_token":token,"refresh_token":refresh_token,"expires_at":expires_at,"user_id":user_id,"device_id":device_id})
- JavaScriptBridge.eval("try{localStorage.setItem('glutwacht.auth.v1',"+JSON.stringify(value)+")}catch(e){}")
+ if not storage_enabled:return
+ var value={"access_token":token,"refresh_token":refresh_token,"expires_at":expires_at,"user_id":user_id,"device_id":device_id}
+ if OS.has_feature("web"):
+  JavaScriptBridge.eval("try{localStorage.setItem('glutwacht.auth.v1',"+JSON.stringify(JSON.stringify(value))+")}catch(e){}")
+ elif not native_store.save_session(value):status="Angemeldet · Sitzung konnte nicht gespeichert werden"
+func email_history() -> Array:
+ if not storage_enabled:return []
+ var raw=""
+ if OS.has_feature("web"):
+  var stored=JavaScriptBridge.eval("(()=>{try{return localStorage.getItem('glutwacht.emails.v1')||'[]'}catch(e){return '[]'}})()",true)
+  if stored is String:raw=stored
+ elif FileAccess.file_exists(email_history_path):raw=FileAccess.get_file_as_string(email_history_path)
+ var values=JSON.parse_string(raw) if not raw.is_empty() else []
+ return values.filter(func(v):return v is String and v.length()<255 and "@" in v).slice(0,5) if values is Array else []
+func remember_email(email:String):
+ if not storage_enabled:return
+ var normalized=email.strip_edges().to_lower();var values=email_history();values.erase(normalized);values.push_front(normalized);write_email_history(values.slice(0,5))
+func write_email_history(values:Array):
+ if not storage_enabled:return
+ if OS.has_feature("web"):JavaScriptBridge.eval("try{localStorage.setItem('glutwacht.emails.v1',"+JSON.stringify(JSON.stringify(values))+")}catch(e){}")
+ else:
+  var f=FileAccess.open(email_history_path,FileAccess.WRITE)
+  if f:f.store_string(JSON.stringify(values));f.close();native_store.protect(email_history_path)
 func restore_session() -> Dictionary:
- if not OS.has_feature("web"):return {"ok":false}
- var raw=JavaScriptBridge.eval("(()=>{try{return localStorage.getItem('glutwacht.auth.v1')}catch(e){return null}})()",true)
- if not raw is String:return {"ok":false}
- var saved=JSON.parse_string(raw)
- if not saved is Dictionary:return {"ok":false}
+ if not storage_enabled:return {"ok":false}
+ var saved={}
+ if OS.has_feature("web"):
+  var raw=JavaScriptBridge.eval("(()=>{try{return localStorage.getItem('glutwacht.auth.v1')}catch(e){return null}})()",true)
+  if raw is String:
+   var decoded=JSON.parse_string(raw)
+   if decoded is Dictionary:saved=decoded
+ else:saved=native_store.load_session()
+ if saved.is_empty():return {"ok":false}
  token=String(saved.get("access_token",""));refresh_token=String(saved.get("refresh_token",""));user_id=String(saved.get("user_id",""));expires_at=float(saved.get("expires_at",0));device_id=String(saved.get("device_id",uuid()))
  var session=await ensure_session()
  if not session.ok:return session
  var checked=await call_api("/auth/v1/user",HTTPClient.METHOD_GET)
- if not checked.ok:return checked
+ if not checked.ok:
+  if int(checked.get("http_status",0))==401:logout()
+  return checked
  if not checked.data is Dictionary or checked.data.get("id","")!=user_id:
   logout();return {"ok":false,"message":"Bitte erneut anmelden."}
  return {"ok":true}
@@ -70,7 +98,7 @@ func call_api(path:String,method:int,body:Dictionary={}) -> Dictionary:
  # remains exposed by CORS. A second inflate fails with err != 0 && err != 1.
  http.accept_gzip=not OS.has_feature("web")
  var headers=PackedStringArray(["apikey: "+public_key,"Content-Type: application/json"])
- if not token.is_empty():headers.append("Authorization: Bearer "+token)
+ if not token.is_empty() and not path.begins_with("/auth/v1/token"):headers.append("Authorization: Bearer "+token)
  var error=http.request(url+path,headers,method,"" if method==HTTPClient.METHOD_GET else JSON.stringify(body))
  if error!=OK:busy=false;http.queue_free();return {"ok":false,"message":"Verbindung konnte nicht gestartet werden."}
  var result=await http.request_completed
@@ -92,7 +120,7 @@ func call_api(path:String,method:int,body:Dictionary={}) -> Dictionary:
    match String(parsed.get("message","")):
     "revision_conflict":message="Neuerer Cloud-Stand vorhanden. Erst laden; nichts wurde überschrieben."
     "other_device_active":message="Ein anderes Gerät spielt gerade. Warte mindestens 90 Sekunden."
-  return {"ok":false,"message":message,"code":String(parsed.get("message","")) if parsed is Dictionary else "http_error"}
+  return {"ok":false,"message":message,"http_status":int(result[1]),"code":String(parsed.get("error_code",parsed.get("code",parsed.get("message","")))) if parsed is Dictionary and path.begins_with("/auth/") else (String(parsed.get("message","")) if parsed is Dictionary else "http_error")}
  return {"ok":true,"data":parsed}
 func login(email:String,password:String,register:bool=false,redirect:String="") -> Dictionary:
  if signed_in():return {"ok":false,"message":"Zuerst das aktuelle Konto abmelden."}
@@ -105,6 +133,7 @@ func login(email:String,password:String,register:bool=false,redirect:String="") 
  if not payload is Dictionary:return {"ok":false,"message":"Ungültige Serverantwort."}
  if not payload.has("access_token"):return {"ok":false,"message":"Bitte die Bestätigungs-E-Mail öffnen und danach anmelden."}
  if not accept_session(payload):return {"ok":false,"message":"Ungültige Anmeldung."}
+ remember_email(email)
  revision=0;loaded=false;pending.clear()
  status="Angemeldet"
  return {"ok":signed_in()}
@@ -134,6 +163,7 @@ func upload(snapshot:Dictionary) -> Dictionary:
  else:status="Cloud-Sicherung ausstehend"
  return result
 func logout():
+ if storage_enabled and not OS.has_feature("web"):native_store.clear()
  if storage_enabled and OS.has_feature("web"):JavaScriptBridge.eval("try{localStorage.removeItem('glutwacht.auth.v1')}catch(e){}")
  token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();pending_restore.clear();status="Nicht angemeldet"
 
@@ -153,7 +183,9 @@ func ensure_session() -> Dictionary:
  if expires_at==0 or Time.get_unix_time_from_system()<expires_at-60:return {"ok":true}
  if refresh_token.is_empty():return {"ok":false,"message":"Sitzung abgelaufen. Bitte erneut anmelden; dein Dorf bleibt lokal erhalten."}
  var result=await call_api("/auth/v1/token?grant_type=refresh_token",HTTPClient.METHOD_POST,{"refresh_token":refresh_token})
- if not result.ok:return result
+ if not result.ok:
+  if int(result.get("http_status",0)) in [400,401]:logout()
+  return result
  if not result.data is Dictionary or not accept_session(result.data,user_id):return {"ok":false,"message":"Sitzung konnte nicht sicher erneuert werden."}
  return {"ok":true}
 func request_recovery(email:String,redirect:String) -> Dictionary:

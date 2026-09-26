@@ -271,7 +271,7 @@ func _process(dt):
    save()
    if sim.mode=="home":
     var old_dialog=dialog;var old_building=selected_building;var gems_earned=progress.recent_gems
-    refresh_home()
+    refresh_home();tone("build_done")
     for site in completed_sites:sim.effects.append({"kind":"skill","pos":site,"life":1.1,"max":1.1,"color":Color("ffdf80")})
     if old_dialog=="building":open_building(old_building)
     elif old_dialog=="upgrades":open_upgrades()
@@ -434,7 +434,7 @@ func save():
    account.status="Lokal gesichert · Cloud ausstehend"
    if not cloud_sync_paused and cloud_clock>=0:call_deferred("sync_cloud")
 func tone(kind):
- if sound and progress.data.sound and sound_time<=0:sound_time=.14;sound.play("equip" if kind=="click" else kind)
+ if sound and progress.data.sound:sound.play("click" if kind=="click" else kind)
 func toast(text:String):
  if toast_label:toast_label.text=text;toast_time=4
 func collect_resources():
@@ -515,9 +515,25 @@ func open_catalog():
   label(p,d.name,Rect2(x+8,y+106,216,28),18,GOLD,true)
   var unlocked=Catalog.unlocked(k,int(progress.data.hall));var cc=d.cost
   if unlocked:costs(p,cc,Vector2(x+10,y+141),219,13)
-  else:icon(p,"lock",Rect2(x+18,y+139,30,30));label(p,"Haupthaus %d"%Catalog.required_hall(k),Rect2(x+56,y+140,158,31),16)
-  var b=button(p,"BAUEN  %d/%d"%[progress.count_kind(k),Catalog.building_limit(k,int(progress.data.hall))] if unlocked else "GESPERRT",Rect2(x+10,y+177,212,40),func():begin_build(k),unlocked)
-  b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=Catalog.building_limit(k,int(progress.data.hall)) or (k!="wall" and progress.free_builders()==0)
+  else:icon(p,"hall",Rect2(x+18,y+139,30,30));label(p,"Haupthaus Lv. %d"%Catalog.required_hall(k),Rect2(x+56,y+140,158,31),15)
+  var reason=""
+  if not unlocked:reason="Benötigt Haupthaus Level %d (aktuell %d)."%[Catalog.required_hall(k),progress.data.hall]
+  elif progress.count_kind(k)>=Catalog.building_limit(k,int(progress.data.hall)):reason="Gebäudelimit erreicht. Die Bauübersicht zeigt die Freischaltungen der nächsten Haupthausstufe."
+  elif k!="wall" and progress.free_builders()==0:reason="Alle Bauarbeiter sind beschäftigt. Warte auf einen Bauabschluss."
+  elif not progress.affordable(cc):reason="Es fehlen Rohstoffe. Die benötigten Mengen stehen auf der Karte."
+  var caption="BAUEN  %d/%d"%[progress.count_kind(k),Catalog.building_limit(k,int(progress.data.hall))] if reason.is_empty() else ("HAUPTHAUS LV. %d"%Catalog.required_hall(k) if not unlocked else "WARUM GESPERRT?")
+  var explanation=reason
+  var b=button(p,caption,Rect2(x+10,y+177,212,40),func():
+   if explanation.is_empty():begin_build(k)
+   else:show_build_requirement(k,explanation),reason.is_empty())
+  b.add_theme_font_size_override("font_size",16);b.tooltip_text=reason
+func show_build_requirement(kind:String,reason:String):
+ var p=open_dialog("build_requirement",Catalog.BUILD[kind].name,"")
+ icon(p,"hall" if not Catalog.unlocked(kind,int(progress.data.hall)) else "lock",Rect2(360,100,120,110))
+ var message=label(p,"",Rect2(36,228,788,145),25,GOLD,true);message.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;message.text=reason
+ button(p,"Zur Bauauswahl",Rect2(36,421,378,65),func():open_catalog())
+ button(p,"Haupthaus ansehen",Rect2(432,421,390,65),func():open_building("hall"),true)
+
 func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
@@ -713,7 +729,7 @@ func open_campaign_stage(index:int):
 func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
 func start_raid():
  deploy_group=false
- if sim.start(-1,true):close_dialog();result_shown=false;deploying="hero";world.setup(sim);build_hud();tone("equip")
+ if sim.start(-1,true):close_dialog();result_shown=false;deploying="hero";world.setup(sim);build_hud();tone("battle_start")
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
 func end_raid():
@@ -897,7 +913,7 @@ func open_account():
   button(p,"Abmelden" if require_login else "Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
  if OS.has_feature("web") and bool(JavaScriptBridge.eval("!!window.GlutwachtAccount",true)):
   JavaScriptBridge.eval("window.GlutwachtAccount.show("+JSON.stringify(account_notice)+")");return
- if OS.has_feature("ios"):
+ if not OS.has_feature("web"):
   var form=load("res://game3d/ui/native_account_form.gd").new();p.add_child(form);form.configure(self,p.size);return
  var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
  var password=LineEdit.new();password.placeholder_text="Passwort · bei Registrierung mindestens 12 Zeichen";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)

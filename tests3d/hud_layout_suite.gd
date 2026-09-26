@@ -13,7 +13,7 @@ func run():
  for mode in ["home","scout","raid"]:
   if mode=="scout":game.open_raid()
   elif mode=="raid":game.start_raid()
-  var buttons=game.hud.find_children("*","Button",true,false)
+  var buttons=game.hud.find_children("*","Button",true,false).filter(func(b):return b.is_visible_in_tree())
   for i in range(buttons.size()):
    var b:Button=buttons[i]
    check(game.safe_rect().encloses(b.get_global_rect()),mode+": control inside viewport "+b.name)

@@ -6,11 +6,13 @@
  style.textContent+=`#gw-account{background:linear-gradient(145deg,#22646e,#428a78);color:#fff8e8}#gw-account form{background:#23565e;border:2px solid #f4d598;border-radius:26px;box-shadow:0 12px 32px #163a4244}#gw-account h1{color:#fff0b6}#gw-account input{background:#184851;border-color:#b7d6cb}#gw-account button{background:#286b78;border-color:#f4d598}#gw-account button[type=submit]{background:#c95b20}#gw-account small{color:#e0ede5}`;
  document.head.appendChild(style);
  const panel=document.createElement('section');panel.id='gw-account';panel.hidden=true;panel.setAttribute('aria-label','Glutwacht Konto');
- panel.innerHTML=`<form novalidate><h1>Glutwacht</h1><p>Anmelden oder ein eigenes Konto erstellen.</p><label for="gw-email">E-Mail</label><input id="gw-email" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required><label for="gw-password">Passwort</label><input id="gw-password" name="password" type="password" autocomplete="current-password" required><small>Bei Registrierung mindestens 12 Zeichen.</small><p id="gw-notice" role="status" aria-live="polite"></p><div class="actions"><button type="submit">Anmelden</button><button type="button" id="gw-register">Registrieren</button></div><button type="button" id="gw-recover" class="recovery">Passwort vergessen</button></form>`;
+ panel.innerHTML=`<form novalidate><h1>Glutwacht</h1><p>Anmelden oder ein eigenes Konto erstellen.</p><label for="gw-email">E-Mail</label><input id="gw-email" list="gw-saved-emails" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required><datalist id="gw-saved-emails"></datalist><label for="gw-password">Passwort</label><input id="gw-password" name="password" type="password" autocomplete="current-password" required><small>Bei Registrierung mindestens 12 Zeichen.</small><p id="gw-notice" role="status" aria-live="polite"></p><div class="actions"><button type="submit">Anmelden</button><button type="button" id="gw-register">Registrieren</button></div><button type="button" id="gw-recover" class="recovery">Passwort vergessen</button></form>`;
  document.body.appendChild(panel);
  panel.querySelector('h1').textContent='Willkommen in Glutwacht';
  panel.querySelector('p').textContent='Dein Dorf. Deine Helden. Dein nächstes Abenteuer.';
  const email=panel.querySelector('#gw-email'),password=panel.querySelector('#gw-password'),notice=panel.querySelector('#gw-notice');
+ function rememberedEmails(){try{const v=JSON.parse(localStorage.getItem('glutwacht.emails.v1')||'[]');return Array.isArray(v)?v.filter(x=>typeof x==='string'&&x.includes('@')).slice(0,5):[];}catch{return [];}}
+ function refreshEmails(){const list=panel.querySelector('#gw-saved-emails');list.replaceChildren();for(const value of rememberedEmails()){const option=document.createElement('option');option.value=value;list.appendChild(option);}if(!email.value)email.value=rememberedEmails()[0]||'';}
  let pending=null;
  function disabled(value){panel.querySelectorAll('button').forEach(b=>b.disabled=value);}
  function submit(action){
@@ -27,7 +29,7 @@
  // Stop canvas keyboard handlers from consuming native form typing.
  for(const type of ['keydown','keyup','keypress'])panel.addEventListener(type,e=>e.stopPropagation());
  window.GlutwachtAccount={
-  show(message){panel.hidden=false;notice.textContent=message||'Dein Fortschritt wird automatisch in deinem Konto gespeichert.';disabled(false);},
+  show(message){refreshEmails();panel.hidden=false;notice.textContent=message||'Dein Fortschritt wird automatisch in deinem Konto gespeichert.';disabled(false);},
   hide(){panel.hidden=true;password.value='';},
   take(){const result=pending;pending=null;return result?JSON.stringify(result):null;}
  };

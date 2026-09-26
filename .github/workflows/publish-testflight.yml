@@ -30,6 +30,12 @@ jobs:
           python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
           python3 tools/check_godot.py logs/native-account.log godot --headless --path . --script tests3d/native_account_suite.gd
           python3 tools/check_godot.py logs/account-save.log godot --headless --path . --script tests3d/account_save_suite.gd
+      - name: Persistent native sessions, remembered emails and automatic hero combat
+        run: |
+          python3 tools/check_godot.py logs/native-session.log godot --headless --path . --script tests3d/native_session_suite.gd
+          python3 tools/check_godot.py logs/comfort.log godot --headless --path . --script tests3d/comfort_suite.gd
+          python3 tools/check_godot.py logs/hud-rules.log godot --headless --path . --script tests3d/hud_rules.gd
+          python3 tools/check_godot.py logs/release-gate.log godot --headless --path . --script tests3d/release_gate.gd
       - name: Cloud recovery, retry safety and restoration freeze
         run: python3 tools/check_godot.py logs/cloud-recovery.log godot --headless --path . --script tests3d/cloud_recovery_suite.gd
       - name: Quest progression and battle reports
@@ -120,6 +126,6 @@ jobs:
           python3 tools/check_godot.py logs/windows-export.log godot --headless --path . --export-release Windows builds/windows/Glutwacht.exe
       - uses: actions/upload-artifact@v4
         with:
-          name: Glutwacht-Windows-0.13.1
+          name: Glutwacht-Windows-0.14.0
           path: builds/windows
           retention-days: 30

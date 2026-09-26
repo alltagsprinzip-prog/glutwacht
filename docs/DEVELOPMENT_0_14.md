@@ -13,7 +13,7 @@ Continues 0.13.1; no new account system, reset or replacement repository.
 
 ## Evidence and validation
 - Initial render-only review at 52a77c8: 34 new assertions plus 54 simulated touch assertions passed; four real Godot screenshots reviewed. Corrected overbright imported rocks/bridge and sync-label overlap afterward.
-- Local final logic: 37 Heroic assertions (viewport sizes, persistence, collection idempotence, deployment, camera), 187 release/migration assertions, 204 HUD layout assertions. Account save 37, native account 9, cloud recovery 10, progression 106, campaign 68 passed during development.
+- Local final logic: 40 Heroic assertions (viewport sizes, persistence, collection idempotence, deployment, camera), 187 release/migration assertions, 144 visible-control HUD layout assertions. Account save 37, native account 9, cloud recovery 10, progression 106, campaign 68 passed during development.
 - Native publication workflow requires fresh release, HUD, Heroic render, account, recovery, campaign, tutorial, social and simulated touch checks before producing signed iOS and Windows builds. Final CI results supersede these local counts.
 - Render metrics explicitly identify CI software rendering and replay conditions. They are not measurements of iPhone GPU performance.
 
@@ -23,3 +23,12 @@ Continues 0.13.1; no new account system, reset or replacement repository.
 - Clan/friend systems and their permissions are preserved, not extended in this visual pass. This release does not turn private client snapshots into an authoritative economy or enable secure PvP.
 - Do not downgrade after placing buildings in expanded territory: old clients still clamp to the old bounds. Saves remain schema 7; only supported forward loading is covered.
 - TestFlight availability is reported only after Apple processing and group assignment are checked. A successful upload is not device acceptance.
+
+## Session, combat and clarity follow-up
+- Native login now persists separately from village exports in an app-private encrypted file, restores the identity through the server and saves rotated refresh tokens. Temporary network failure retains the session for retry; revoked tokens and explicit logout clear it. No password is stored. This is device-bound file encryption, not an Apple Keychain / Windows Credential Manager integration.
+- Up to five successful login addresses are remembered, most recent prefilled, native suggestions after three characters; addresses can be removed. Web form exposes saved addresses through a datalist and existing browser autocomplete. Actual iOS keyboard/password-manager behavior still needs hardware verification.
+- Autoangriff appears after manual hero deployment. It approaches and attacks enemies; joystick input immediately switches back to manual. It does not automatically spend skills or potions.
+- Locked catalog cards explain the actual main-building level with its icon, limits, builder availability or missing resources; a reachable explanation leads back to the catalog or main building.
+- Original procedural combat audio now separates swing, bow, shield, impact and siege cues with three variants, pitch variation, voice pooling and per-cue throttling. Construction completion and battle start have distinct cues. These are synthesized effects, not recorded realistic Foley; listening acceptance remains open.
+- Local mocked native-session tests: 13/13; interaction/audio checks: 24/24; account-save 37/37, recovery 10/10, visible HUD 144/144. They are not real multi-device or signed-in backend acceptance.
+- Static scenery batching excludes ships and selectable obstacles. At 1560×720 on Linux llvmpipe LLVM 20.1.2, the 60-frame village replay changed from 1006 to 705 draw calls and 27677 ms to 25878 ms. These software-render timings do not predict iPhone frame rate.

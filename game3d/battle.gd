@@ -34,6 +34,7 @@ var first_target=""
 var reserve={"melee":0,"archers":0,"shield":0,"siege":0}
 var manual_deployment=false
 var hero_deployed=true
+var hero_auto_attack=false
 func friendly_units() -> Array:return ([hero] if hero_deployed else [])+living(allies)
 func deploy_hero(pos:Vector2) -> bool:
  if mode!="raid" or result!="" or hero_deployed or not deployment_valid(pos):return false
@@ -63,7 +64,7 @@ func make_hero(pos:Vector2):
   if site.kind=="hero_hall":hero.hp+=15*int(site.level);hero.max_hp=hero.hp
  hero.class_key=hero_key()
 func home():
- hero_deployed=true
+ hero_deployed=true;hero_auto_attack=false
  campaign_index=-1
  mode="home";time=0;pending_hits.clear();pending_skills.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0,"shield":0,"siege":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
 func soldier(kind:String,pos:Vector2) -> Dictionary:
@@ -123,7 +124,7 @@ func home_buildings():
   var item=building(b.kind,Vector2(b.x,b.z),Catalog.BUILD[b.kind].radius,hp,b.level,b.uid,"ally",b.rotation)
   item.construction=b.construction;item.stock=float(b.get("stock",0.0));buildings.append(item)
 func reset_battle():
- hero_deployed=true
+ hero_deployed=true;hero_auto_attack=false
  pending_hits.clear();pending_skills.clear();audio_events.clear();looted={"wood":0,"stone":0,"gold":0}
  time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0,"shield":0,"siege":0}
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
@@ -181,6 +182,7 @@ func animate_attack(u:Dictionary,duration:float):
  u.attack_time=duration;u.attack_total=duration;u.attack_seq+=1;u.anim="attack";u.cast_kind="normal"
 func queue_hit(u:Dictionary,target:Dictionary,amount:float,reach:float,ranged:bool=false,color:Color=Color("ffd98c"),delay:float=-1):
  var windup=delay if delay>=0 else float(u.get("attack_total",.6))*.52
+ if audio_events.size()<8:audio_events.append("siege" if u.kind=="siege" else ("bow" if ranged else "swing"))
  pending_hits.append({"source":u,"target":target,"damage":amount,"reach":reach,"ranged":ranged,"color":color,"wait":windup,"stage":"windup"})
 func update_hits(dt:float):
  for i in range(pending_hits.size()-1,-1,-1):
@@ -294,7 +296,7 @@ func damage(u:Dictionary,amount:float):
  if u==hero and (not hero_deployed or invulnerable>0):return
  var dealt=minf(u.hp,amount);u.hp=maxf(0,u.hp-amount);u.flash=.16
  accrue_loot(u)
- if audio_events.size()<4:audio_events.append("hurt" if u==hero else "hit")
+ if audio_events.size()<4:audio_events.append("hurt" if u==hero else ("shield" if u.kind=="shield" else "hit"))
  if combat_texts.size()<28:combat_texts.append({"pos":u.pos,"value":"-%d"%ceili(dealt),"heal":false,"life":.9,"max":.9})
  if u.get("team","")=="enemy":alarm=true
  if u.hp<=0:
@@ -315,6 +317,7 @@ func strike():
    if distance(hero,t)<c.range and (t.pos-hero.pos).normalized().dot(facing)>-.2:queue_hit(hero,t,hero.damage,c.range,false,Color(c.color))
 func skill():
  if not hero_deployed or not active() or result!="" or skill_cd>0 or hero.hp<=0:return
+ if audio_events.size()<8:audio_events.append("skill")
  var c=stats();var key=hero_key();skill_cd=maxf(2,c.skill_cd-.4*training("skill"))
  var duration=.8 if key!="mage" else 1.2
  animate_attack(hero,duration);hero.cast_kind="skill";attack_cd=maxf(attack_cd,duration)
@@ -384,6 +387,12 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
   u.stagger=maxf(0,float(u.get("stagger",0))-dt);u.flash=maxf(0,u.flash-dt);u.attack_time=maxf(0,u.attack_time-dt)
   if u.hp<=0:u.dead_time+=dt
   u.anim="attack" if u.attack_time>0 else "Idle"
+ if hero_deployed and input.length()>.1:hero_auto_attack=false
+ if hero_auto_attack and hero_deployed and active() and hero.hp>0:
+  var target=army_target(hero)
+  if target!=null:
+   if distance(hero,target)>float(stats().range)*.9:approach(hero,target,float(stats().speed),dt)
+   else:strike()
  if hero_deployed and input.length()>.1 and hero.hp>0 and float(hero.get("dash_time",0))<=0:facing=input.normalized();move(hero,input,stats().speed,dt)
  hero.facing=facing
  if mode=="home":

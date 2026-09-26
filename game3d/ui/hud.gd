@@ -102,6 +102,8 @@ static func combat(g):
  for key in ["deploy_single","deploy_group"]:g.hud_widgets[key].add_theme_font_size_override("font_size",24)
  g.hud_widgets.deploy_hint=text(g,"",Rect2(275,110,735,45),22,TEXT,true)
  g.hud_widgets.deploy_hero=g.button(g.hud,"Held einsetzen",Rect2(20,413,216,64),func():g.choose_deploy("hero"),true)
+ g.hud_widgets.auto_attack=g.button(g.hud,"Autoangriff: AUS",Rect2(20,413,216,64),func():g.sim.hero_auto_attack=not g.sim.hero_auto_attack;update(g))
+ g.hud_widgets.auto_attack.add_theme_font_size_override("font_size",21)
  g.hud_widgets.follow=g.button(g.hud,"Zum Helden",Rect2(1088,316,172,66),func():g.world.follow_hero=true)
  g.hud_widgets.follow.add_theme_font_size_override("font_size",22)
  g.create_stick()
@@ -164,6 +166,9 @@ static func update(g):
  if g.hud_widgets.has("deploy_hero"):
   g.hud_widgets.deploy_hero.visible=not g.sim.hero_deployed
   g.hud_widgets.follow.disabled=not g.sim.hero_deployed
+  g.hud_widgets.auto_attack.visible=g.sim.hero_deployed
+  g.hud_widgets.auto_attack.text="Autoangriff: AN" if g.sim.hero_auto_attack else "Autoangriff: AUS"
+  g.hud_widgets.auto_attack.add_theme_stylebox_override("normal",g.skin("selected" if g.sim.hero_auto_attack else "blue"))
  if g.hud_widgets.has("deploy_group"):
   var remaining=int(g.sim.reserve.get(g.deploying,0))
   for key in ["deploy_group","deploy_single"]:g.hud_widgets[key].visible=remaining>0

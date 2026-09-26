@@ -10,7 +10,7 @@ func check(ok:bool,title:String):
 func write_raw(path:String,d):
  var f=FileAccess.open(path,FileAccess.WRITE);f.store_string(JSON.stringify(d));f.close()
 func fixture(key:String):
- var p=P.new();p.choose_hero(key);var b=B.new(p.data);b.start(0,true);b.hero.pos=Vector2.ZERO;b.buildings=[];b.traps=[];b.raid_building_total=1;b.enemies=[];b.allies=[];return b
+ var p=P.new();p.choose_hero(key);var b=B.new(p.data);b.start(0,true);b.deploy_hero(b.entry_position());b.hero.pos=Vector2.ZERO;b.buildings=[];b.traps=[];b.raid_building_total=1;b.enemies=[];b.allies=[];return b
 func _initialize():
  var path="user://qa-hud-save.json";var now=Time.get_unix_time_from_system()
  var p=P.new();p.choose_hero("ninja");p.data.hall=5;p.data.barracks=4;p.data.smithy=3;p.data.wood=3421;p.data.stone=2314;p.data.gold=1783;p.data.gems=97;p.data.wins=12;p.data.xp.ninja=1900;p.data.sword=true;p.data.builder_bonus=1
@@ -60,7 +60,7 @@ func _initialize():
   check(b.skill_cd>0,key+" ability retains cooldown")
  # Full command-driven raid, no manipulation of enemy health or combat damage.
  p=P.new();p.choose_hero("warrior");p.data.hall=3;p.data.barracks=3;p.data.melee=5;p.data.archers=5
- var raid=B.new(p.data);raid.start(0,true)
+ var raid=B.new(p.data);raid.start(0,true);raid.deploy_hero(raid.entry_position())
  for kind in ["melee","archers"]:
   for i in range(5):check(raid.deploy(kind,Vector2(-5+i*2,27)),"complete raid deploy "+kind+str(i))
  for i in range(3601):
