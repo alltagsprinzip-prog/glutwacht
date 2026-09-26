@@ -1,8 +1,9 @@
 shader_type spatial;
 render_mode diffuse_lambert_wrap;
+uniform float length=15.0;
 float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
 void fragment(){
- vec2 p=UV*vec2(4.0,30.0);p.x+=mod(floor(p.y),2.0)*.5;
+ vec2 p=UV*vec2(4.0,length*2.0);p.x+=mod(floor(p.y),2.0)*.5;
  vec2 cell=floor(p);vec2 edge=abs(fract(p)-.5);
  float stone=1.0-smoothstep(.37,.48,max(edge.x,edge.y));
  float shade=hash(cell);

@@ -1,6 +1,7 @@
 extends RefCounted
 # Hand-built realtime art study. Batched geometry: one draw call per structure.
 # No generated background, no changes to account or economy data.
+static var shared_material:StandardMaterial3D
 var surface=SurfaceTool.new()
 var triangles=0
 var rng=RandomNumberGenerator.new()
@@ -202,6 +203,7 @@ func landscape(parent:Node3D,buildings:Array):
 func finish(parent:Node3D,title:String):
  surface.index()
  var model=MeshInstance3D.new();model.name=title;model.mesh=surface.commit()
- var mat=StandardMaterial3D.new();mat.vertex_color_use_as_albedo=true;mat.roughness=.79;mat.cull_mode=BaseMaterial3D.CULL_DISABLED
- model.material_override=mat;parent.add_child(model);model.set_meta("art_triangles",triangles)
+ if shared_material==null:
+  shared_material=StandardMaterial3D.new();shared_material.vertex_color_use_as_albedo=true;shared_material.roughness=.79;shared_material.cull_mode=BaseMaterial3D.CULL_DISABLED
+ model.material_override=shared_material;parent.add_child(model);model.set_meta("art_triangles",triangles)
  return model

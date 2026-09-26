@@ -138,6 +138,7 @@ func setup(sim):
  terrain()
  if art_preview and mode=="home":ArtVillage.new().landscape(landscape,sim.buildings)
  else:village_paths(sim);scenery(sim)
+ batch_static_landscape()
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
@@ -151,6 +152,45 @@ func setup(sim):
  for axis in range(4):
   var p=Vector3(0,.065,27) if axis==0 else (Vector3(0,.065,-27) if axis==1 else (Vector3(27,.065,0) if axis==2 else Vector3(-27,.065,0)))
   box(edges,p,Vector3(54,.04,.32) if axis<2 else Vector3(.32,.04,54),Color("f1b973"))
+func batch_static_landscape():
+ # Merge only immutable decoration, in spatial cells. Moving boats and selectable
+ # obstacles remain independent; obstacles are created after this call.
+ var buckets={}
+ for node in landscape.find_children("*","MeshInstance3D",true,false):
+  var moving=false
+  for boat in boats:
+   if boat.root==node or boat.root.is_ancestor_of(node):moving=true;break
+  if moving or node.mesh==null:continue
+  var transform=landscape.global_transform.affine_inverse()*node.global_transform
+  var cell=Vector2i(floori(transform.origin.x/24),floori(transform.origin.z/24))
+  for surface in range(node.mesh.get_surface_count()):
+   var mat=node.get_active_material(surface)
+   if mat==null:continue
+   var arrays=node.mesh.surface_get_arrays(surface);var format=""
+   for array in arrays:format+="1" if array!=null and array.size()>0 else "0"
+   var key=str(mat.get_instance_id())+str(cell)+format+str(node.cast_shadow)
+   if not buckets.has(key):buckets[key]={"material":mat,"shadow":node.cast_shadow,"parts":[]}
+   buckets[key].parts.append({"node":node,"surface":surface,"transform":transform})
+ var removed={}
+ for bucket in buckets.values():
+  if bucket.parts.size()<2:continue
+  var joined=SurfaceTool.new();joined.begin(Mesh.PRIMITIVE_TRIANGLES)
+  for part in bucket.parts:
+   joined.append_from(part.node.mesh,part.surface,part.transform)
+   # Hide the merged surface without removing unmerged sibling surfaces.
+   if not removed.has(part.node):removed[part.node]=[]
+   removed[part.node].append(part.surface)
+  var batch=mesh_node(joined.commit(),Vector3.ZERO,bucket.material,landscape);batch.name="StaticLandscapeBatch";batch.cast_shadow=bucket.shadow
+ for node in removed:
+  if removed[node].size()==node.mesh.get_surface_count():node.queue_free()
+  else:
+   var remainder=ArrayMesh.new()
+   for surface in range(node.mesh.get_surface_count()):
+    if surface in removed[node]:continue
+    remainder.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,node.mesh.surface_get_arrays(surface))
+    remainder.surface_set_material(remainder.get_surface_count()-1,node.get_active_material(surface))
+   node.mesh=remainder
+   for surface in range(remainder.get_surface_count()):node.set_surface_override_material(surface,null)
 func terrain():
  var surf=SurfaceTool.new();surf.begin(Mesh.PRIMITIVE_TRIANGLES)
  for x in range(-82,82,2):
@@ -192,7 +232,7 @@ func village_paths(sim):
   var length=start.distance_to(end)
   if length>.1:
    var path=PlaneMesh.new();path.size=Vector2(2.0,length)
-   var gravel=ShaderMaterial.new();gravel.shader=load("res://game3d/path.gdshader")
+   var gravel=ShaderMaterial.new();gravel.shader=load("res://game3d/path.gdshader");gravel.set_shader_parameter("length",length)
    var middle=(start+end)*.5;var paving=mesh_node(path,Vector3(middle.x,.025,middle.y),gravel,landscape);paving.rotation.y=atan2(end.x-start.x,end.y-start.y)
  # A small meeting place rather than a square tile under each house.
  disc(3.4,Color("928163"),Vector3(0,.026,8),landscape)

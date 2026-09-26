@@ -50,9 +50,9 @@ const cloud=require('./mock_cloud.cjs');
   assert.equal((await state()).hero,'warrior');
   const start=await state();
   const cdp=await context.newCDPSession(page);
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:145,y:502,id:4}]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:145,y:614,id:4}]});
   await page.waitForFunction(p=>Math.hypot(window.__glutwacht.hero_x-p.hero_x,window.__glutwacht.hero_z-p.hero_z)>1,start,{timeout:30000});
-  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:300,y:502,id:4}]});
+  await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:300,y:614,id:4}]});
   await page.waitForTimeout(500);
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForTimeout(1200);
@@ -60,7 +60,7 @@ const cloud=require('./mock_cloud.cjs');
   console.log('Joystick observations',JSON.stringify({start,moved}));
   assert.ok(Math.hypot(moved.hero_x-start.hero_x,moved.hero_z-start.hero_z)>1,'joystick moves hero');
   await page.screenshot({path:'logs/browser/home.png'});
-  for(const [x,y,name,closeX] of [[366,654,'catalog',1104],[1215,140,'shop',1025]]){
+  for(const [x,y,name,closeX] of [[436,654,'catalog',1104],[1215,140,'shop',1025]]){
    await tap(x,y);await wait(new Function(`return window.__glutwacht?.dialog===${JSON.stringify(name)}`));
    await tap(closeX,name==='catalog'?107:129);
    await wait(()=>window.__glutwacht?.dialog==='');
@@ -71,6 +71,11 @@ const cloud=require('./mock_cloud.cjs');
   assert.equal((await state()).gold,start.gold,'resources survive reload');
   await tap(1170,654);await wait(()=>window.__glutwacht?.mode==='scout');
   await tap(1170,653);await wait(()=>window.__glutwacht?.mode==='raid');
+  const heroEntry=(await state()).deployment_points[0];
+  assert.ok(heroEntry,'visible legal hero deployment point');
+  await tap(...heroEntry);
+  await wait(()=>window.__glutwacht.selected_troop==='');
+  await tap(70,220); // choose available warriors after deploying the hero
   for(let i=0;i<5;i++){
    const before=await state();
    assert.ok(before.deployment_points.length,'legal visible deployment point');

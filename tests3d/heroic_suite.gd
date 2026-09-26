@@ -24,7 +24,11 @@ func run():
  g.progress.store_file("user://qa-expanded.json")
  var loaded=load("res://game3d/progress.gd").new();loaded.load_file("user://qa-expanded.json")
  check(loaded.data.structures[0].x==-35 and loaded.data.structures[0].z==30,"new village coordinates survive save reload")
- DirAccess.remove_absolute("user://qa-expanded.json");g.progress.data=saved;g.refresh_home()
+ DirAccess.remove_absolute("user://qa-expanded.json");g.progress.data=saved;g.sim=g.Battle.new(saved);g.refresh_home()
+ await frames()
+ check(g.world.landscape.find_children("StaticLandscapeBatch*","MeshInstance3D",true,false).size()>0,"immutable scenery is batched")
+ check(g.world.boats.all(func(b):return is_instance_valid(b.root) and not b.root.is_queued_for_deletion()),"moving ships excluded from static batches")
+ check(g.world.obstacles.size()==g.progress.data.obstacles.size(),"selectable obstacles remain independent")
  var save_before=JSON.stringify(g.progress.data)
  for viewport in [Vector2i(1280,720),Vector2i(1560,720),Vector2i(1710,720),Vector2i(1440,900)]:
   root.size=viewport;await frames();g.layout_art_preview();g.build_hud()
