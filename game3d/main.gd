@@ -70,16 +70,36 @@ var account_active=false
 var cloud_clock=0.0
 var cloud_sync_paused=false
 var pending_import
+var art_preview=false
 func _ready():
- progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data)
- world=World.new();add_child(world);world.setup(sim)
+ art_preview=art_preview or "--art-preview" in OS.get_cmdline_user_args()
+ if OS.has_feature("web"):art_preview=art_preview or bool(JavaScriptBridge.eval("new URLSearchParams(location.search).get('atelier')==='1'",true))
+ progress=Progress.new()
+ if art_preview:
+  progress.choose_hero("warrior");progress.data.player_name="Grafikprobe"
+  progress.data.tutorial_done=["hero","build","upgrade","train","battle"]
+  progress.data.wood=1100;progress.data.stone=1100;progress.data.gold=1100
+  progress.data.core_positions={"hall":{"x":0,"z":-7},"barracks":{"x":-10,"z":4},"smithy":{"x":11,"z":4}}
+  progress.data.structures[0].x=-13;progress.data.structures[0].z=-10
+  progress.data.structures[1].x=14;progress.data.structures[1].z=-10
+  progress.data.obstacles=[];progress.data.sound=false
+ else:progress.load_file(save_path)
+ sim=Battle.new(progress.data)
+ if art_preview:sim.hero.pos=Vector2(2,6)
+ world=World.new();world.art_preview=art_preview;add_child(world);world.setup(sim)
  var layer=CanvasLayer.new();add_child(layer);ui=Control.new();ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);ui.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(ui)
+ if art_preview:
+  get_window().content_scale_aspect=Window.CONTENT_SCALE_ASPECT_EXPAND
+  get_viewport().size_changed.connect(layout_art_preview);layout_art_preview()
  var theme=Theme.new();theme.default_font_size=28;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
  account=load("res://game3d/online/account.gd").new();add_child(account)
  sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
  if not progress.warning.is_empty():toast(progress.warning)
  if progress.write_blocked:call_deferred("open_save_tools")
- call_deferred("restore_account_start")
+ if not art_preview:call_deferred("restore_account_start")
+func layout_art_preview():
+ ui.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+ ui.size=Vector2(1280,720);ui.position=(get_viewport().get_visible_rect().size-ui.size)*.5
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
  var s=StyleBoxFlat.new()
  s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
@@ -129,6 +149,8 @@ func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Call
  var h=minf(47,rect.size.y-32) if title!="" else minf(46,rect.size.y-12)
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
  if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,CREAM,true)
+ if art_preview:
+  var finish=load("res://game3d/ui/button_finish.gd").new();finish.size=rect.size;finish.round_button=key=="attack" and sim.mode=="home";b.add_child(finish)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
  var index=0
@@ -176,7 +198,7 @@ func _process(dt):
  if not sim:return
  clock+=dt;production_clock+=dt;save_clock+=dt;sound_time=maxf(0,sound_time-dt)
  if production_clock>=1:
-  if OS.has_feature("web"):
+  if OS.has_feature("web") and not art_preview:
    var imported=JavaScriptBridge.eval("window.__glutwachtImportText || null",true)
    if imported is String and imported!="":
     JavaScriptBridge.eval("window.__glutwachtImportText=null",true);prepare_save_import(imported)
@@ -330,6 +352,7 @@ func _notification(what):
   if account_active and not account.busy and not cloud_sync_paused:sync_cloud()
   if not paused and build_kind=="":open_menu()
 func save():
+ if art_preview:return
  if not progress.store_file(save_path):toast(progress.warning);return
  if account_active:
   account.dirty=true;account.save_metadata()
@@ -645,6 +668,7 @@ func open_local_overview(status:bool=false):
  button(p,"Weiter",Rect2(543,474,279,51),func():close_dialog(),true)
 
 func open_save_tools():
+ if art_preview:toast("Grafikprobe: Dein echtes Dorf und deine Sicherungen bleiben unverändert.");return
  var p=open_dialog("saves","Dein lokaler Spielstand","")
  label(p,"Held, Gebäude, Training und Bauzeiten bleiben bei Updates erhalten.",Rect2(29,102,800,59),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  label(p,"Ein anderer Browser oder eine andere Website hat einen eigenen Speicher.\nSichere dein Dorf als Datei, bevor du den Ort wechselst.",Rect2(29,183,800,103),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -664,6 +688,7 @@ func request_save_import():
   JavaScriptBridge.eval("(()=>{const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{const f=i.files[0];if(f&&f.size<1048576)window.__glutwachtImportText=await f.text();};i.click();})();",true)
  else:toast("Sicherungsimport im Browser öffnen.")
 func prepare_save_import(text:String):
+ if art_preview:return
  if text.length()>1048576:toast("Datei ist zu groß.");return
  var parser=JSON.new();var status=parser.parse(text)
  var raw=parser.data if status==OK else null
@@ -715,6 +740,7 @@ func open_inbox():
  label(p,"Hier siehst du deinen Dorfstatus. Nachrichten anderer Spieler sind noch nicht verfügbar.",Rect2(32,374,790,100),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 
 func open_account():
+ if art_preview:toast("Grafikprobe ohne Konto. Dein gespeichertes Dorf liegt unter dem normalen Spiellink.");return
  if account.recovering:open_recovery_password();return
  var p=open_dialog("account","Konto und Cloud","")
  if not account.configured():
@@ -732,6 +758,7 @@ func open_account():
  button(p,"Registrieren",Rect2(434,378,388,65),func():authenticate(email.text,password.text,true))
  button(p,"Passwort vergessen",Rect2(32,461,790,54),func():request_account_recovery(email.text))
 func authenticate(email:String,password:String,register:bool):
+ if art_preview:return
  if account.busy:return
  if email.strip_edges().is_empty() or password.is_empty():toast("E-Mail und Passwort eingeben.");return
  close_dialog();toast("Verbindung wird hergestellt …")
@@ -815,6 +842,7 @@ func activate_local_account(meta:Dictionary):
  if progress.data.hero=="":open_tutorial()
  await sync_cloud()
 func restore_account_start():
+ if art_preview:return
  if OS.has_feature("web") and JavaScriptBridge.eval("!!window.__glutwachtEmailLink",true):
   await check_email_link();return
  var result=await account.restore_session()

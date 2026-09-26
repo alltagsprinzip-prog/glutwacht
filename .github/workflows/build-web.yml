@@ -11,6 +11,31 @@ concurrency:
   group: glutwacht-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  art-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: false
+      - name: Import and verify isolated art preview
+        run: |
+          python3 tools/check_godot.py logs/art-import.log godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/art-rules.log godot --headless --path . --script tests3d/art_preview_suite.gd
+      - name: Render actual playable village and mobile framing
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/art
+        run: |
+          mkdir -p logs/art
+          python3 tools/check_godot.py logs/art-render.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/art_preview_render.gd
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: art-preview-review
+          path: logs
   validate:
     runs-on: ubuntu-latest
     timeout-minutes: 15

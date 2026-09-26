@@ -13,6 +13,9 @@ static func crystal(w,parent:Node,pos:Vector3,size:float,color:Color):
  var m=PrismMesh.new();m.size=Vector3(size,size*2,size);var n=w.mesh_node(m,pos,w.material(color,.25,true),parent);n.rotation.z=.17;return n
 static func draw(w,b:Dictionary,parent:Node3D) -> float:
  var kind=String(b.kind);var level=int(b.level);var tier=int((level-1)/2);var size=float(w.Catalog.BUILD[kind].size)
+ if w.art_preview and w.mode=="home":
+  if kind=="hall":return w.ArtVillage.new().hall(parent,level)
+  if kind in ["barracks","smithy","lumber"]:return w.ArtVillage.new().cottage(parent,kind)
  var stone=Color("b9bba2");var gold=Color("edbb56");var timber=Color("ac773f");var enemy=b.get("team","ally")=="enemy"
  var accent=Color("dc8054") if enemy else Color("328de0")
  var height=3.5

@@ -10,7 +10,7 @@ static func plate(g,rect:Rect2,color:Color=Color("263e46")):
 static func action(g,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false):
  var b=g.icon_button(g.hud,key,title,rect,func():g.tone("click");callback.call(),primary)
  b.set_meta("hud_action",title)
- if b.get_child_count()>1:
+ if b.get_child_count()>1 and b.get_child(1) is Label:
   var caption=b.get_child(1);caption.add_theme_font_size_override("font_size",21)
   caption.position=Vector2(4,rect.size.y-36);caption.size=Vector2(rect.size.x-8,34)
  return b
@@ -123,7 +123,7 @@ static func scout(g):
  var b=action(g,"attack","ANGREIFEN",Rect2(991,597,269,107),func():g.start_raid(),true);b.disabled=g.Catalog.army_count(g.progress.data)==0
 static func update(g):
  if not g.stats:return
- if g.hud_widgets.has("sync"):g.hud_widgets.sync.text=g.account.status if g.account.signed_in() else "Gastdorf · lokal gespeichert"
+ if g.hud_widgets.has("sync"):g.hud_widgets.sync.text="GRAFIKPROBE · separates Testdorf · wird nicht gespeichert" if g.art_preview else (g.account.status if g.account.signed_in() else "Gastdorf · lokal gespeichert")
  for key in g.resource_bars:
   var b=g.resource_bars[key];b.size.x=125.0*clampf(float(g.progress.data[key])/g.progress.storage(),0,1)
   g.resource_labels[key].text=format_number(g.progress.data[key])

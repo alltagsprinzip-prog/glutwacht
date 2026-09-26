@@ -33,6 +33,8 @@ var selection:MeshInstance3D
 var edges:Node3D
 var boats:Array=[]
 var village_clock=0.0
+var art_preview=false
+const ArtVillage=preload("res://game3d/art_village.gd")
 func health_bar(parent:Node3D,height:float,width:float,color:Color) -> Dictionary:
  var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height,0)
  var parts=[]
@@ -120,8 +122,13 @@ func setup(sim):
  if mode=="scout":target_zoom=48;focus=Vector3(0,0,-2)
  elif sim.active():target_zoom=48;focus=Vector3.ZERO
  else:target_zoom=46;focus=Vector3(0,0,1)
+ if art_preview and mode=="home":
+  target_zoom=36;pan=Vector2(0,-3);focus=Vector3(0,0,-3)
+  sky_env.ambient_light_energy=.62;sun.light_energy=.85;sun.light_color=Color("ffe6ba")
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
- terrain();village_paths(sim);scenery(sim)
+ terrain()
+ if art_preview and mode=="home":ArtVillage.new().landscape(landscape,sim.buildings)
+ else:village_paths(sim);scenery(sim)
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
@@ -145,6 +152,8 @@ func terrain():
     surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise).srgb_to_linear());surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
  var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+ if art_preview:
+  mat.set_shader_parameter("grass_dark",Color("30442c"));mat.set_shader_parameter("grass_light",Color("718454"))
  var water=PlaneMesh.new();water.size=Vector2(9,132);water.subdivide_depth=120
  mesh_node(water,Vector3(39,.09,0),water_material(),landscape)
  asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),10.2,"width",PI/2)
