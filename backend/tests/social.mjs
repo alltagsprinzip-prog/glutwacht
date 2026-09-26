@@ -14,7 +14,7 @@ try{
  for(const id of ids)await db.query('insert into auth.users values($1)',[id]);
  await db.exec(readFileSync(new URL('../migrations/001_private_saves.sql',import.meta.url),'utf8'));
  const dir=new URL('../../supabase/migrations/',import.meta.url);
- await db.exec(readFileSync(new URL(readdirSync(dir).find(x=>x.endsWith('_social_foundation.sql')),dir),'utf8'));
+ for(const migration of readdirSync(dir).filter(x=>x.endsWith('.sql')).sort())await db.exec(readFileSync(new URL(migration,dir),'utf8'));
  const tags=[];
  for(let i=0;i<3;i++){
   await login(i);check((await call('state')).enrolled===false,'profile requires opt-in');
@@ -28,8 +28,8 @@ try{
  await login(2);check((await call('state')).incoming.length===0,'unrelated account cannot see requests');
  await login(1);check((await call('state')).incoming.length===1,'recipient sees request');
  await call('accept',{tag:tags[0]});check((await call('state')).friends.length===1,'recipient can accept');
- await db.exec('reset role');await db.query('insert into public.player_saves(user_id,snapshot) values($1,$2)',[ids[0],{version:7,hall:2,barracks:1,smithy:1,hero:'warrior',gold:987,structures:[{uid:'s1',kind:'lumber',level:1,x:1,z:2,stock:80}],private_secret:'hidden'}]);
- await login(1);let visit=await call('visit',{tag:tags[0]});check(!('gold' in visit.village)&&!('private_secret' in visit.village)&&!('stock' in visit.village.structures[0]),'visit exposes only allowed layout');
+ await db.exec('reset role');await db.query('insert into public.player_saves(user_id,snapshot) values($1,$2)',[ids[0],{version:7,hall:2,barracks:1,smithy:1,hero:'warrior',gold:987,structures:[{uid:'s1',kind:'lumber',level:1,x:1,z:2,stock:80,private_note:'never share'}],private_secret:'hidden'}]);
+ await login(1);let visit=await call('visit',{tag:tags[0]});check(!('gold' in visit.village)&&!('private_secret' in visit.village)&&!('stock' in visit.village.structures[0])&&!('private_note' in visit.village.structures[0]),'visit exposes only allowed layout');
  await call('block',{tag:tags[0]});check((await call('state')).friends.length===0,'blocking removes friendship');
  await login(0);await reject('request',{tag:tags[1]},/player_unavailable/);
  await login(1);await call('unblock',{tag:tags[0]});
@@ -52,6 +52,7 @@ try{
  await call('promote',{tag:tags[1]});
  await login(1);await call('invite',{tag:tags[2]});await reject('kick',{tag:tags[0]},/role_required/);
  await login(2);check((await call('state')).messages.length===0,'outsider cannot read clan messages');await call('join',{clan_id:clan});
+ await call('block',{tag:tags[1]});
  await login(1);await call('kick',{tag:tags[2]});
  await login(2);check((await call('state')).clan===null,'kick removes membership');await reject('chat',{body:'no',request_id:'55555555-5555-4555-8555-555555555555'},/clan_required/);
  await login(0);await call('transfer',{tag:tags[1]});await call('leave');
