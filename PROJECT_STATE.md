@@ -1,5 +1,13 @@
 # Glutwacht – aktueller Stand 26.09.2026
 
+## Neuester Live-Stand: 12:34 Berlin – freundlichere Oberfläche und Truppeneinsatz
+
+Nutzer bestätigt Anmeldung funktioniert. Neuer Auftrag: freundlicher/kreativer/lebensfroher, fünf Krieger gemeinsam einsetzen, keine Bogenschützenkarte ohne Bogenschützen. Umgesetzt und veröffentlicht als Sites-Version 10; Deployment `appgdep_6ab79fb7ea10819183b00eebc737ae71` succeeded. Build `df5d3bd2cc08`, Sites-Source `300d8473a8b24d0e8794ec842e6e0d79954da8e3`, Spielcode `a12774863c793e5bcbe03af75ecb9299ad3c804c`.
+
+Türkise statt dunkelblauer Panels, verschiedenfarbige Hauptaktionen, plastische Glanzkanten auch im normalen Spiel, federndes Iconfeedback beim Drücken, freundlichere HTML-Anmeldung und passender äußerer Fensterrahmen. Keine neuen Landschaftsassets oder Gebäude in diesem Update. Im Angriff: nur Reserve > 0 sichtbar, Karten werden ohne Lücken angeordnet; Einzeln / Alle N wählbar, danach ein Bodentipp in gültigem Randbereich. deploy_squad setzt die ganze ausgewählte Truppengattung in einem Simulationsschritt ein, gültige kleine Formation bzw. gültiger Ausgangspunkt als Randfallback. Kein Verbrauch bei ungültiger Stelle, kein Duplizieren, nach Erschöpfung Karten/Modusknöpfe ausblenden. Neuer Angriff startet im Einzelmodus. Accountfix und Save-Schema unverändert.
+
+Geprüft: friendly_combat_suite 13/13 lokal und CI. Lauf `36235873433`: Konto-/Speicher-, HUD-Geometrie-, echte Touchtests (inklusive fünf Krieger mit einem Bodentipp) und native Renderprüfungen bestanden; art-review und native-account-input abgeschlossen erfolgreich. Tatsächliches mobiles Renderbild `runtime/friendly-review/art/atelier-browser-mobile.png` angesehen. Separater gzip-/Cloud-Browserlauf `36235873453` erfolgreich. Gesamter WebGL-Spielablauf in validate zum Abschluss noch laufend, der zuvor bekannte Reload-Konflikt ist NICHT als behoben behauptet. Nutzerdaten nicht gelöscht oder migriert.
+
 ## Neuester Live-Stand: 12:18 Berlin – Fehler direkt nach Anmeldung behoben
 
 Sites-Version 9 ist live; Deployment `appgdep_6ab79bf8c5088191a5e6e6e845caf772` succeeded, Build `e978c0251b10`, Sites-Source `c0bd8cb5fced7fab4fe5863b44b44535a4a6ab94`, Produktcode `cb3773e4fb9dc53b5315e187475bcb226b86a8f8`. Späterer Commit `3edc339c09f05ffca44b3bf9e5f771089a42a045` ändert nur Tests, kein neuer Produktbuild erforderlich.
