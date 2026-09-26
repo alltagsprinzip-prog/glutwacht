@@ -71,6 +71,13 @@ var cloud_clock=0.0
 var cloud_sync_paused=false
 var pending_import
 var art_preview=false
+var require_login=OS.has_feature("web")
+var account_notice=""
+func auth_locked() -> bool:
+ return require_login and not art_preview and not account_active
+func update_access():
+ world.visible=not auth_locked();hud.visible=not auth_locked()
+ if auth_locked():paused=true
 func _ready():
  art_preview=art_preview or "--art-preview" in OS.get_cmdline_user_args()
  if OS.has_feature("web"):art_preview=art_preview or bool(JavaScriptBridge.eval("new URLSearchParams(location.search).get('atelier')==='1'",true))
@@ -95,7 +102,9 @@ func _ready():
  account=load("res://game3d/online/account.gd").new();add_child(account)
  sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
  if not progress.warning.is_empty():toast(progress.warning)
- if progress.write_blocked:call_deferred("open_save_tools")
+ update_access()
+ if auth_locked():open_account()
+ elif progress.write_blocked:call_deferred("open_save_tools")
  if not art_preview:call_deferred("restore_account_start")
 func layout_art_preview():
  ui.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -196,6 +205,11 @@ func _process(dt):
  var elapsed=float(frame_tick-last_frame_tick)/1000000.0 if last_frame_tick>0 else dt
  last_frame_tick=frame_tick
  if not sim:return
+ if auth_locked():
+  update_access()
+  if OS.has_feature("web"):JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"mode":"login","dialog":dialog,"login_required":true}))
+  return
+ update_access()
  clock+=dt;production_clock+=dt;save_clock+=dt;sound_time=maxf(0,sound_time-dt)
  if production_clock>=1:
   if OS.has_feature("web") and not art_preview:
@@ -352,7 +366,7 @@ func _notification(what):
   if account_active and not account.busy and not cloud_sync_paused:sync_cloud()
   if not paused and build_kind=="":open_menu()
 func save():
- if art_preview:return
+ if art_preview or auth_locked():return
  if not progress.store_file(save_path):toast(progress.warning);return
  if account_active:
   account.dirty=true;account.save_metadata()
@@ -393,7 +407,7 @@ func open_shop():
    if progress.shop_buy(it[0]):save();refresh_home();open_shop();tone("pickup"),true)
   buy.disabled=int(progress.data.gems)<it[2] or (it[0]=="builder" and int(progress.data.builder_bonus)>=1) or (it[0]!="builder" and int(progress.data[it[0]])>=progress.storage())
 func open_dialog(name:String,heading:String,sub:String) -> Control:
- close_dialog();dialog=name;paused=true;held=false;cancel_gestures()
+ close_dialog(true);dialog=name;paused=true;held=false;cancel_gestures()
  if stick:stick.release()
  modal=Control.new();modal.size=Vector2(1280,720);modal.z_index=100;ui.add_child(modal)
  var veil=ColorRect.new();veil.color=Color(.025,.065,.09,.58);veil.size=Vector2(1280,720);modal.add_child(veil)
@@ -404,10 +418,11 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  var trim=panel(p,Rect2(8,8,rect.size.x-16,67),Color("385962"));trim.mouse_filter=Control.MOUSE_FILTER_IGNORE
  label(p,heading,Rect2(25,12,rect.size.x-125,48),27,GOLD)
  if sub!="":label(p,sub,Rect2(27,82,rect.size.x-60,31),16,CREAM)
- if name!="result" and not (name=="heroes" and progress.data.hero==""):
+ if not auth_locked() and name!="result" and not (name=="heroes" and progress.data.hero==""):
   var close=icon_button(p,"close","",Rect2(rect.size.x-87,6,77,67),func():close_dialog());close.name="CloseDialog";close.z_index=10
  return p
-func close_dialog():
+func close_dialog(force:bool=false):
+ if auth_locked() and not force:return
  if is_inside_tree():get_viewport().set_input_as_handled()
  modal_guard_until=Time.get_ticks_msec()+350
  hero_views.clear()
@@ -529,7 +544,8 @@ func open_building(uid:String):
  if not job.is_empty():icon_button(p,"gems","%d · SOFORT"%progress.speedup_cost(uid),Rect2(35,532,300,76),func():
   if progress.speedup(uid):save();refresh_home();open_building(uid),true)
  elif Catalog.RESOURCES.has(b.kind):icon_button(p,"collect","SAMMELN",Rect2(35,532,300,76),func():collect_building_resource(uid))
- elif b.kind in ["barracks","camp"]:icon_button(p,"army","ARMEE",Rect2(35,532,300,76),func():open_army())
+ elif b.kind=="barracks":icon_button(p,"army","TRUPPEN",Rect2(35,532,300,76),func():open_barracks_guide())
+ elif b.kind=="camp":icon_button(p,"army","ARMEE",Rect2(35,532,300,76),func():open_army())
  elif b.kind in ["smithy","hero_hall"]:icon_button(p,"training","TRAINING",Rect2(35,532,300,76),func():open_training())
 func confirm_remove(uid:String):
  var b=progress.find_building(uid)
@@ -549,6 +565,19 @@ func open_army():
   label(p,str(progress.data.get(k,0)),Rect2(625,y+12,65,62),27,CREAM,true)
   var plus=button(p,"+",Rect2(712,y+12,94,62),func():progress.army(k,1);save();refresh_home();open_army(),true);plus.disabled=count+int(d.slots)>progress.capacity() or not unlocked
  button(p,"FERTIG",Rect2(545,471,282,55),func():close_dialog(),true)
+ button(p,"TRUPPEN FREISCHALTEN",Rect2(28,471,495,55),func():open_barracks_guide()).add_theme_font_size_override("font_size",23)
+func open_barracks_guide():
+ var p=open_dialog("troop_progression","Kaserne · neue Truppen","Deine Kaserne: Level %d · Dein Haupthaus: Level %d"%[progress.data.barracks,progress.data.hall])
+ for i in range(Catalog.TROOP_ORDER.size()):
+  var k=Catalog.TROOP_ORDER[i];var d=Catalog.TROOPS[k];var y=119+i*80
+  var unlocked=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
+  panel(p,Rect2(25,y,810,76));icon(p,k,Rect2(36,y+6,64,64))
+  label(p,d.name+" · "+("VERFÜGBAR" if unlocked else "LEVEL %d"%d.barracks),Rect2(113,y+2,700,31),21,GOLD)
+  label(p,d.role,Rect2(113,y+32,700,24),18)
+  label(p,"Haupthaus %d + Kaserne %d"%[d.hall,d.barracks],Rect2(113,y+54,700,22),16)
+ label(p,"Jede Kasernenstufe zusätzlich: +30 Leben und +5 Angriff für Truppen.",Rect2(28,440,805,30),18,GOLD)
+ button(p,"KASERNE AUSBAUEN",Rect2(28,476,394,50),func():open_building("barracks"),true).add_theme_font_size_override("font_size",22)
+ button(p,"ARMEE AUFSTELLEN",Rect2(438,476,394,50),func():open_army()).add_theme_font_size_override("font_size",22)
 func open_training(troops:bool=false):
  var key=sim.hero_key();var p=open_dialog("training","Soforttraining","Dauerhafte Verbesserung · keine Wartezeit")
  button(p,"HELD",Rect2(28,117,388,51),func():open_training(false),not troops)
@@ -650,7 +679,7 @@ func open_menu():
  var rows=[["hero","WASD / Stick","Held bewegen"],["move","Ziehen / zwei Finger","Kamera / Zoom"],["attack","J / Angriff halten","Schlagen"],["skill","K · Leertaste · H","Fähigkeit · Rolle · Trank"]]
  for i in range(rows.size()):
   var y=191+i*53;icon(p,rows[i][0],Rect2(34,y,38,38));label(p,rows[i][1],Rect2(88,y,336,40),19,GOLD);label(p,rows[i][2],Rect2(450,y,356,40),18)
- label(p,"Lokaler Spielstand · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
+ label(p,(account.status if account_active else "Lokaler Spielstand")+" · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
  button(p,"Spielstand sichern / laden",Rect2(28,459,441,59),func():open_save_tools())
  if sim.active():button(p,"Angriff beenden",Rect2(500,459,328,59),func():close_dialog();end_raid())
  elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(500,459,328,59),func():return_home())
@@ -671,7 +700,7 @@ func open_save_tools():
  if art_preview:toast("Grafikprobe: Dein echtes Dorf und deine Sicherungen bleiben unverändert.");return
  var p=open_dialog("saves","Dein lokaler Spielstand","")
  label(p,"Held, Gebäude, Training und Bauzeiten bleiben bei Updates erhalten.",Rect2(29,102,800,59),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- label(p,"Ein anderer Browser oder eine andere Website hat einen eigenen Speicher.\nSichere dein Dorf als Datei, bevor du den Ort wechselst.",Rect2(29,183,800,103),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Kontodorf: Auf einem anderen Gerät mit demselben Konto anmelden. Warte vorher auf CLOUD GESICHERT. Die Datei ist eine zusätzliche Sicherung." if account_active else "Ein anderer Browser hat einen eigenen lokalen Speicher. Sichere dein Dorf als Datei, bevor du den Ort wechselst.",Rect2(29,183,800,103),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  label(p,progress.warning if progress.write_blocked else ("Kontostand · "+account.status if account_active else "Du spielst lokal. Konto und Cloud findest du im Dorfprofil."),Rect2(29,317,800,60),20,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  button(p,"Sicherung speichern",Rect2(28,427,394,72),func():export_save(),true)
  button(p,"Sicherung laden",Rect2(442,427,390,72),func():request_save_import())
@@ -750,27 +779,28 @@ func open_account():
   label(p,account.status+"\nPrivates Dorf · ohne Rangliste",Rect2(32,110,790,95),26,GOLD)
   button(p,"Cloud-Stand laden",Rect2(32,231,790,67),func():load_cloud())
   var upload=button(p,"Jetzt sichern",Rect2(32,318,790,67),func():sync_cloud(),true);upload.disabled=not account_active
-  button(p,"Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
+  button(p,"Abmelden" if require_login else "Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
  var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
- var password=LineEdit.new();password.placeholder_text="Passwort";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
- label(p,"Jedes Konto hat sein eigenes Dorf. Dein bisheriges lokales Dorf bleibt separat erhalten.",Rect2(32,286,790,82),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var password=LineEdit.new();password.placeholder_text="Passwort · bei Registrierung mindestens 12 Zeichen";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
+ label(p,account_notice if account_notice!="" else "Melde dich an oder erstelle ein Konto. Dein Dorf wird automatisch diesem Konto zugeordnet und gespeichert.",Rect2(32,286,790,82),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  button(p,"Anmelden",Rect2(32,378,380,65),func():authenticate(email.text,password.text,false),true)
  button(p,"Registrieren",Rect2(434,378,388,65),func():authenticate(email.text,password.text,true))
  button(p,"Passwort vergessen",Rect2(32,461,790,54),func():request_account_recovery(email.text))
 func authenticate(email:String,password:String,register:bool):
  if art_preview:return
  if account.busy:return
- if email.strip_edges().is_empty() or password.is_empty():toast("E-Mail und Passwort eingeben.");return
- close_dialog();toast("Verbindung wird hergestellt …")
+ if email.strip_edges().is_empty() or password.is_empty():account_notice="Bitte E-Mail und Passwort eingeben.";open_account();return
+ account_notice="Verbindung wird hergestellt …";open_account()
  var result=await account.login(email,password,register,web_redirect())
- if not result.ok:toast(result.get("message","Anmeldung fehlgeschlagen."));open_account();return
+ if not result.ok:account_notice=result.get("message","Anmeldung fehlgeschlagen.");open_account();return
+ account_notice=""
  await load_cloud(true)
 func load_cloud(automatic:bool=false):
  if account.busy:return
  cloud_sync_paused=true
  var result=await account.fetch_save()
- if not result.ok:toast(result.message);return
- if not result.empty and not Progress.validate_save(result.snapshot).is_empty():toast("Cloud-Stand ungültig; dein Dorf bleibt unverändert.");return
+ if not result.ok:account.status=result.message;open_account();return
+ if not result.empty and not Progress.validate_save(result.snapshot).is_empty():account.status="Cloud-Stand ungültig; dein Dorf bleibt unverändert.";open_account();return
  var local_path="user://account-"+account.user_id+".json"
  var meta=account.read_metadata()
  var local_exists=FileAccess.file_exists(local_path)
@@ -786,7 +816,7 @@ func load_cloud(automatic:bool=false):
   button(p,"Lokalen Kontostand als Datei sichern",Rect2(32,350,790,52),func():download_snapshot(FileAccess.get_file_as_string(local_path)))
  label(p,"Neues Kontodorf erstellen." if result.empty else "Gespeichertes Kontodorf von der Cloud laden.",Rect2(32,110,790,80),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  label(p,"Auf diesem Gerät liegt ein möglicherweise neuerer Stand. Cloud laden behält vorher eine lokale Sicherheitskopie. Abbrechen verändert nichts." if local_exists and bool(meta.get("dirty",true)) else "Dein Gastdorf bleibt separat erhalten. Dieses Konto lädt ausschließlich sein eigenes Dorf.",Rect2(32,229,790,128),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"Abbrechen",Rect2(32,420,380,65),func():close_dialog())
+ button(p,"Zurück",Rect2(32,420,380,65),func():open_account())
  button(p,"Dorf öffnen",Rect2(434,420,388,65),func():activate_cloud(result),true)
 func activate_cloud(result:Dictionary):
  if not account.signed_in() or account.busy:return
@@ -830,7 +860,8 @@ func leave_account():
   if account.dirty:
    toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
  await account.sign_out();account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
- if progress.write_blocked:open_save_tools()
+ if auth_locked():update_access();open_account()
+ elif progress.write_blocked:open_save_tools()
  elif progress.data.hero=="":open_tutorial()
 func activate_local_account(meta:Dictionary):
  var path="user://account-"+account.user_id+".json"
@@ -850,6 +881,7 @@ func restore_account_start():
   await load_cloud(true)
  elif account.signed_in():
   account.status="Verbindung fehlt · Konto noch nicht geladen";open_account()
+ elif auth_locked():open_account()
  elif progress.data.hero=="" and not progress.write_blocked:open_tutorial()
 
 func web_redirect() -> String:
@@ -858,7 +890,8 @@ func web_redirect() -> String:
 func request_account_recovery(email:String):
  if account.busy:return
  var result=await account.request_recovery(email,web_redirect())
- toast("Falls ein Konto vorhanden ist, erhältst du einen Wiederherstellungslink." if result.ok else result.message)
+ account_notice="Falls ein Konto vorhanden ist, erhältst du einen Wiederherstellungslink." if result.ok else result.message
+ open_account()
 func check_email_link():
  if not OS.has_feature("web"):return
  var raw=JavaScriptBridge.eval("(()=>{const r=window.__glutwachtEmailLink;delete window.__glutwachtEmailLink;return r?JSON.stringify(r):null;})()",true)
@@ -886,13 +919,14 @@ func open_tutorial():
  var step=progress.tutorial_step()
  if step=="done":toast("Einführung abgeschlossen. Dein Dorf wartet auf dich.");return
  var titles={"hero":"Willkommen in Glutwacht","build":"Dein erstes Bauprojekt","upgrade":"Mache dein Dorf stärker","train":"Bereite deinen Helden vor","battle":"Dein erster Angriff"}
- var details={"hero":"Wähle deinen Starthelden. Seine Erfahrung und dein Fortschritt bleiben bei deinem Dorf gespeichert.","build":"Öffne Bauen, wähle ein Sägewerk und setze sie auf einen freien Platz. Mit dem Stick bewegst du deinen Helden; durch Ziehen verschiebst du die Kamera.","upgrade":"Werte dein Haupthaus auf. In der Vorschau siehst du Kosten, Bauzeit und neue Freischaltungen. Bauzeiten laufen auch offline weiter.","train":"Öffne Training und verbessere eine Fähigkeit deines Helden. In Armee stellst du deine Truppen zusammen.","battle":"Öffne Angriff → Kampagne und erkunde das erste Lager. Setze deine Truppen ein, bewege deinen Helden und nutze seine Fähigkeiten. Nach dem Kampf kehrst du ins Dorf zurück."}
+ var details={"hero":"1. Vergleiche die vier Helden.\n2. Tippe bei deinem Favoriten auf WÄHLEN.\nEr bleibt dein Startheld; weitere Helden kommen später.","build":"1. Tippe unten auf SÄGEWERK PLATZIEREN.\n2. Wähle eine freie, grün markierte Stelle.\n3. Bestätige mit HIER BAUEN. Danach liefert es Holz.","upgrade":"1. Öffne das Haupthaus über den Knopf unten.\n2. Vergleiche Nutzen, Kosten und Bauzeit.\n3. Tippe auf AUSBAUEN. Kaserne 2 ermöglicht dann Bogenschützen – beide Gebäude brauchen Level 2.","train":"1. Öffne HELDENTRAINING.\n2. Wähle Angriff, Leben oder Fähigkeit und tippe auf den Upgrade-Pfeil. Es kostet Rohstoffe und wirkt sofort.\nTruppen stellst du kostenlos unter ARMEE zusammen.","battle":"1. Wähle ein Lager und starte den Angriff.\n2. Tippe außerhalb der roten Zone, um Truppen einzusetzen.\n3. Bewege den Helden mit dem Stick; nutze rechts seine Fähigkeiten. Danach geht es zurück ins Dorf."}
  var order=["hero","build","upgrade","train","battle"]
  var p=open_dialog("tutorial",titles[step],"Einführung · Schritt %d von 5"%(order.find(step)+1))
  icon(p,"hero" if step=="hero" else ("attack" if step=="battle" else step if step!="train" else "training"),Rect2(355,100,140,140))
- label(p,details[step],Rect2(52,250,750,145),25).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,details[step],Rect2(52,245,750,164),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  var callbacks={"hero":open_heroes,"build":func():begin_build("lumber"),"upgrade":func():open_building("hall"),"train":open_training,"battle":open_campaign}
- button(p,"LOS GEHT’S",Rect2(235,427,380,72),callbacks[step],true)
+ var actions={"hero":"HELD AUSWÄHLEN","build":"SÄGEWERK PLATZIEREN","upgrade":"HAUPTHAUS ÖFFNEN","train":"HELDENTRAINING","battle":"LAGER AUSWÄHLEN"}
+ var next=button(p,actions[step],Rect2(175,427,500,72),callbacks[step],true);next.add_theme_font_size_override("font_size",24)
 func share_test_link():
  if OS.has_feature("web"):
   JavaScriptBridge.eval("(()=>{const u=location.origin; if(navigator.share){navigator.share({title:'Glutwacht',url:u}).catch(()=>{});}else{navigator.clipboard.writeText(u).catch(()=>window.prompt('Testlink kopieren',u));}})()")

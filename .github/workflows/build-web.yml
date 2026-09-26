@@ -63,6 +63,8 @@ jobs:
         run: node tools/auth_callback.test.cjs
       - name: Headless startup
         run: python3 tools/check_godot.py logs/start.log godot --headless --audio-driver Dummy --path . --quit-after 120
+      - name: Mandatory login and troop guide
+        run: python3 tools/check_godot.py logs/login-gate.log godot --headless --path . --script tests3d/login_gate_suite.gd
       - name: Gameplay and save regression tests
         run: python3 tools/check_godot.py logs/rules.log godot --headless --path . --script tests3d/release_suite.gd
       - name: HUD ability rules
