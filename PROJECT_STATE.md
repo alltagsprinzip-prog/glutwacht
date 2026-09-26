@@ -1,5 +1,17 @@
 # Glutwacht – aktueller Stand 26.09.2026
 
+## Live-Abschluss 26.09.2026, 11:24 Berlin
+
+Auf ausdrücklichen Wunsch zum eigenen Testen veröffentlicht: Sites-Version 6, Build `5c12c30d4a65`, Deployment `appgdep_6ab78f23f1688191847b38f0b0a8507e` **succeeded**, URL https://glutwacht-spieltest.mg-automobile24.chatgpt.site . Vollständiger Browser-/Render-Regressionslauf `36232395630` zum Veröffentlichungszeitpunkt noch NICHT abgeschlossen; nicht als grün behaupten. Art-Review erfolgreich. Nächster technischer Schritt: Status/Logs dieses Laufs prüfen; bei Hänger im Render-Test insbesondere `surface_get_array_len` auf PrimitiveMesh prüfen (ggf. universell `surface_get_arrays(surface)[Mesh.ARRAY_VERTEX].size()` verwenden). Produktcode des veröffentlichten Pakets unverändert seit `29731b5`; spätere Änderungen nur Tests/Dokumentation. Echte E-Mail-/Zwei-Geräte-Abnahme weiterhin offen.
+
+## Aktueller Vorrang: Kontopflicht und echte neue Modelle (26.09., Vormittag)
+
+Spielcode `29731b5e9c1a0501a7e423e41a1dbbba44d91b8a`; Verifikationskorrektur `b7c5006489cfe3693b25ad605f462191ee738e00`. Browser verlangt geladenes Konto vor Spielbeginn; Gastdorf bleibt verborgen und pausiert. Persistente Anmeldehinweise, nummeriertes Tutorial, Kasernenführer für die vier bestehenden Truppen. Neues Haupthaus, Kaserne, Schmiede und Sägewerk auch im normalen Kontodorf, mit erhaltenen Positionen und Leveln. Separates ungespeichertes Testdorf unter `/v08/?atelier=1`. Details: `docs/ACCOUNT_ENTRY.md`, `docs/ART_PREVIEW.md`.
+
+Sites-Version 6 vorbereitet: Source `a5601b60f4c63e1bd1ec3496cd0d8b3c03928915`, Build `5c12c30d4a65`. Veröffentlichung noch nicht bestätigt; abschließenden Eintrag beachten. Aktueller vollständiger CI-Lauf `36232395630`; SQL-Lauf `36232395617` erfolgreich. Vorgängerlauf scheiterte ausschließlich an einem Render-Test, der Mesh-Knoten statt Geometrie zählte; bei gebatchten Gebäuden jetzt tatsächliche Vertex-Zahl pro Upgrade geprüft, keine Prüfung entfernt. Account 37/37, Einführung/Retry 19/19, Login-Gate 10/10, HUD 154/154 lokal erfolgreich. Produktive Save-Tabelle hat RLS und Eigentümer-SELECT-Policy; keinerlei Datenbank- oder Nutzerdatenänderung.
+
+Weiter offen: echtes E-Mail-Onboarding und physischer Gerätewechsel, iPhone-Leistung, weitere individuelle Gebäudetypen/Charaktere und die vollständige künstlerische Qualität des Konzeptbildes. Browser-Kontotests verwenden einen isolierten Testtransport, keine echten Benutzer. Vorhandene lokale Gastdateien bleiben separat und werden keinem neuen Konto still zugewiesen.
+
 ## Verbindlicher Auftrag
 Neuester Nutzerauftrag vollständig in docs/AUFTRAG_2026-09-26.md. Bestehendes Godot-3D-Spiel fortsetzen; helles lebendiges Dorf, sinnvolle Freischaltungen, eigene Grafiken. docs/MASTERPLAN.md bleibt Grundlage; neuester Auftrag priorisiert Gestaltung und Fortschritt vor weiterer Online-Ausweitung. Keine kostenpflichtigen Ressourcen.
 

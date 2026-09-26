@@ -15,3 +15,6 @@ GitHub CLI-Login fehlt; nach Prüfung von Repository-Eigentümer und vorhandener
 Neuester Auftrag: Entwurf 1 (Heroic Pop) anwenden. Siehe letzten Eintrag in PROJECT_STATE. Öffentlicher Link bleibt gleich; Freund registriert sich über Profil → Konto / Cloud → Registrieren mit eigener E-Mail.
 
 Heroic Pop ist veröffentlicht: Sites-Version 5, Build cfe8c7585bd5; beide CI-Läufe bestanden, finale Screenshots geprüft. Spielcode 1840d3f91d8e71b0c76e1482cf9a5d184f9ce027. Kein weiteres Deployment dieser unveränderten Version nötig.
+# Neuester Arbeitsstand: 26.09.2026, Kontopflicht + neue Gebäudemodelle
+
+Zuerst den neuesten Abschluss in `PROJECT_STATE.md` lesen. Aktueller Code `29731b5`, danach Test-/Dokukorrektur `b7c5006`. Sites-Version 6 mit Build `5c12c30d4a65` ist vorbereitet; Live-Status im Abschluss prüfen. Normaler Webstart verlangt Konto, Grafikprobe bleibt bewusst ungespeichert. Neue Gebäude auch im normalen Dorf, nicht nur in der Probe. Konten/Progression: `docs/ACCOUNT_ENTRY.md`; Grafik: `docs/ART_PREVIEW.md`. Keine Blender-Installation nach blockiertem Systemversuch wiederholen; Nutzer erlaubte Umsetzung direkt in Godot. Keine Datenbankmigration oder Löschung.
