@@ -490,6 +490,7 @@ func update_effects(sim):
 func update_camera(sim,dt:float):
  if not camera:return
  var goal=Vector3(pan.x,0,pan.y)
+ if art_preview and mode=="home":goal.y=2.0
  if false:
   var factor=clampf((60-target_zoom)/35.0,0,1)
   goal+=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)*factor

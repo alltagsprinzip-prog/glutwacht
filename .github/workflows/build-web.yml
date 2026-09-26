@@ -19,7 +19,7 @@ jobs:
       - uses: solarlabyrinth/action-setup-godot@v3
         with:
           version: 4.7.2-stable
-          export-templates: false
+          export-templates: true
       - name: Import and verify isolated art preview
         run: |
           python3 tools/check_godot.py logs/art-import.log godot --headless --editor --path . --import
@@ -31,6 +31,17 @@ jobs:
         run: |
           mkdir -p logs/art
           python3 tools/check_godot.py logs/art-render.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/art_preview_render.gd
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Export and exercise actual art preview in browser
+        run: |
+          mkdir -p dist/v08
+          python3 tools/check_godot.py logs/art-export.log godot --headless --path . --export-release Web dist/v08/index.html
+          python3 tools/web_bootstrap.py dist/v08
+          npm install --prefix "$RUNNER_TEMP/atelier-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/atelier-browser/node_modules/playwright/cli.js" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/atelier-browser/node_modules" node tools/art_web_smoke.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

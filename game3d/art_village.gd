@@ -8,14 +8,14 @@ const STONE=Color("bcb4a0")
 const MORTAR=Color("747568")
 const PLASTER=Color("d7c9a5")
 const WOOD=Color("69462d")
-const BLUE=Color("23527d")
+const BLUE=Color("376c98")
 const GOLD=Color("c89948")
 func _init():
  surface.begin(Mesh.PRIMITIVE_TRIANGLES);rng.seed=714
 func tri(a:Vector3,b:Vector3,c:Vector3,color:Color):
  var n=(b-a).cross(c-a).normalized()
  for p in [a,b,c]:
-  surface.set_normal(n);surface.set_color(color.srgb_to_linear());surface.add_vertex(p)
+  surface.set_normal(n);surface.set_color(color);surface.add_vertex(p)
  triangles+=1
 func quad(a:Vector3,b:Vector3,c:Vector3,d:Vector3,color:Color):
  tri(a,b,c,color);tri(a,c,d,color)
@@ -55,6 +55,9 @@ func stone_wall(p:Vector3,s:Vector3):
    for side in [-1,1]:block(Vector3(x,y,p.z+side*s.z*.5),Vector3(width-.035,height-.03,.14),c,.035)
 func roof(p:Vector3,width:float,depth:float,height:float):
  var rise=height/(width*.5);var angle=atan(rise)
+ for z in [-depth*.5+.18,depth*.5-.18]:
+  tri(p+Vector3(-width*.43,.0,z),p+Vector3(0,height-.18,z),p+Vector3(width*.43,.0,z),PLASTER)
+  block(p+Vector3(0,height*.46,z+.03),Vector3(.13,height*.92,.12),WOOD,.02)
  for side in [-1,1]:
   var a=p+Vector3(0,height,-depth*.5);var b=p+Vector3(side*width*.5,0,-depth*.5)
   var c=p+Vector3(side*width*.5,0,depth*.5);var d=p+Vector3(0,height,depth*.5)
@@ -66,7 +69,7 @@ func roof(p:Vector3,width:float,depth:float,height:float):
    for col in range(cols):
     var z=-depth*.5+(col+.5)*depth/cols
     var point=p+Vector3(side*distance,height-distance*rise+.035,z)
-    block(point,Vector3(width*.5/rows/cos(angle)*1.13,.10,depth/cols-.025),BLUE.lightened(rng.randf_range(-.12,.2)),.035,Basis(Vector3.BACK,-side*angle))
+    block(point,Vector3(width*.5/rows/cos(angle)*1.13,.10,depth/cols-.025),BLUE.lightened(rng.randf_range(-.035,.07)),.035,Basis(Vector3.BACK,-side*angle))
  block(p+Vector3(0,height+.09,0),Vector3(.20,.20,depth+.15),GOLD,.05)
  for z in [-depth*.5,depth*.5]:
   for side in [-1,1]:block(p+Vector3(side*width*.25,height*.5,z),Vector3(width*.5/cos(angle)+.15,.16,.18),WOOD,.03,Basis(Vector3.BACK,-side*angle))
@@ -144,7 +147,7 @@ func tree(p:Vector3,height:float):
  for i in range(7):
   var a=i*2.4;var q=p+Vector3(cos(a)*height*.18,height*(.54+i*.052),sin(a)*height*.15)
   var r=height*(.26-float(i)*.013)
-  foliage(q,r,Color("426547").lightened(.018*i))
+  foliage(q,r,Color("547440").lightened(.018*i))
 func foliage(p:Vector3,r:float,col:Color):
  var rings=5;var segments=10
  for row in range(rings):
@@ -160,10 +163,12 @@ func landscape(parent:Node3D,buildings:Array):
  for b in buildings:
   var end=b.pos+Vector2(0,3.7);var start=Vector2(0,8)
   var steps=maxi(1,int(start.distance_to(end)/.55))
+  var along=(end-start).normalized();var across=Vector2(along.y,-along.x);var turn=atan2(along.x,along.y)
   for i in range(steps):
    var pos=start.lerp(end,float(i)/steps)
    for side in [-1,0,1]:
-    block(Vector3(pos.x+side*.49,.035,pos.y),Vector3(.45,.09,.51),Color("a69d82").lightened(rng.randf_range(-.11,.11)),.05,Basis(Vector3.UP,rng.randf_range(-.10,.10)))
+    var q=pos+across*side*.49
+    block(Vector3(q.x,.035,q.y),Vector3(.45,.09,.51),Color("b7ac94").lightened(rng.randf_range(-.08,.08)),.05,Basis(Vector3.UP,turn+rng.randf_range(-.035,.035)))
  for x in range(-5,6):
   for z in range(-4,5):
    if Vector2(x,z).length()>5.0:continue
@@ -173,15 +178,25 @@ func landscape(parent:Node3D,buildings:Array):
  cylinder(Vector3(0,.62,8),.22,1.15,STONE,16,.13)
  cylinder(Vector3(0,1.69,8),.66,.13,STONE,24)
  cylinder(Vector3(0,1.83,8),.56,.06,Color("568f99"),24)
- for i in range(20):
-  var a=TAU*i/20;tree(Vector3(cos(a)*25,0,-3+sin(a)*24),5.6+rng.randf()*2.5)
+ for i in range(26):
+  var a=TAU*i/26;var r=26+rng.randf_range(-1.8,4)
+  tree(Vector3(cos(a)*r,0,-3+sin(a)*r),4.8+rng.randf()*3.4)
  for side in [-1,1]:
   for i in range(13):
    var p=Vector3(side*20.0,.3,-20+i*3.2)
    block(p,Vector3(1.4,.7,1.1),STONE.darkened(.1),.20,Basis(Vector3.UP,rng.randf()))
- for i in range(60):
-  var a=TAU*i/60;var p=Vector3(cos(a)*22,0,-3+sin(a)*21)
-  foliage(p+Vector3.UP*.25,.45,Color("42603b"))
+ for i in range(38):
+  var a=rng.randf()*TAU;var r=rng.randf_range(21,24);var p=Vector3(cos(a)*r,0,-3+sin(a)*r)
+  foliage(p+Vector3.UP*.25,.45,Color("5c8043"))
+ for x in [-4.2,4.2]:
+  for z in [-3.0,3.4]:
+   var p=Vector3(x,.20,z)
+   block(p,Vector3(1.75,.42,1.05),STONE,.08)
+   block(p+Vector3.UP*.23,Vector3(1.55,.06,.85),Color("544431"),.02)
+   for i in range(7):
+    var q=p+Vector3(rng.randf_range(-.65,.65),.55,rng.randf_range(-.30,.30))
+    foliage(q,.26,Color("638346"))
+    foliage(q+Vector3.UP*.18,.085,Color("e6c165") if i%2 else Color("9a80bc"))
  finish(parent,"Atelier_Garten")
 func finish(parent:Node3D,title:String):
  surface.index()
