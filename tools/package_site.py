@@ -29,7 +29,7 @@ s=s.replace('src="index.js"',f'src="index.js?build={build}"').replace("window.__
 (target/'game.html').write_text(s)
 wrapper=target/'index.html';s=wrapper.read_text()
 import re
-s=re.sub(r"frame.src='game.html'.*?;",f"frame.src='game.html?build={build}'+(location.search?'&'+location.search.slice(1):'')+location.hash;",s)
+s=re.sub(r"frame.src=.*?;",f"frame.src='game.html?build={build}'+(location.search?'&'+location.search.slice(1):'')+location.hash;",s)
 s=s.replace('iframe{display:block;','iframe{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);display:block;')
 wrapper.write_text(s)
 (site/'dist/_headers').write_text('/*\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n')

@@ -1,15 +1,13 @@
-# Nächste Sitzung
+# Weiterarbeit ab 26.09.2026 – Account-/Tutorial-Meilenstein
 
-Zuerst PROJECT_STATE.md, docs/AUFTRAG_2026-09-26.md und docs/FREISCHALTUNGEN.md lesen. Dann git status, Branch, aktuelle Sites-Version/CI prüfen. Kein Neustart.
+Zuerst PROJECT_STATE.md und docs/CHANGE_2026-09-26_ACCOUNTS.md lesen. Neues Spielcode-Commit fd82fa6faf84223cb2508b7f02b7c2b1e47df47d; Branch update/masterplan-online-20260925, Draft-PR #4. Kein Neustart oder Save-Reset.
 
-Aktueller Meilenstein: helles Dorf und Freischaltungen, zwei neue Truppentypen. Quellbranch update/masterplan-online-20260925, Draft-PR #4. Test-Site appgprj_6ab6edbc13c081919e1740f7b8bd9ee4, /v08/ beibehalten. Vor Veröffentlichungsbehauptung Deploymentstatus prüfen.
+Sites appgprj_6ab6edbc13c081919e1740f7b8bd9ee4, gleiche Adresse und /v08/. Vollbild/Schließen aus letztem Sites-Checkout erhalten. Publikum jetzt öffentlich per Link auf Nutzerauftrag. Anmeldung und Daten bleiben kontoindividuell. Sites-Version 4 erfolgreich veröffentlicht: https://glutwacht-spieltest.mg-automobile24.chatgpt.site (Details in PROJECT_STATE).
 
-Nächste Priorität nach Spielprobe: mobiles responsives HUD und Safe Areas, Kontraste/individuelle Gebäude/lebendige Animationen, Kampagnenbalance und erweiterte Einstiegsschritte. Bestehende funktionierende Speicher-/Kampagnenlogik erhalten.
+Neue Ursachenbehebung: Sitzung wiederherstellen, eigenes Dorf automatisch laden, sofort nach Aktionen sichern, Netzwerkfehler erneut versuchen, Konflikte explizit entscheiden. Account-sidecar speichert dirty/revision/pending getrennt vom Dorf; Session steht separat im Browser, nie im Export. Bestehende Nutzer müssen sich einmal neu anmelden, weil vorher kein Session-Persist vorhanden war.
 
-Automatische neue Fortschrittsprüfung tests3d/progression_suite.gd (106/106), HUD 154/154, Account/Save 37/37, Regeln 187/187, Render 72/72. Echte Geräteprüfung und echte Mehrkontentests fehlen weiterhin. Nicht als vollständig fertig ausgeben.
+Neue Einführung: Held → Sägewerk → Upgrade → Heldentraining → Kampf. Alte Dörfer mit Held erhalten tutorial_done; keine Belohnungen allein durch Tutorialklicks. Hero immutable. Neue UI/Icons/Schiffe umgesetzt, weitere künstlerische Qualität und echtes iPhone-Feedback bleiben sinnvoll.
 
-Supabase/Brevo/SMTP sind eingerichtet, Benutzer-E-Mail bestätigt. Auth-Redirect der privaten Test-Site noch offen; keine erneute Einrichtung und keine Keys verlangen. Frühere Ablehnung eines privilegierten Admin-Testendpunkts respektieren.
+Nächster konkreter Schritt nach Veröffentlichung: Nutzer mit eigenem Konto auf zwei Geräten prüfen lassen (ohne Kennwörter im Chat). Im Spiel auf Cloud gesichert achten; bei Gerätelock bis 90 Sekunden warten. Echte E-Mail-Registrierung/Recovery testen. Gastimport ausschließlich durch bewussten Dateiimport ins aktive Konto. Serverautorisierte Wirtschaft ist weiterhin offen.
 
-## Veröffentlichung dieses Meilensteins
-Privater Test erfolgreich aktualisiert am 26.09.2026, 00:35 Europe/Berlin. Spielcode 1bf2699999ab92cae0bbddf792a0f007ab6f20a4, ergänzender Migrationstest ef73874cc90472429136afcee1f6c3e84076e93a. Sites-Quellcommit 47ae0d53c03cacb18f23a3c650933f574dcd596d; Deployment appgdep_6ab6f72ff36881918b78dee2ec918e88 succeeded. Gleicher Link und /v08/, keine lokalen Saves gelöscht. Erstes Archiv wegen unvollständiger Kompression abgelehnt; bereinigtes Archiv vor Upload mit gzip -t geprüft. PCK lädt zusätzlich als exportiertes Paket in Godot.
-Weitere Nachweise: Touch 51/51, Migration/Fähigkeiten 73/73, ursprünglicher Release-Gate bestanden. GitHub-Datenbanklauf 36197182222 erfolgreich; Spiellauf 36197182223 zuletzt noch in Arbeit (Touch erfolgreich). Nachfolgend abschließenden CI-WebGL-Status abrufen; nicht mit realer iPhone-Abnahme verwechseln.
+GitHub CLI-Login fehlt; nach Prüfung von Repository-Eigentümer und vorhandener Branch-Autorisierung wurde der vorhandene Connector mit Blob/Tree/Commit/Ref genutzt. Keine Tokens erfragen. Lokales X11-Rendering ist im Sandboxprofil nicht möglich; native Render- und WebGL-Prüfungen laufen im bestehenden GitHub CI. Abgeschlossen: Spiel-/WebGL-CI 36203719934 und Datenbank-CI 36203719893 beide erfolgreich. Browser testet echte Tutorialaktionen, Touch-Steuerung, Neuladen mit Held/Ressourcen und vollständigen Kampf. Echte kontoübergreifende Zwei-Geräte-Abnahme bleibt offen.
