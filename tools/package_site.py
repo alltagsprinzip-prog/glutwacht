@@ -33,5 +33,5 @@ s=re.sub(r"frame.src=.*?;",f"frame.src='game.html?build={build}'+(location.searc
 s=s.replace('iframe{display:block;','iframe{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);display:block;')
 wrapper.write_text(s)
 (site/'dist/_headers').write_text('/*\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n')
-(site/'dist/build.json').write_text(json.dumps({'build':build,'version':'0.10'}))
+(site/'dist/build.json').write_text(json.dumps({'build':build,'version':'0.11'}))
 print('SITE_BUILD',build,'WASM_PARTS',len(parts))

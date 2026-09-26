@@ -5,8 +5,8 @@ const Progress=preload("res://game3d/progress.gd")
 const Battle=preload("res://game3d/battle.gd")
 const World=preload("res://game3d/world.gd")
 const Stick=preload("res://game3d/stick.gd")
-const CREAM=Color("233d59")
-const GOLD=Color("206aa4")
+const CREAM=Color("fff5df")
+const GOLD=Color("f4c76c")
 var progress
 var save_path=Progress.SAVE
 var sim
@@ -87,10 +87,11 @@ func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> S
  s.shadow_color=Color(0,0,0,.22);s.shadow_size=6 if width>0 else 0;s.shadow_offset=Vector2(0,5) if width>0 else Vector2.ZERO
  return s
 func skin(key:String) -> StyleBoxFlat:
- var palette={"panel":["f3f7fb","c4d5e5"],"blue":["e0effb","80b5dc"],"gold":["72d99a","38a874"],"pressed":["56a4da","2577b6"],"disabled":["d2dbe4","bac6d1"],"selected":["b5e3ff","328bd5"]}
+ var palette={"panel":["142c46","b88b48"],"blue":["203f60","d5ad65"],"gold":["e97812","ffe2a0"],"pressed":["12283f","ffd982"],"disabled":["344354","6f7982"],"selected":["346d9c","ffe2a0"]}
  var colors=palette.get(key,palette.panel)
- var box=style(Color(colors[0]),Color(colors[1]),2,18)
- box.shadow_color=Color("172f5140");box.shadow_size=8;box.shadow_offset=Vector2(0,4)
+ var box=style(Color(colors[0]),Color(colors[1]),2,22)
+ box.border_width_bottom=4;box.border_width_top=2
+ box.shadow_color=Color("071321a0");box.shadow_size=7;box.shadow_offset=Vector2(0,5)
  return box
 func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
  if color.v>.65:color=Color("294953")
@@ -100,12 +101,12 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  parent.add_child(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
  var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
- l.add_theme_color_override("font_shadow_color",Color(1,.98,.88,.3));l.add_theme_constant_override("shadow_offset_y",1)
+ l.add_theme_color_override("font_shadow_color",Color(0,.03,.07,.8));l.add_theme_constant_override("shadow_offset_y",1)
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);return l
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",27)
- b.add_theme_color_override("font_color",Color("31251a") if primary else Color("143a60"))
+ b.add_theme_color_override("font_color",CREAM)
  b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("c3cecf"))
  b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
@@ -115,6 +116,9 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
  var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
 func icon_texture(key:String) -> Texture2D:
+ var heroic={"attack":Rect2(90,20,520,420),"hero":Rect2(710,0,460,449),"build":Rect2(95,447,530,376),"training":Rect2(715,450,485,370),"army":Rect2(75,826,558,380),"portrait":Rect2(667,812,570,430)}
+ if heroic.has(key):
+  var art=AtlasTexture.new();art.atlas=load("res://assets3d/icons/heroic-actions.png");art.region=heroic[key];art.filter_clip=true;return art
  var mapping={"wood":Vector2(0,0),"stone":Vector2(1,0),"gold":Vector2(0,1),"wall":Vector2(1,1)}
  if mapping.has(key):
   var texture=AtlasTexture.new();texture.atlas=load("res://assets3d/icons/resources-modern.png");var cell=texture.atlas.get_width()/2
@@ -124,7 +128,7 @@ func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Call
  var b=button(parent,"",rect,callback,primary);b.name="Action_"+key;b.tooltip_text=title;b.set_meta("icon_key",key)
  var h=minf(47,rect.size.y-32) if title!="" else minf(46,rect.size.y-12)
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
- if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,Color("30291e") if primary else Color("143a60"),true)
+ if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,CREAM,true)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
  var index=0
@@ -205,7 +209,7 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.10","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.11","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
 func deployment_preview_points() -> Array:

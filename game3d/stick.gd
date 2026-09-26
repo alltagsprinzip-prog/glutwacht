@@ -38,14 +38,14 @@ func _draw():
  var radius=minf(size.x,size.y)*.43
  var knob=radius*.34
  draw_circle(c+Vector2(0,5),radius+3,Color(.015,.035,.045,.6))
- draw_circle(c,radius,Color(.05,.12,.16,.76))
- draw_arc(c,radius,0,TAU,64,Color("ead29b"),3,true)
+ draw_circle(c,radius,Color(.06,.14,.23,.48))
+ draw_arc(c,radius,0,TAU,64,Color("a9c9e1a0"),3,true)
  draw_arc(c,radius*.72,0,TAU,64,Color(.65,.80,.80,.28),2,true)
  for i in range(4):
   var d=Vector2.RIGHT.rotated(i*PI/2)
-  draw_line(c+d*radius*.78,c+d*radius*.9,Color("ead29b"),3,true)
+  draw_line(c+d*radius*.78,c+d*radius*.9,Color("a9c9e1a0"),3,true)
  var center=c+value*radius*.62
  draw_circle(center+Vector2(0,4),knob+2,Color(.015,.035,.045,.8))
- draw_circle(center,knob,Color("dec493"))
- draw_circle(center-Vector2(0,4),knob*.78,Color("f6e5bd"))
- draw_arc(center,knob,0,TAU,32,Color("fff2cd"),2,true)
+ draw_circle(center,knob,Color("92aac1"))
+ draw_circle(center-Vector2(0,4),knob*.78,Color("d1e3f4"))
+ draw_arc(center,knob,0,TAU,32,Color("f3f7ff"),2,true)

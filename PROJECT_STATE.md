@@ -56,3 +56,7 @@ Verbindlich: docs/CHANGE_2026-09-26_ACCOUNTS.md. Code fd82fa6faf84223cb2508b7f02
 - Finale Screenshots von Hauptansicht, Upgradedialog und Fluss geprüft; Ressourcenbalken und Wasserhöhe korrigiert.
 - Weiterhin offen: tatsächliche E-Mail-Registrierung/Recovery und zwei echte Nutzerkonten auf zwei physischen Geräten, iPhone-Leistung; weitere grafische Verfeinerung. Spätere Freischaltung weiterer Helden noch nicht implementiert.
 - Packaging-Helfer ersetzt versionierten iframe-Pfad nun idempotent; Dateigleichheit und stabile Save-Namespace lokal geprüft.
+
+## Heroic Pop – 26.09.2026
+
+Nutzer wählte Entwurf 1. Umsetzung: kompaktes Navy/Gold-HUD, horizontale Ressourcen, Profil mit eigenem gerenderten Portrait, fünf große Navigationskacheln, runder orangefarbener Angriff rechts, Shop oben rechts, transparenter silberner Joystick, durchgängige dunkle Dialoge. Originalatlas heroic-actions.png enthält sechs neue plastische Icons. Haupthaus mit blauem Dach, Goldfirst und zwei Ecktürmen. Keine Save-/Accountlogik geändert, Schema 7 und /v08/ erhalten. Layouttest 154/154 lokal erfolgreich; finale Render-/Touch-/Browserprüfung und Veröffentlichung folgen. Der Entwurf ist eine künstlerische Referenz; die laufende 3D-Welt wird nicht durch das statische Konzeptbild ersetzt.

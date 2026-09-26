@@ -51,7 +51,7 @@ const assert=require('node:assert/strict');
   console.log('Joystick observations',JSON.stringify({start,moved}));
   assert.ok(Math.hypot(moved.hero_x-start.hero_x,moved.hero_z-start.hero_z)>1,'joystick moves hero');
   await page.screenshot({path:'logs/browser/home.png'});
-  for(const [x,y,name,closeX] of [[313,654,'catalog',1104],[1188,654,'shop',1025]]){
+  for(const [x,y,name,closeX] of [[366,654,'catalog',1104],[1215,140,'shop',1025]]){
    await tap(x,y);await wait(new Function(`return window.__glutwacht?.dialog===${JSON.stringify(name)}`));
    await tap(closeX,name==='catalog'?107:129);
    await wait(()=>window.__glutwacht?.dialog==='');
@@ -60,7 +60,7 @@ const assert=require('node:assert/strict');
   await wait(()=>window.__glutwacht?.mode==='home' && window.__glutwacht.dialog==='',120000);
   assert.equal((await state()).hero,'warrior','hero selection survives browser reload');
   assert.equal((await state()).gold,start.gold,'resources survive reload');
-  await tap(100,654);await wait(()=>window.__glutwacht?.mode==='scout');
+  await tap(1170,654);await wait(()=>window.__glutwacht?.mode==='scout');
   await tap(1170,653);await wait(()=>window.__glutwacht?.mode==='raid');
   for(let i=0;i<5;i++){
    const before=await state();

@@ -42,17 +42,27 @@ static func draw(w,b:Dictionary,parent:Node3D) -> float:
    w.box(parent,Vector3(0,.45,0),Vector3(6.4,.75,5.2),stone)
    for x in [-2.9,2.9]:
     for z in [-2.25,2.25]:column(w,parent,Vector3(x,.4,z),2.9,.42,stone.lightened(.13))
-   roof(w,parent,Vector3(0,3.15,0),7.4,6.2,2.5,Color("e87832"))
-   roof(w,parent,Vector3(0,3.4,0),6.7,5.5,2.45,Color("ffad45"))
+   roof(w,parent,Vector3(0,3.15,0),7.4,6.2,2.5,Color("164a79"))
+   roof(w,parent,Vector3(0,3.4,0),6.7,5.5,2.45,Color("2978b2"))
    w.box(parent,Vector3(0,1.2,2.47),Vector3(1.6,2.2,.18),timber.darkened(.2))
    w.box(parent,Vector3(0,2.45,2.62),Vector3(2.15,.35,.6),gold)
    for x in [-1.95,1.95]:
     w.box(parent,Vector3(x,1.9,2.46),Vector3(.9,.95,.13),Color("3c91bf"))
     w.box(parent,Vector3(x,1.9,2.55),Vector3(.1,1.0,.1),gold)
    w.box(parent,Vector3(0,.12,3.05),Vector3(2.2,.22,1.25),stone)
+   # Heroic Pop: blue roof, gold ridge, compact defensive turrets and framed entry.
+   w.box(parent,Vector3(0,5.87,0),Vector3(.19,.18,5.7),gold)
+   for x in [-2.65,2.65]:
+    column(w,parent,Vector3(x,0,2.28),3.9,.61,stone.lightened(.15))
+    roof(w,parent,Vector3(x,3.9,2.28),1.6,1.65,1.3,accent)
+    w.box(parent,Vector3(x,3.0,2.84),Vector3(.27,.66,.10),Color("173957"))
+    w.box(parent,Vector3(x,2.59,2.86),Vector3(.48,.12,.15),gold)
+   for z in [-1.9,-.95,0.0,.95,1.9]:
+    for side in [-1,1]:
+     var seam=w.box(parent,Vector3(side*1.69,4.63,z),Vector3(4.14,.055,.06),Color("195987"));seam.rotation.z=-side*.63
    height=6.0
    for x in [-size*.44,size*.44]:w.banner(parent,Vector3(x,0,size*.3),3.5+float(tier)*.35,enemy)
-   if level>=3:w.asset("House_1.obj",parent,Vector3(2.7,.16,-2.1),3.2,"width",PI/2,Color("ea9b38"))
+   if level>=3:w.asset("House_1.obj",parent,Vector3(2.7,.16,-2.1),3.2,"width",PI/2,Color("3788be"))
    if level>=5:
     column(w,parent,Vector3(-3.4,0,2.6),3.9,.85,stone)
     roof(w,parent,Vector3(-3.4,3.9,2.6),2.1,2.1,1.2,accent)
