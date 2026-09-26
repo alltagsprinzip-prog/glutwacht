@@ -11,8 +11,63 @@ concurrency:
   group: glutwacht-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  native-account-input:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          npm install --prefix "$RUNNER_TEMP/account-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/account-browser/node_modules/playwright/cli.js" install --with-deps chromium webkit
+          NODE_PATH="$RUNNER_TEMP/account-browser/node_modules" node tools/web_account.test.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-account-input
+          path: logs/account-browser
+  art-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: true
+      - name: Import and verify isolated art preview
+        run: |
+          python3 tools/check_godot.py logs/art-import.log godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/art-rules.log godot --headless --path . --script tests3d/art_preview_suite.gd
+      - name: Render actual playable village and mobile framing
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/art
+        run: |
+          mkdir -p logs/art
+          python3 tools/check_godot.py logs/art-render.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/art_preview_render.gd
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Export and exercise actual art preview in browser
+        run: |
+          mkdir -p dist/v08
+          python3 tools/check_godot.py logs/art-export.log godot --headless --path . --export-release Web dist/v08/index.html
+          python3 tools/web_bootstrap.py dist/v08
+          npm install --prefix "$RUNNER_TEMP/atelier-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/atelier-browser/node_modules/playwright/cli.js" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/atelier-browser/node_modules" node tools/art_web_smoke.cjs
+          NODE_PATH="$RUNNER_TEMP/atelier-browser/node_modules" node tools/web_compression.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: art-preview-review
+          path: logs
   validate:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - name: Godot 4.7.2 and export templates
@@ -22,10 +77,28 @@ jobs:
           export-templates: true
       - name: Import all resources and reject script errors
         run: python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
+      - name: Email callback privacy checks
+        run: node tools/auth_callback.test.cjs
       - name: Headless startup
         run: python3 tools/check_godot.py logs/start.log godot --headless --audio-driver Dummy --path . --quit-after 120
+      - name: Mandatory login and troop guide
+        run: python3 tools/check_godot.py logs/login-gate.log godot --headless --path . --script tests3d/login_gate_suite.gd
+      - name: Squad deployment and contextual troop HUD
+        run: python3 tools/check_godot.py logs/friendly-combat.log godot --headless --path . --script tests3d/friendly_combat_suite.gd
       - name: Gameplay and save regression tests
         run: python3 tools/check_godot.py logs/rules.log godot --headless --path . --script tests3d/release_suite.gd
+      - name: HUD ability rules
+        run: python3 tools/check_godot.py logs/hud_rules.log godot --headless --path . --script tests3d/hud_rules.gd
+      - name: Account and save regression tests
+        run: python3 tools/check_godot.py logs/account_save_suite.log godot --headless --path . --script tests3d/account_save_suite.gd
+      - name: Onboarding and sync retry tests
+        run: python3 tools/check_godot.py logs/onboarding.log godot --headless --path . --script tests3d/onboarding_sync_suite.gd
+      - name: Campaign progression and save tests
+        run: python3 tools/check_godot.py logs/campaign.log godot --headless --path . --script tests3d/campaign_suite.gd
+      - name: Troop unlock and progression tests
+        run: python3 tools/check_godot.py logs/progression.log godot --headless --path . --script tests3d/progression_suite.gd
+      - name: HUD geometry and dialog tests
+        run: python3 tools/check_godot.py logs/hud_layout_suite.log godot --headless --path . --script tests3d/hud_layout_suite.gd
       - name: Existing upstream regression gate
         run: python3 tools/check_godot.py logs/upstream.log godot --headless --path . --script tests3d/release_gate.gd
       - name: Touch interface regression tests
@@ -35,7 +108,10 @@ jobs:
       - name: Rendered scene regression tests
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
-        run: python3 tools/check_godot.py logs/visual.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/visual_release.gd
+          GLUTWACHT_QA_DIR: logs/screenshots
+        run: |
+          mkdir -p logs/screenshots
+          python3 tools/check_godot.py logs/visual.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/visual_release.gd
       - name: Export validated web build
         run: |
           mkdir -p dist/v08

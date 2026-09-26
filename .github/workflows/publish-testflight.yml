@@ -1,0 +1,67 @@
+name: Publish Glutwacht to TestFlight
+on:
+  workflow_dispatch:
+  push:
+    branches: [update/masterplan-online-20260925]
+    paths:
+      - '.github/workflows/publish-testflight.yml'
+      - 'tools/publish_testflight.py'
+permissions:
+  contents: read
+concurrency:
+  group: glutwacht-testflight
+  cancel-in-progress: false
+jobs:
+  native-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+      - run: |
+          godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/native-account.log godot --headless --path . --script tests3d/native_account_suite.gd
+          python3 tools/check_godot.py logs/account-save.log godot --headless --path . --script tests3d/account_save_suite.gd
+  xcode-project:
+    needs: native-preflight
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install official Godot macOS editor and iOS templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot_root="$RUNNER_TEMP/glutwacht-godot"
+          mkdir -p "$godot_root/bin"
+          release="https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable"
+          curl --fail --location --retry 3 "$release/Godot_v4.7.2-stable_macos.universal.zip" -o "$godot_root/editor.zip"
+          unzip -q "$godot_root/editor.zip" -d "$godot_root"
+          ln -s "$godot_root/Godot.app/Contents/MacOS/Godot" "$godot_root/bin/godot"
+          echo "$godot_root/bin" >> "$GITHUB_PATH"
+          curl --fail --location --retry 3 "$release/Godot_v4.7.2-stable_export_templates.tpz" -o "$godot_root/templates.tpz"
+          templates_root="$HOME/Library/Application Support/Godot/export_templates/4.7.2.stable"
+          mkdir -p "$templates_root"
+          unzip -j -q "$godot_root/templates.tpz" templates/ios.zip templates/version.txt -d "$templates_root"
+      - name: Configure real Apple team and unique build number
+        env:
+          APPLE_TEAM_ID: ZYCVLZJMPG
+          GLUTWACHT_BUILD_NUMBER: ${{ github.run_number }}
+        run: godot --headless --path . --script tools/prepare_ios.gd
+      - name: Export Xcode project
+        run: |
+          godot --headless --editor --path . --import
+          godot --headless --path . --export-release iOS builds/ios/Glutwacht.zip
+      - name: Sign and upload to TestFlight
+        env:
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          GLUTWACHT: ${{ secrets.GLUTWACHT }}
+        run: python3 tools/publish_testflight.py

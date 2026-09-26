@@ -13,8 +13,11 @@ static func crystal(w,parent:Node,pos:Vector3,size:float,color:Color):
  var m=PrismMesh.new();m.size=Vector3(size,size*2,size);var n=w.mesh_node(m,pos,w.material(color,.25,true),parent);n.rotation.z=.17;return n
 static func draw(w,b:Dictionary,parent:Node3D) -> float:
  var kind=String(b.kind);var level=int(b.level);var tier=int((level-1)/2);var size=float(w.Catalog.BUILD[kind].size)
- var stone=Color("738a91");var gold=Color("edbb56");var timber=Color("865334");var enemy=b.get("team","ally")=="enemy"
- var accent=Color("dc8054") if enemy else Color("389aaa")
+ if w.mode=="home":
+  if kind=="hall":return w.ArtVillage.new().hall(parent,level)
+  if kind in ["barracks","smithy","lumber"]:return w.ArtVillage.new().cottage(parent,kind,level)
+ var stone=Color("b9bba2");var gold=Color("edbb56");var timber=Color("ac773f");var enemy=b.get("team","ally")=="enemy"
+ var accent=Color("dc8054") if enemy else Color("328de0")
  var height=3.5
  if kind=="wall":
   var h=1.15+float(tier)*.32;parent.rotation.y=int(b.get("rotation",0))*PI/2
@@ -32,14 +35,37 @@ static func draw(w,b:Dictionary,parent:Node3D) -> float:
   return h+1
  # A shaped foundation keeps every structure distinct from the ground.
  var foundation=Color("8c9480") if level<3 else stone
- w.box(parent,Vector3(0,.10,0),Vector3(size*.88,.20,size*.70),foundation)
+ var footing=w.disc(size*.42,foundation.lightened(.12),Vector3(0,.04,0),parent)
+ footing.scale.z=.79
  w.box(parent,Vector3(0,.21,size*.4),Vector3(size*.35,.25,.65),Color("c6c4a0"))
  match kind:
   "hall":
-   var house=w.asset("Inn.obj",parent,Vector3(0,.18,0),size*.90,"width",0,Color("ea9b38"));height=float(house.get_meta("height"))+.3
-   w.asset("Bell_Tower.obj",parent,Vector3(-2.8,.15,-2.2),2.4,"width",0,Color("dc802f"))
+   # Own broad, chunky silhouette with a two-layer roof and round corner buttresses.
+   w.box(parent,Vector3(0,1.65,0),Vector3(5.9,3.1,4.8),Color("f1d59b"))
+   w.box(parent,Vector3(0,.45,0),Vector3(6.4,.75,5.2),stone)
+   for x in [-2.9,2.9]:
+    for z in [-2.25,2.25]:column(w,parent,Vector3(x,.4,z),2.9,.42,stone.lightened(.13))
+   roof(w,parent,Vector3(0,3.15,0),7.4,6.2,2.5,Color("164a79"))
+   roof(w,parent,Vector3(0,3.4,0),6.7,5.5,2.45,Color("2978b2"))
+   w.box(parent,Vector3(0,1.2,2.47),Vector3(1.6,2.2,.18),timber.darkened(.2))
+   w.box(parent,Vector3(0,2.45,2.62),Vector3(2.15,.35,.6),gold)
+   for x in [-1.95,1.95]:
+    w.box(parent,Vector3(x,1.9,2.46),Vector3(.9,.95,.13),Color("3c91bf"))
+    w.box(parent,Vector3(x,1.9,2.55),Vector3(.1,1.0,.1),gold)
+   w.box(parent,Vector3(0,.12,3.05),Vector3(2.2,.22,1.25),stone)
+   # Heroic Pop: blue roof, gold ridge, compact defensive turrets and framed entry.
+   w.box(parent,Vector3(0,5.87,0),Vector3(.19,.18,5.7),gold)
+   for x in [-2.65,2.65]:
+    column(w,parent,Vector3(x,0,2.28),3.9,.61,stone.lightened(.15))
+    roof(w,parent,Vector3(x,3.9,2.28),1.6,1.65,1.3,accent)
+    w.box(parent,Vector3(x,3.0,2.84),Vector3(.27,.66,.10),Color("173957"))
+    w.box(parent,Vector3(x,2.59,2.86),Vector3(.48,.12,.15),gold)
+   for z in [-1.9,-.95,0.0,.95,1.9]:
+    for side in [-1,1]:
+     var seam=w.box(parent,Vector3(side*1.69,4.63,z),Vector3(4.14,.055,.06),Color("195987"));seam.rotation.z=-side*.63
+   height=6.0
    for x in [-size*.44,size*.44]:w.banner(parent,Vector3(x,0,size*.3),3.5+float(tier)*.35,enemy)
-   if level>=3:w.asset("House_1.obj",parent,Vector3(2.7,.16,-2.1),3.2,"width",PI/2,Color("ea9b38"))
+   if level>=3:w.asset("House_1.obj",parent,Vector3(2.7,.16,-2.1),3.2,"width",PI/2,Color("3788be"))
    if level>=5:
     column(w,parent,Vector3(-3.4,0,2.6),3.9,.85,stone)
     roof(w,parent,Vector3(-3.4,3.9,2.6),2.1,2.1,1.2,accent)
@@ -56,7 +82,7 @@ static func draw(w,b:Dictionary,parent:Node3D) -> float:
      w.box(parent,Vector3(x-.4+i*.4,.5,2.0),Vector3(.45,.12,.17),gold)
    column(w,parent,Vector3(0,0,3.1),2,.14,timber);w.box(parent,Vector3(0,1.25,3.1),Vector3(1.3,.45,.45),Color("b99a59"))
   "smithy":
-   var house=w.asset("Blacksmith.obj",parent,Vector3(-.5,.15,-.5),size*.82,"width",0,Color("425c70"));height=float(house.get_meta("height"))+.4
+   var house=w.asset("Blacksmith.obj",parent,Vector3(-.5,.15,-.5),size*.82,"width",0,Color("4e96c5"));height=float(house.get_meta("height"))+.4
    w.box(parent,Vector3(2.1,2.3,-1.4),Vector3(1.2,4.6,1.2),Color("4c5960"));height=maxf(height,5)
    for y in [1.0,2.2,3.4,4.5]:w.box(parent,Vector3(2.1,y,-1.4),Vector3(1.4,.14,1.4),stone)
    w.asset("Bonfire_Lit.obj",parent,Vector3(2.1,0,2),1.6,"width")
@@ -65,7 +91,7 @@ static func draw(w,b:Dictionary,parent:Node3D) -> float:
   "lumber":
    for x in [-2.2,2.2]:
     for z in [-1.7,1.7]:column(w,parent,Vector3(x,.2,z),2.5,.16,timber)
-   roof(w,parent,Vector3(0,2.7,0),5.6,4.6,1.4,Color("56864c"));height=4.3
+   roof(w,parent,Vector3(0,2.7,0),5.6,4.6,1.4,Color("81b847"));height=4.3
    w.asset("log_stackLarge.glb",parent,Vector3(-1.2,.2,0),1.65,"height")
    for i in range(3):
     var log=CylinderMesh.new();log.top_radius=.35;log.bottom_radius=.35;log.height=3.2;log.radial_segments=10

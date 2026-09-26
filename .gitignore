@@ -7,3 +7,7 @@ node_modules/
 
 dist/
 logs/
+builds/
+*.p12
+*.mobileprovision
+*.p8

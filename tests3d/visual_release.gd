@@ -17,6 +17,14 @@ func run():
  game=load("res://game3d/main.tscn").instantiate();game.save_path="user://qa-visual-release.json";root.add_child(game);await frame()
  game.progress.data.hero="warrior";game.progress.data.hero_id="warrior";game.close_dialog();game.refresh_home();game.modal_guard_until=0;await frame(20)
  await shot("home-final")
+ game.open_building("hall");await shot("upgrade-modern");game.close_dialog()
+ game.open_upgrades();await shot("progression-modern");game.close_dialog()
+ game.open_tutorial();await shot("tutorial-modern");game.close_dialog()
+ game.open_barracks_guide();await shot("barracks-guide");check(game.dialog=="troop_progression","barracks unlock guide opens");game.close_dialog()
+ var prior_pan=game.world.pan;game.world.pan=Vector2(31,15)
+ for i in range(90):game.world.sync(game.sim,1.0/60)
+ await shot("river-modern");game.world.pan=prior_pan
+
  var original_pan=game.world.pan
  game.pointer_begin(7,Vector2(650,410));game.pointer_move(7,Vector2(720,440));game.pointer_end(7,Vector2(720,440));check(game.world.pan!=original_pan,"free-ground drag pans village")
  game.world.pan=Vector2.ZERO;game.world.sync(game.sim,1);game.world.focus=Vector3.ZERO;game.world.sync(game.sim,1)
@@ -30,7 +38,15 @@ func run():
  game.selected_obstacle="o1";game.remove_selected_obstacle();check(game.progress.obstacle_job_for("o1").size()>0 and game.world.workers.size()>0,"obstacle removal renders a worker")
  await shot("worker-final")
  game.open_building("hall");await shot("upgrade-final");game.close_dialog();game.open_catalog();await shot("catalog-final");game.close_dialog()
+ game.open_upgrades();await shot("progression-map");game.close_dialog()
  game.open_army();await shot("army-final");game.close_dialog();game.open_training();await shot("training-final");game.close_dialog();game.open_shop();await shot("shop-final");game.close_dialog()
+ game.open_campaign();await shot("campaign-map")
+ check(game.dialog=="campaign","campaign map opens with ten stages")
+ game.open_campaign_stage(0);await shot("campaign-scout")
+ check(game.sim.campaign_index==0 and game.sim.mode=="scout","campaign card opens fixed scout target")
+ game.start_raid();check(game.sim.campaign_index==0 and game.sim.mode=="raid","campaign starts through ordinary battle controls")
+ game.choose_deploy_group(true);await shot("friendly-combat-squad")
+ game.return_home();game.open_account();await shot("account-entry");game.close_dialog()
  # Render every class and its skill. Fixtures are isolated from real saved profiles.
  for key in game.Catalog.HERO_ORDER:
   game.progress.data.hero=key;game.progress.data.hero_id=key;game.open_raid();game.start_raid();game.sim.hero.pos=Vector2(0,0);game.sim.enemies=[game.sim.unit("guard",Vector2(0,-2),2000,0,"enemy")];game.sim.buildings=[];game.sim.raid_building_total=1;game.world.setup(game.sim)
@@ -45,7 +61,10 @@ func run():
   var previous_count=0
   for level in [1,3,5,7,10]:
    var visual=Node3D.new();container.add_child(visual);game.World.Architecture.draw(game.world,{"kind":kind,"level":level,"team":"ally","rotation":0},visual)
-   var mesh_count=visual.find_children("*","GeometryInstance3D",true,false).size()
-   check(mesh_count>previous_count,kind+" tier "+str(level)+" has distinct geometry");previous_count=mesh_count;visual.queue_free();await frame()
+   # Count actual geometry, not scene nodes: batched models use one mesh per building.
+   var vertex_count=0
+   for model in visual.find_children("*","MeshInstance3D",true,false):
+    for surface in range(model.mesh.get_surface_count()):vertex_count+=model.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX].size()
+   check(vertex_count>previous_count,kind+" tier "+str(level)+" has distinct geometry");previous_count=vertex_count;visual.queue_free();await frame()
  container.queue_free();game.queue_free();await frame();DirAccess.remove_absolute("user://qa-visual-release.json")
  print("VISUAL_RELEASE_TESTS ",checks-failures,"/",checks);quit(1 if failures else 0)

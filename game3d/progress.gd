@@ -6,13 +6,14 @@ const MAX_LEVEL=10
 const TITLES={"hall":"Haupthaus","barracks":"Kaserne","smithy":"Schmiede"}
 var data:Dictionary
 var warning=""
-var protected_path=""
+var write_blocked=false
+var blocked_path=""
 var recent_gems=0
 func _init():data=fresh()
 func new_training() -> Dictionary:
  var heroes={}
  for key in Catalog.HERO_ORDER:heroes[key]={"power":0,"vitality":0,"skill":0}
- return {"heroes":heroes,"troops":{"melee":0,"archers":0}}
+ return {"heroes":heroes,"troops":{"melee":0,"archers":0,"shield":0,"siege":0}}
 func fresh_obstacles() -> Array:
  return [
   {"uid":"o1","kind":"tree","x":-27.0,"z":-24.0},
@@ -25,7 +26,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -51,7 +52,7 @@ func training_cost(group:String,key:String,attribute:String="") -> Dictionary:
 func train(group:String,key:String,attribute:String="") -> bool:
  if group not in ["heroes","troops"]:return false
  if group=="heroes" and (key!=String(data.hero) or not Catalog.HEROES.has(key) or attribute not in ["power","vitality","skill"]):return false
- if group=="troops" and (key not in ["melee","archers"] or not Catalog.troop_unlocked(key,int(data.hall),int(data.barracks))):return false
+ if group=="troops" and (key not in Catalog.TROOP_ORDER or not Catalog.troop_unlocked(key,int(data.hall),int(data.barracks))):return false
  if training_level(group,key,attribute)>=5:return false
  var c=training_cost(group,key,attribute)
  if not affordable(c):return false
@@ -59,13 +60,7 @@ func train(group:String,key:String,attribute:String="") -> bool:
  if group=="heroes":data.training.heroes[key][attribute]+=1
  else:data.training.troops[key]+=1
  return true
-func capacity() -> int:
- var camps=count_kind("camp")
- if camps==0:return mini(10,4+int(data.hall)*2)
- var total=8
- for b in all_buildings():
-  if b.kind=="camp":total+=2+int(b.level)*2
- return total
+func capacity() -> int:return Catalog.army_capacity(data)
 func storage() -> int:return 1200*int(data.hall)
 func all_buildings() -> Array:
  var out:Array=[]
@@ -113,14 +108,15 @@ func finish_upgrade(uid:String,target:int):
   for item in data.structures:
    if item.uid==uid:item.level=target
 func army(kind:String,change:int) -> bool:
- if kind not in ["melee","archers"] or not Catalog.troop_unlocked(kind,int(data.hall),int(data.barracks)):return false
+ if kind not in Catalog.TROOP_ORDER:return false
+ if change>0 and not Catalog.troop_unlocked(kind,int(data.hall),int(data.barracks)):return false
  var amount=int(data[kind])+change
- if amount<0 or int(data.melee)+int(data.archers)+change>capacity():return false
+ if amount<0 or (change>0 and Catalog.army_slots(data)+change*int(Catalog.TROOPS[kind].slots)>capacity()):return false
  data[kind]=amount;return true
 func can_change_hero() -> bool:return data.hero==""
 func choose_hero(key:String) -> bool:
  if not Catalog.HEROES.has(key) or not can_change_hero():return false
- data.hero=key;data.hero_id=key;return true
+ data.hero=key;data.hero_id=key;tutorial_event("hero");return true
 func count_kind(kind:String) -> int:
  var count=0
  for b in all_buildings():
@@ -131,7 +127,7 @@ func placement_error(kind:String,pos:Vector2,ignore_uid:String="") -> String:
  if not Catalog.unlocked(kind,int(data.hall)):return "Freischaltung ab Haupthaus-Stufe %d."%Catalog.required_hall(kind)
  var radius=float(Catalog.BUILD[kind].radius)
  if absf(pos.x)>31-radius or absf(pos.y)>31-radius:return "Außerhalb deiner Dorfgrenze."
- if ignore_uid=="" and count_kind(kind)>=int(Catalog.BUILD[kind].limit):return "Maximale Anzahl dieses Gebäudes erreicht."
+ if ignore_uid=="" and count_kind(kind)>=Catalog.building_limit(kind,int(data.hall)):return "Maximale Anzahl dieses Gebäudes erreicht."
  if pos.distance_to(Vector2(0,18))<4.5:return "Der Sammelplatz der Armee muss frei bleiben."
  for o in data.get("obstacles",[]):
   var r=1.8 if o.kind=="tree" else 1.5
@@ -254,9 +250,14 @@ func speedup(uid:String) -> bool:
  if job.is_empty():job=obstacle_job_for(uid)
  data.gems-=cost;job.finish=Time.get_unix_time_from_system();production();return true
 func store_file(path:String=SAVE) -> bool:
- if path==protected_path:
-  warning="Vorhandener Spielstand geschützt. Automatisches Speichern ist gesperrt."
+ if write_blocked and path==blocked_path:
+  warning="Unlesbarer Spielstand bleibt geschützt. Bitte eine gültige Sicherung importieren."
   return false
+ # Retain the last readable version before any schema migration or UI update writes.
+ if FileAccess.file_exists(path) and not FileAccess.file_exists(path+".before-hud"):
+  if DirAccess.copy_absolute(path,path+".before-hud")!=OK:
+   warning="Sicherung fehlgeschlagen; Spielstand wird nicht überschrieben."
+   return false
  var f=FileAccess.open(path+".tmp",FileAccess.WRITE)
  if f==null:warning="Speichern fehlgeschlagen.";return false
  f.store_string(JSON.stringify(data));f.close()
@@ -265,15 +266,22 @@ func store_file(path:String=SAVE) -> bool:
  return error==OK
 func load_file(path:String=SAVE) -> bool:
  if not FileAccess.file_exists(path):return false
- var decoder=JSON.new()
- var parse_error=decoder.parse(FileAccess.get_file_as_string(path))
- var parsed=decoder.data if parse_error==OK else null
- if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5,6,7]:
-  protected_path=path
-  warning="Spielstand nicht kompatibel oder unlesbar. Die Originaldatei bleibt unverändert; Speichern ist gesperrt."
+ var parser=JSON.new()
+ var parse_status=parser.parse(FileAccess.get_file_as_string(path))
+ var parsed=parser.data if parse_status==OK else null
+ if not validate_save(parsed).is_empty():
+  write_blocked=true;blocked_path=path
+  var backup=FileAccess.open(path+".unreadable",FileAccess.WRITE)
+  if backup:backup.store_string(FileAccess.get_file_as_string(path));backup.close()
+  warning="Spielstand unlesbar. Die Originaldatei wurde als Sicherung erhalten."
   return false
- protected_path=""
+ write_blocked=false;blocked_path=""
  var clean=fresh()
+ clean.player_name=String(parsed.get("player_name","Mein Dorf")).strip_edges().left(24)
+ if clean.player_name.is_empty():clean.player_name="Mein Dorf"
+ for task in parsed.get("claimed_tasks",[]):
+  if task in ["hero","hall2","training","victory"] and task not in clean.claimed_tasks:clean.claimed_tasks.append(task)
+ for stage in parsed.get("campaign_stars",{}):clean.campaign_stars[stage]=int(parsed.campaign_stars[stage])
  for k in ["wood","stone","gold","wins"]:clean[k]=clampi(int(parsed.get(k,clean[k])),0,999999)
  clean.gems=clampi(int(parsed.get("gems",clean.gems)),0,999999)
  clean.builder_bonus=clampi(int(parsed.get("builder_bonus",0)),0,1)
@@ -294,7 +302,7 @@ func load_file(path:String=SAVE) -> bool:
     if not b is Dictionary:continue
     var kind=String(b.get("kind",""));var uid=String(b.get("uid",""))
     if not Catalog.BUILD.has(kind) or TITLES.has(kind) or uid=="" or seen.has(uid) or TITLES.has(uid):continue
-    if clean.structures.size()>=56:break
+    if clean.structures.size()>=256:break
     seen[uid]=true
     clean.structures.append({"uid":uid,"kind":kind,"level":clampi(int(b.get("level",1)),1,MAX_LEVEL),"x":clampf(float(b.get("x",0)),-29,29),"z":clampf(float(b.get("z",0)),-29,29),"rotation":posmod(int(b.get("rotation",0)),2),"stock":clampf(float(b.get("stock",0)),0,140*clampi(int(b.get("level",1)),1,MAX_LEVEL))})
   clean.next_uid=maxi(3,int(parsed.get("next_uid",3)))
@@ -317,6 +325,7 @@ func load_file(path:String=SAVE) -> bool:
     if uid!="" and clean.obstacles.any(func(o):return o.uid==uid) and not clean.obstacle_jobs.any(func(j):return j.uid==uid) and finish_time>start_time and finish_time-start_time<=15.0:clean.obstacle_jobs.append({"uid":uid,"start":start_time,"finish":finish_time})
  clean.hero=String(parsed.get("hero_id",clean.hero)) if Catalog.HEROES.has(String(parsed.get("hero_id",clean.hero))) else clean.hero
  clean.hero_id=clean.hero
+ clean.tutorial_done=parsed.get("tutorial_done",["hero","build","upgrade","train","battle"] if clean.hero!="" else []).duplicate()
  var positions=parsed.get("core_positions",{})
  if positions is Dictionary:
   for key in TITLES:
@@ -325,6 +334,7 @@ func load_file(path:String=SAVE) -> bool:
  # Restore the roster only after camp capacity is known. Never truncate a valid old army.
  var saved_melee=maxi(0,int(parsed.get("melee",5)));var saved_archers=maxi(0,int(parsed.get("archers",0)))
  data.melee=mini(saved_melee,200);data.archers=mini(saved_archers,200)
+ for kind in ["shield","siege"]:data[kind]=clampi(int(parsed.get(kind,0)),0,200)
  if int(parsed.version)>=4:
   var training=parsed.get("training",{})
   if training is Dictionary:
@@ -334,7 +344,7 @@ func load_file(path:String=SAVE) -> bool:
      if heroes.get(k) is Dictionary:
       for a in ["power","vitality","skill"]:data.training.heroes[k][a]=clampi(int(heroes[k].get(a,0)),0,5)
    if troops is Dictionary:
-    for k in ["melee","archers"]:data.training.troops[k]=clampi(int(troops.get(k,0)),0,5)
+    for k in Catalog.TROOP_ORDER:data.training.troops[k]=clampi(int(troops.get(k,0)),0,5)
   var jobs=parsed.get("jobs",[])
   if jobs is Array:
    for job in jobs:
@@ -347,3 +357,81 @@ func load_file(path:String=SAVE) -> bool:
     if target!=int(b.level)+1 and not (bool(job.get("new",false)) and target==1 and b.level==1):continue
     data.jobs.append({"uid":uid,"start":start_time,"finish":finish_time,"target":target,"new":bool(job.get("new",false))})
  production();return true
+
+# Validate before coercion: malformed nested values must never replace a real save.
+static func validate_save(raw) -> String:
+ if not raw is Dictionary:return "Die Sicherung enthält kein Dorf."
+ if not raw.get("version") is float and not raw.get("version") is int:return "Version fehlt."
+ if int(raw.version) not in [2,3,4,5,6,7]:return "Unbekannte Spielstandversion."
+ for key in ["wood","stone","gold","gems","hall","barracks","smithy","melee","archers","shield","siege","wins","builder_bonus","next_uid","last_production"]:
+  if raw.has(key) and (not numeric(raw[key]) or float(raw[key])<0):return "Ungültiges Zahlenfeld: "+key
+ if not raw.get("campaign_stars",{}) is Dictionary:return "Ungültige Kampagne."
+ for stage in raw.get("campaign_stars",{}):
+  if not stage is String or stage not in ["0","1","2","3","4","5","6","7","8","9"]:return "Ungültiges Kampagnenlager."
+  var stars=raw.campaign_stars[stage]
+  if not numeric(stars) or float(stars)!=int(stars) or int(stars)<0 or int(stars)>3:return "Ungültige Kampagnensterne."
+ if raw.has("tutorial_done"):
+  if not raw.tutorial_done is Array:return "Ungültige Einführung."
+  for step in raw.tutorial_done:
+   if step not in ["hero","build","upgrade","train","battle"]:return "Ungültiger Einführungsschritt."
+ if raw.has("claimed_tasks") and not raw.claimed_tasks is Array:return "Ungültige Aufgaben."
+ for key in ["hero","hero_id","player_name"]:
+  if raw.has(key) and not raw[key] is String:return "Ungültiger Held."
+ for key in ["structures","jobs","obstacles","obstacle_jobs"]:
+  if not raw.get(key,[]) is Array:return "Ungültige Liste: "+key
+  if raw.get(key,[]).size()>256:return "Zu viele Einträge: "+key
+  var seen={}
+  for item in raw.get(key,[]):
+   if not item is Dictionary:return "Ungültiger Eintrag: "+key
+   if not item.get("uid") is String or item.uid=="" or seen.has(item.uid):return "Ungültige oder doppelte ID."
+   seen[item.uid]=true
+   for field in ["x","z","level","rotation","stock","start","finish","target"]:
+    if item.has(field) and not numeric(item[field]):return "Ungültiger Gebäudewert."
+   if item.has("kind") and not item.kind is String:return "Ungültiger Gebäudetyp."
+ for key in ["training","xp","core_positions"]:
+  if not raw.get(key,{}) is Dictionary:return "Ungültiges Feld: "+key
+ var training=raw.get("training",{})
+ for key in ["heroes","troops"]:
+  if not training.get(key,{}) is Dictionary:return "Ungültiges Training."
+ for hero in training.get("heroes",{}).values():
+  if not hero is Dictionary:return "Ungültiges Heldentraining."
+  for value in hero.values():
+   if not numeric(value):return "Ungültiger Trainingswert."
+ for value in training.get("troops",{}).values():
+  if not numeric(value):return "Ungültiger Truppenwert."
+ for value in raw.get("xp",{}).values():
+  if not numeric(value):return "Ungültige Erfahrung."
+ for position in raw.get("core_positions",{}).values():
+  if not position is Dictionary or not numeric(position.get("x")) or not numeric(position.get("z")):return "Ungültige Position."
+ return ""
+static func numeric(value) -> bool:
+ return (value is int or value is float) and is_finite(float(value))
+
+func tasks() -> Array:
+ var trained=false
+ for hero in data.training.heroes.values():
+  for value in hero.values():
+   if int(value)>0:trained=true
+ for value in data.training.troops.values():
+  if int(value)>0:trained=true
+ return [
+  {"id":"hero","title":"Wähle deinen Helden","done":data.hero!="","gold":30},
+  {"id":"hall2","title":"Haupthaus auf Stufe 2","done":int(data.hall)>=2,"gold":60},
+  {"id":"training","title":"Schließe ein Training ab","done":trained,"gold":40},
+  {"id":"victory","title":"Gewinne deinen ersten Angriff","done":int(data.wins)>0,"gold":80}
+ ]
+func claim_task(id:String) -> bool:
+ if id in data.claimed_tasks:return false
+ for task in tasks():
+  if task.id==id and task.done:
+   # Never silently discard a reward at a full store.
+   if int(data.gold)+int(task.gold)>storage():return false
+   data.gold+=int(task.gold);data.claimed_tasks.append(id);return true
+ return false
+
+func tutorial_event(step:String):
+ if step in ["hero","build","upgrade","train","battle"] and step not in data.tutorial_done:data.tutorial_done.append(step)
+func tutorial_step() -> String:
+ for step in ["hero","build","upgrade","train","battle"]:
+  if step not in data.tutorial_done:return step
+ return "done"

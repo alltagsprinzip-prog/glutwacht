@@ -1,11 +1,12 @@
 extends Node3D
+const Hud=preload("res://game3d/ui/hud.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 const Progress=preload("res://game3d/progress.gd")
 const Battle=preload("res://game3d/battle.gd")
 const World=preload("res://game3d/world.gd")
 const Stick=preload("res://game3d/stick.gd")
-const CREAM=Color("f6e9c7")
-const GOLD=Color("f2c46b")
+const CREAM=Color("fff5df")
+const GOLD=Color("f4c76c")
 var progress
 var save_path=Progress.SAVE
 var sim
@@ -52,6 +53,7 @@ var resource_labels={}
 var builder_text:Label
 var modal_guard_until=0
 var deploying=""
+var deploy_group=false
 var deploy_drag_last=Vector2(9999,9999)
 var deployment_buttons={}
 var selected_building=""
@@ -60,27 +62,66 @@ var gestures:Dictionary={}
 var loot_labels:Dictionary={}
 var stars_view:Array=[]
 var inspect_text:Label
-var browser_qa=false
 var last_frame_tick=0
+var browser_qa=false
+var hud_widgets:Dictionary={}
+var save_import_callback
+var account
+var account_active=false
+var cloud_clock=0.0
+var cloud_sync_paused=false
+var pending_import
+var art_preview=false
+var require_login=OS.has_feature("web") or OS.has_feature("ios")
+var account_notice=""
+func auth_locked() -> bool:
+ return require_login and not art_preview and not account_active
+func update_access():
+ world.visible=not auth_locked();hud.visible=not auth_locked()
+ if auth_locked():paused=true
 func _ready():
- if OS.has_feature("web"):browser_qa=bool(JavaScriptBridge.eval("new URLSearchParams(location.search).has('qa')"))
- progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data)
- world=World.new();add_child(world);world.setup(sim)
+ art_preview=art_preview or "--art-preview" in OS.get_cmdline_user_args()
+ if OS.has_feature("web"):art_preview=art_preview or bool(JavaScriptBridge.eval("new URLSearchParams(location.search).get('atelier')==='1'",true))
+ progress=Progress.new()
+ if art_preview:
+  progress.choose_hero("warrior");progress.data.player_name="Grafikprobe"
+  progress.data.tutorial_done=["hero","build","upgrade","train","battle"]
+  progress.data.wood=1100;progress.data.stone=1100;progress.data.gold=1100
+  progress.data.core_positions={"hall":{"x":0,"z":-7},"barracks":{"x":-10,"z":4},"smithy":{"x":11,"z":4}}
+  progress.data.structures[0].x=-13;progress.data.structures[0].z=-10
+  progress.data.structures[1].x=14;progress.data.structures[1].z=-10
+  progress.data.obstacles=[];progress.data.sound=false
+ else:progress.load_file(save_path)
+ sim=Battle.new(progress.data)
+ if art_preview:sim.hero.pos=Vector2(2,6)
+ world=World.new();world.art_preview=art_preview;add_child(world);world.setup(sim)
  var layer=CanvasLayer.new();add_child(layer);ui=Control.new();ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);ui.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(ui)
- var theme=Theme.new();theme.default_font_size=22;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
+ if art_preview or OS.has_feature("ios"):
+  get_window().content_scale_aspect=Window.CONTENT_SCALE_ASPECT_EXPAND
+  get_viewport().size_changed.connect(layout_art_preview);layout_art_preview()
+ var theme=Theme.new();theme.default_font_size=28;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
+ account=load("res://game3d/online/account.gd").new();add_child(account)
  sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
  if not progress.warning.is_empty():toast(progress.warning)
- if progress.data.hero=="":call_deferred("open_heroes")
+ update_access()
+ if auth_locked():open_account()
+ elif progress.write_blocked:call_deferred("open_save_tools")
+ if not art_preview:call_deferred("restore_account_start")
+func layout_art_preview():
+ ui.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+ ui.size=Vector2(1280,720);ui.position=(get_viewport().get_visible_rect().size-ui.size)*.5
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
  var s=StyleBoxFlat.new()
  s.bg_color=bg;s.border_color=border;s.set_border_width_all(width);s.set_corner_radius_all(radius)
  s.content_margin_left=0;s.content_margin_right=0;s.content_margin_top=0;s.content_margin_bottom=0
  s.shadow_color=Color(0,0,0,.22);s.shadow_size=6 if width>0 else 0;s.shadow_offset=Vector2(0,5) if width>0 else Vector2.ZERO
  return s
-func skin(key:String) -> StyleBoxTexture:
- var box=StyleBoxTexture.new();box.texture=load("res://assets3d/ui/"+key+".svg")
- for side in [SIDE_LEFT,SIDE_RIGHT,SIDE_TOP,SIDE_BOTTOM]:box.set_texture_margin(side,18)
- box.content_margin_left=0;box.content_margin_top=0;box.content_margin_right=0;box.content_margin_bottom=0
+func skin(key:String) -> StyleBoxFlat:
+ var palette={"panel":["23565e","e0bc7b"],"blue":["286b78","f4d598"],"gold":["c95b20","fff0b6"],"pressed":["214e60","fff0b6"],"disabled":["506a70","a7b7b5"],"selected":["357b55","fff0b6"]}
+ var colors=palette.get(key,palette.panel)
+ var box=style(Color(colors[0]),Color(colors[1]),2,22)
+ box.border_width_bottom=4;box.border_width_top=2
+ box.shadow_color=Color("163a4260");box.shadow_size=5;box.shadow_offset=Vector2(0,4)
  return box
 func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
  if color.v>.65:color=Color("294953")
@@ -90,131 +131,62 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  parent.add_child(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
  var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
- l.add_theme_color_override("font_shadow_color",Color(0.03,.10,.14,.75));l.add_theme_constant_override("shadow_offset_y",1)
+ l.add_theme_color_override("font_shadow_color",Color(0,.03,.07,.8));l.add_theme_constant_override("shadow_offset_y",1)
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);return l
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
- var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",19)
- b.add_theme_color_override("font_color",Color("3c2c17") if primary else Color.WHITE)
- b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("394b53") if primary else Color("abb7b0"))
+ var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",27)
+ b.add_theme_color_override("font_color",CREAM)
+ b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("c3cecf"))
  b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
- b.add_theme_stylebox_override("disabled",style(Color("acb9b9"),Color("586a6b"),3,13) if primary else skin("disabled"))
+ b.add_theme_stylebox_override("disabled",skin("disabled"))
  b.pressed.connect(callback);parent.add_child(b);return b
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
- var img=TextureRect.new();img.texture=load("res://assets3d/icons/"+key+".svg");img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(img);return img
+ var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
+func icon_texture(key:String) -> Texture2D:
+ var heroic={"attack":Rect2(90,20,520,420),"hero":Rect2(710,0,460,449),"build":Rect2(95,447,530,376),"training":Rect2(715,450,485,370),"army":Rect2(75,826,558,380),"portrait":Rect2(667,812,570,430)}
+ if heroic.has(key):
+  var art=AtlasTexture.new();art.atlas=load("res://assets3d/icons/heroic-actions.png");art.region=heroic[key];art.filter_clip=true;return art
+ var mapping={"wood":Vector2(0,0),"stone":Vector2(1,0),"gold":Vector2(0,1),"wall":Vector2(1,1)}
+ if mapping.has(key):
+  var texture=AtlasTexture.new();texture.atlas=load("res://assets3d/icons/resources-modern.png");var cell=texture.atlas.get_width()/2
+  texture.region=Rect2(mapping[key]*cell,Vector2(cell,cell));return texture
+ return load("res://assets3d/icons/"+key+".svg")
 func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=button(parent,"",rect,callback,primary);b.name="Action_"+key;b.tooltip_text=title;b.set_meta("icon_key",key)
- var h=minf(52,rect.size.y-32) if title!="" else minf(44,rect.size.y-12)
+ var h=minf(47,rect.size.y-32) if title!="" else minf(46,rect.size.y-12)
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
- if title!="":label(b,title,Rect2(4,rect.size.y-30,rect.size.x-8,26),19,Color("392c1c") if primary else CREAM,true)
+ b.button_down.connect(func():var art=b.get_child(0);art.pivot_offset=art.size*.5;art.scale=Vector2.ONE*.92)
+ b.button_up.connect(func():b.get_child(0).create_tween().tween_property(b.get_child(0),"scale",Vector2.ONE,.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
+ if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,CREAM,true)
+ var finish=load("res://game3d/ui/button_finish.gd").new();finish.size=rect.size;finish.round_button=key=="attack" and sim.mode=="home";b.add_child(finish)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
  var index=0
  for key in ["wood","stone","gold"]:
   var x=pos.x+float(index)*width/3;icon(parent,key,Rect2(x,pos.y,30,30));label(parent,str(int(values.get(key,0))),Rect2(x+33,pos.y,width/3-35,30),font_size);index+=1
 func stat_row(parent:Control,key:String,title:String,current:String,next:String,y:float):
- icon(parent,key,Rect2(342,y,28,28));label(parent,title,Rect2(379,y,160,30),17)
- label(parent,current+"  →  "+next,Rect2(540,y,250,30),20,GOLD,true)
+ icon(parent,key,Rect2(342,y,34,34));label(parent,title,Rect2(389,y,180,34),22)
+ label(parent,current+"  →  "+next,Rect2(585,y,410,34),26,GOLD,true)
 func choose_deploy(kind:String):
- cancel_gestures();deploying=kind;update_hud()
+ if int(sim.reserve.get(kind,0))<=0:return
+ cancel_gestures();deploying=kind;deploy_group=false;update_hud()
+func choose_deploy_group(value:bool):
+ cancel_gestures();deploy_group=value;update_hud()
 func clear_hud():
  if hud:ui.remove_child(hud);hud.queue_free()
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
  stick=null;production_text=null;collect_button=null;objective=null;health=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear();loot_labels.clear();stars_view.clear()
 func build_hud():
- clear_hud()
- stats=label(hud,"",Rect2(0,0,1,1),1);stats.hide()
- subtitle=label(hud,"",Rect2(0,0,1,1),1);subtitle.hide()
- toast_label=label(hud,"",Rect2(350,520,580,42),18,Color.WHITE,true)
- toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
- if sim.mode=="home" or build_kind!="":
-  panel(hud,Rect2(16,12,290,76));icon(hud,"badge",Rect2(14,12,70,76));label(hud,str(Catalog.level(progress.data,sim.hero_key())),Rect2(20,24,58,40),26,CREAM,true)
-  label(hud,"SONNENHAIN",Rect2(89,15,210,28),22,CREAM)
-  label(hud,"Haupthaus "+str(progress.data.hall),Rect2(91,45,200,23),15,CREAM)
-  panel(hud,Rect2(360,16,103,48));icon(hud,"worker",Rect2(365,21,34,34));builder_text=label(hud,"",Rect2(399,20,60,37),18,CREAM,true)
-  panel(hud,Rect2(477,16,120,48));icon(hud,"gems",Rect2(483,21,36,36));resource_labels.gems=label(hud,"",Rect2(521,20,68,38),18,CREAM,true)
-  var colors=[Color("ce964e"),Color("8aafc7"),Color("f2c04f")]
-  for i in range(3):
-   var key=["wood","stone","gold"][i];var y=14+i*49
-   panel(hud,Rect2(1000,y,260,43),Color(.08,.15,.17,.92))
-   var bar=ProgressBar.new();bar.show_percentage=false;bar.position=Vector2(1039,y+26);bar.size=Vector2(210,9);bar.max_value=progress.storage();bar.value=progress.data[key];bar.mouse_filter=Control.MOUSE_FILTER_IGNORE
-   bar.add_theme_stylebox_override("background",style(Color("152d34"),Color.TRANSPARENT,0,4));bar.add_theme_stylebox_override("fill",style(colors[i],Color.TRANSPARENT,0,4));hud.add_child(bar);resource_bars[key]=bar
-   resource_labels[key]=label(hud,"",Rect2(1044,y+1,200,25),18,CREAM,true);icon(hud,key,Rect2(992,y-1,48,48))
-  icon_button(hud,"menu","",Rect2(18,95,62,60),func():open_menu())
-  icon_button(hud,"hero","",Rect2(18,164,62,60),func():open_heroes())
-  if build_kind!="":build_placement_hud()
-  else:build_home_hud()
- elif sim.mode=="scout":build_scout_hud()
- else:build_combat_hud()
- update_hud()
- if is_instance_valid(modal):ui.move_child(modal,-1)
+ Hud.build(self)
 func build_home_hud():
- icon_button(hud,"attack","ANGRIFF",Rect2(18,608,172,94),func():open_raid(),true)
- icon_button(hud,"build","BAUEN",Rect2(972,608,136,94),func():open_catalog(),true)
- icon_button(hud,"shop","SHOP",Rect2(1120,608,136,94),func():open_shop(),true)
- create_stick()
- if selected_obstacle!="":
-  panel(hud,Rect2(423,605,435,97))
-  icon(hud,"worker",Rect2(439,624,36,36));icon(hud,"gold",Rect2(500,624,32,32));label(hud,"20",Rect2(536,624,48,32),18)
-  icon(hud,"clock",Rect2(582,624,30,30));label(hud,"10s",Rect2(615,624,48,32),18)
-  var remove=icon_button(hud,"worker","ENTFERNEN",Rect2(698,615,148,74),func():remove_selected_obstacle(),true)
-  remove.disabled=not progress.obstacle_job_for(selected_obstacle).is_empty() or progress.free_builders()==0
-  label(hud,"1–5 Juwelen",Rect2(444,665,220,24),14,GOLD)
- elif selected_building!="":
-  var b=progress.find_building(selected_building)
-  if b.is_empty():return
-  panel(hud,Rect2(342,565,596,137))
-  label(hud,Catalog.BUILD[b.kind].name+" · Stufe "+str(b.level),Rect2(352,569,576,32),21,CREAM,true)
-  var actions=[["info","INFO",func():open_building(b.uid)],["upgrade","AUSBAU",func():open_building(b.uid)],["move","BEWEGEN",func():begin_build(b.kind,b.uid)]]
-  if Catalog.RESOURCES.has(b.kind):actions.append(["collect","SAMMELN",func():collect_building_resource(b.uid)])
-  elif b.kind in ["barracks","camp"]:actions.append(["army","ARMEE",func():open_army()])
-  elif b.kind=="smithy":actions.append(["training","TRAINING",func():open_training()])
-  elif b.kind=="hero_hall":actions.append(["hero","HELD",func():open_heroes()])
-  var left=640-actions.size()*71
-  for i in range(actions.size()):
-   var a=actions[i];var btn=icon_button(hud,a[0],a[1],Rect2(left+i*142,610,132,83),a[2],i==1)
-   if a[0]=="move":btn.disabled=not progress.job_for(b.uid).is_empty()
+ Hud.home(self)
 func build_combat_hud():
- panel(hud,Rect2(18,18,251,134))
- label(hud,"ERBEUTET / MÖGLICH",Rect2(32,23,225,25),14,GOLD)
- for i in range(3):
-  var key=["wood","stone","gold"][i];icon(hud,key,Rect2(29,51+i*31,28,28));loot_labels[key]=label(hud,"",Rect2(65,49+i*31,193,30),17)
- panel(hud,Rect2(448,15,382,81))
- for i in range(3):stars_view.append(icon(hud,"star",Rect2(470+i*38,22,35,35)))
- objective=label(hud,"",Rect2(590,25,222,47),24,CREAM,true)
- icon_button(hud,"menu","",Rect2(1190,18,65,61),func():open_menu())
- create_stick()
- cooldowns.skill=icon_button(hud,sim.hero_key(),"SUPER",Rect2(1084,480,100,104),func():sim.skill(),true)
- cooldowns.skill.tooltip_text=Catalog.HEROES[sim.hero_key()].skill
- cooldowns.roll=icon_button(hud,"roll","",Rect2(1004,601,77,77),func():sim.roll(movement()))
- cooldowns.heal=icon_button(hud,"heal","",Rect2(1092,611,77,77),func():sim.heal())
- var attack=icon_button(hud,"attack","",Rect2(1180,582,85,108),func():pass,true)
- attack.button_down.connect(func():held=true);attack.button_up.connect(func():held=false)
- if sim.mode=="raid":
-  deployment_buttons.melee=icon_button(hud,"melee","",Rect2(402,599,110,98),func():choose_deploy("melee"))
-  deployment_buttons.archers=icon_button(hud,"archers","",Rect2(529,599,110,98),func():choose_deploy("archers"))
-  deployment_buttons.hero=icon_button(hud,sim.hero_key(),"HELD",Rect2(656,599,110,98),func():choose_deploy(""))
-  for kind in ["melee","archers"]:
-   var b:Button=deployment_buttons[kind];b.get_child(0).position=Vector2(29,9);b.get_child(0).size=Vector2(52,52)
-   var count=label(b,"",Rect2(8,62,94,28),23,CREAM,true);b.set_meta("count",count)
-  health=ProgressBar.new();health.show_percentage=false;health.position=Vector2(665,688);health.size=Vector2(92,7);health.show_percentage=false;health.max_value=sim.hero.max_hp;health.mouse_filter=Control.MOUSE_FILTER_IGNORE
-  health.add_theme_stylebox_override("background",style(Color("18323c"),Color.TRANSPARENT,0,3));health.add_theme_stylebox_override("fill",style(Color("83ca7c"),Color.TRANSPARENT,0,3));hud.add_child(health)
-  health_text=label(hud,"",Rect2(628,559,166,32),15,CREAM,true)
-  button(hud,"Beenden",Rect2(801,635,128,62),func():end_raid())
+ Hud.combat(self)
 func build_scout_hud():
- var v=sim.village
- panel(hud,Rect2(18,18,271,164))
- label(hud,v.name,Rect2(34,27,237,32),22,GOLD)
- var ratio=float(Catalog.village_strength(v))/maxf(1,float(Catalog.strength(progress.data)))
- label(hud,"STÄRKE  %d%%"%roundi(ratio*100),Rect2(34,63,237,27),15,CREAM)
- for i in range(3):
-  var key=["wood","stone","gold"][i];icon(hud,key,Rect2(34+i*78,100,32,32));label(hud,str(v[key]),Rect2(29+i*80,135,74,30),17,CREAM,true)
- button(hud,"Zurück",Rect2(20,630,142,66),func():return_home())
- button(hud,"Nächstes Dorf",Rect2(525,630,230,66),func():scout_next())
- var b=icon_button(hud,"attack","ANGREIFEN",Rect2(1096,609,160,88),func():start_raid(),true)
- b.disabled=int(progress.data.melee)+int(progress.data.archers)==0
+ Hud.scout(self)
 func build_placement_hud():
  panel(hud,Rect2(334,585,612,113))
  placement_text=label(hud,"",Rect2(350,592,580,35),17,CREAM,true)
@@ -223,53 +195,40 @@ func build_placement_hud():
  place_button=button(hud,"Hier bauen",Rect2(633,634,293,53),func():place_building(),true)
  update_ghost()
 func create_stick():
- stick=Stick.new()
- if sim.mode=="home":
-  stick.position=Vector2(26,424);stick.size=Vector2(156,156)
- else:
-  stick.position=Vector2(34,512);stick.size=Vector2(156,156)
- stick.name="HeroJoystick"
- hud.add_child(stick)
+ stick=Stick.new();stick.name="VillageJoystick" if sim.mode=="home" else "CombatJoystick"
+ stick.position=Vector2(20,432) if sim.mode=="home" else Vector2(20,409)
+ stick.size=Vector2(172,172) if sim.mode=="home" else Vector2(220,195);hud.add_child(stick)
 func update_hud():
- if not stats:return
- for key in resource_bars:
-  resource_bars[key].max_value=progress.storage();resource_bars[key].value=lerpf(float(resource_bars[key].value),float(progress.data[key]),.24)
-  resource_labels[key].text="%d / %d"%[roundi(resource_bars[key].value),progress.storage()]
- if resource_labels.has("gems"):resource_labels.gems.text=str(int(progress.data.get("gems",0)))
- if builder_text:builder_text.text="%d/%d"%[progress.free_builders(),progress.builders()]
- for key in loot_labels:loot_labels[key].text="%d / %d"%[sim.looted[key],sim.village[key]]
- if sim.active():
-  if health:health.value=sim.hero.hp;health_text.text="%d / %d"%[ceili(sim.hero.hp),sim.hero.max_hp]
-  if objective:
-   var remain=maxi(0,180-int(sim.time))
-   objective.text="%d%%   %d:%02d"%[sim.destruction_percent(),int(remain/60),remain%60]
-  for i in range(stars_view.size()):stars_view[i].modulate=Color.WHITE if i<sim.stars() else Color("4e6266")
-  if cooldowns.has("skill"):
-   cooldowns.skill.text="%.1f"%sim.skill_cd if sim.skill_cd>0 else ""
-   cooldowns.roll.text="%.1f"%sim.roll_cd if sim.roll_cd>0 else ""
-   cooldowns.heal.text=str(sim.potion)
-   cooldowns.skill.disabled=sim.skill_cd>0 or sim.hero.hp<=0;cooldowns.roll.disabled=sim.roll_cd>0 or sim.hero.hp<=0;cooldowns.heal.disabled=sim.potion==0 or sim.hero.hp<=0
-  for kind in ["melee","archers"]:
-   if not deployment_buttons.has(kind):continue
-   var btn:Button=deployment_buttons[kind];btn.get_meta("count").text="×%d"%sim.reserve[kind]
-   btn.disabled=sim.reserve[kind]<=0
-   var chosen=deploying==kind and not btn.disabled
-   btn.add_theme_stylebox_override("normal",style(Color("427d79") if chosen else Color("284854"),GOLD if chosen else Color("587985"),4 if chosen else 2,13))
-   btn.pivot_offset=btn.size/2;btn.scale=Vector2.ONE*(1.06 if chosen else 1.0)
-   if btn.disabled and deploying==kind:deploying=""
+ Hud.update(self)
 func movement() -> Vector2:
  if not stick or build_kind!="" or sim.mode=="scout":return Vector2.ZERO
  var v=stick.value
  v+=Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
  return world.screen_to_direction(v.limit_length(1))
 func _process(dt):
+ if OS.has_feature("web") and not art_preview:
+  var request=JavaScriptBridge.eval("window.GlutwachtAccount?.take()",true)
+  if request is String:
+   var submitted=JSON.parse_string(request)
+   if submitted is Dictionary and dialog=="account" and not account.busy:
+    if submitted.get("action","")=="recover":request_account_recovery(String(submitted.get("email","")))
+    elif submitted.get("action","") in ["login","register"]:authenticate(String(submitted.get("email","")),String(submitted.get("password","")),submitted.action=="register")
  var frame_tick=Time.get_ticks_usec()
- # Godot also caps its process delta at low FPS; use a monotonic wall clock for raids.
  var elapsed=float(frame_tick-last_frame_tick)/1000000.0 if last_frame_tick>0 else dt
  last_frame_tick=frame_tick
  if not sim:return
+ if auth_locked():
+  update_access()
+  if OS.has_feature("web"):JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"mode":"login","dialog":dialog,"login_required":true}))
+  return
+ update_access()
  clock+=dt;production_clock+=dt;save_clock+=dt;sound_time=maxf(0,sound_time-dt)
  if production_clock>=1:
+  if OS.has_feature("web") and not art_preview:
+   var imported=JavaScriptBridge.eval("window.__glutwachtImportText || null",true)
+   if imported is String and imported!="":
+    JavaScriptBridge.eval("window.__glutwachtImportText=null",true);prepare_save_import(imported)
+  var old_hall=int(progress.data.hall)
   var finished=progress.production();production_clock=0
   if finished:
    save()
@@ -278,8 +237,11 @@ func _process(dt):
     refresh_home()
     if old_dialog=="building":open_building(old_building)
     elif old_dialog=="upgrades":open_upgrades()
-    toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else "Bau abgeschlossen!")
+    toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else ("NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(int(progress.data.hall),[])) if int(progress.data.hall)>old_hall else "Bau abgeschlossen!"))
  if save_clock>=15:save();save_clock=0
+ cloud_clock+=dt
+ if account_active and account.dirty and not cloud_sync_paused and cloud_clock>=5 and not account.busy:
+  cloud_clock=0;sync_cloud()
  if not paused:
   update_gestures(dt)
   var hp=sim.hero.hp
@@ -289,22 +251,23 @@ func _process(dt):
   if held or Input.is_physical_key_pressed(KEY_J):
    if sim.attack_cd<=0:sim.strike()
   world.sync(sim,dt)
-  if sim.result!="" and not result_shown:result_shown=true;reward=sim.settle();save();tone("victory" if sim.result=="victory" else "death");open_result()
+  if sim.result!="" and not result_shown:result_shown=true;reward=sim.settle();progress.tutorial_event("battle");save();tone("victory" if sim.result=="victory" else "death");open_result()
  else:world.sync(sim,dt)
  toast_time=maxf(0,toast_time-dt)
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
- if OS.has_feature("web") and fmod(clock,1.0)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Sonnenhain 0.8","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":qa_deployment_points() if browser_qa else []}))
-# Read-only diagnostics for the exported browser gate; no gameplay controls are exposed.
-func qa_deployment_points() -> Array:
+ if OS.has_feature("web") and fmod(clock,.25)<dt:
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.11","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":deployment_preview_points()}))
+# Read-only visible candidate points used for automated browser input tests.
+# No state mutations or game-rule overrides are exposed to JavaScript.
+func deployment_preview_points() -> Array:
  var points=[]
  if sim.mode!="raid" or paused:return points
  for axis in range(4):
-  for z in range(-21,22,3):
-   var p=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
-   var screen=world.camera.unproject_position(Vector3(p.x,0,p.y))
-   if Rect2(280,160,690,355).has_point(screen) and sim.deployment_valid(p) and p.distance_to(sim.hero.pos)>2 and not blocks_world_at(screen):points.append([screen.x,screen.y])
+  for z in range(-21,22,6):
+   var pos=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
+   var screen=world.camera.unproject_position(Vector3(pos.x,0,pos.y))
+   if Rect2(180,185,690,340).has_point(screen) and sim.deployment_valid(pos) and pos.distance_to(sim.hero.pos)>2 and not blocks_world_at(screen):points.append([screen.x,screen.y])
  return points
 func blocks_world_at(pos:Vector2,node:Node=null) -> bool:
  if is_instance_valid(modal):return true
@@ -353,7 +316,8 @@ func deploy_at_screen(pos:Vector2) -> bool:
  if deploying=="" or paused:return false
  var ground=world.ground_position(pos)
  if ground.distance_to(sim.hero.pos)<1.6:return false
- if sim.deploy(deploying,ground):tone("equip");update_hud();return true
+ var placed=sim.deploy_squad(deploying,ground)>0 if deploy_group else sim.deploy(deploying,ground)
+ if placed:tone("equip");update_hud();return true
  if sim.reserve.get(deploying,0)>0:
   sim.effects.append({"kind":"invalid","pos":ground,"life":.4,"max":.4,"color":Color("ff675e")})
  return false
@@ -412,9 +376,16 @@ func world_tap(pos:Vector2):
 func _notification(what):
  if what==NOTIFICATION_APPLICATION_FOCUS_OUT and is_inside_tree() and sim:
   save()
+  if account_active and not account.busy and not cloud_sync_paused:sync_cloud()
   if not paused and build_kind=="":open_menu()
 func save():
- if not progress.store_file(save_path):toast(progress.warning)
+ if art_preview or auth_locked():return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ if account_active:
+  account.dirty=true;account.save_metadata()
+  if not account.busy:
+   account.status="Lokal gesichert · Cloud ausstehend"
+   if not cloud_sync_paused and cloud_clock>=0:call_deferred("sync_cloud")
 func tone(kind):
  if sound and progress.data.sound and sound_time<=0:sound_time=.14;sound.play("equip" if kind=="click" else kind)
 func toast(text:String):
@@ -449,20 +420,23 @@ func open_shop():
    if progress.shop_buy(it[0]):save();refresh_home();open_shop();tone("pickup"),true)
   buy.disabled=int(progress.data.gems)<it[2] or (it[0]=="builder" and int(progress.data.builder_bonus)>=1) or (it[0]!="builder" and int(progress.data[it[0]])>=progress.storage())
 func open_dialog(name:String,heading:String,sub:String) -> Control:
- close_dialog();dialog=name;paused=true;held=false;cancel_gestures()
+ close_dialog(true);dialog=name;paused=true;held=false;cancel_gestures()
  if stick:stick.release()
  modal=Control.new();modal.size=Vector2(1280,720);modal.z_index=100;ui.add_child(modal)
  var veil=ColorRect.new();veil.color=Color(.025,.065,.09,.58);veil.size=Vector2(1280,720);modal.add_child(veil)
  var rect=Rect2(210,92,860,536)
+ if name=="building":rect=Rect2(100,48,1080,624)
  if name in ["catalog","heroes"]:rect=Rect2(130,70,1020,580)
  var p=panel(modal,rect,Color("193943"))
  var trim=panel(p,Rect2(8,8,rect.size.x-16,67),Color("385962"));trim.mouse_filter=Control.MOUSE_FILTER_IGNORE
  label(p,heading,Rect2(25,12,rect.size.x-125,48),27,GOLD)
  if sub!="":label(p,sub,Rect2(27,82,rect.size.x-60,31),16,CREAM)
- if name!="result" and not (name=="heroes" and progress.data.hero==""):
-  var close=icon_button(p,"close","",Rect2(rect.size.x-78,9,66,57),func():close_dialog());close.name="CloseDialog";close.z_index=10
+ if not auth_locked() and name!="result" and not (name=="heroes" and progress.data.hero==""):
+  var close=icon_button(p,"close","",Rect2(rect.size.x-87,6,77,67),func():close_dialog());close.name="CloseDialog";close.z_index=10
  return p
-func close_dialog():
+func close_dialog(force:bool=false):
+ if auth_locked() and not force:return
+ if OS.has_feature("web"):JavaScriptBridge.eval("window.GlutwachtAccount?.hide()")
  if is_inside_tree():get_viewport().set_input_as_handled()
  modal_guard_until=Time.get_ticks_msec()+350
  hero_views.clear()
@@ -492,8 +466,8 @@ func open_catalog():
   var unlocked=Catalog.unlocked(k,int(progress.data.hall));var cc=d.cost
   if unlocked:costs(p,cc,Vector2(x+10,y+141),219,13)
   else:icon(p,"lock",Rect2(x+18,y+139,30,30));label(p,"Haupthaus %d"%Catalog.required_hall(k),Rect2(x+56,y+140,158,31),16)
-  var b=button(p,"BAUEN  %d/%d"%[progress.count_kind(k),d.limit] if unlocked else "GESPERRT",Rect2(x+10,y+177,212,40),func():begin_build(k),unlocked)
-  b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=d.limit or (k!="wall" and progress.free_builders()==0)
+  var b=button(p,"BAUEN  %d/%d"%[progress.count_kind(k),Catalog.building_limit(k,int(progress.data.hall))] if unlocked else "GESPERRT",Rect2(x+10,y+177,212,40),func():begin_build(k),unlocked)
+  b.disabled=not unlocked or not progress.affordable(cc) or progress.count_kind(k)>=Catalog.building_limit(k,int(progress.data.hall)) or (k!="wall" and progress.free_builders()==0)
 func begin_build(kind:String,uid:String=""):
  close_dialog();build_kind=kind;move_uid=uid;build_rotation=0;build_pos=Vector2(-15,20)
  if uid!="":
@@ -514,6 +488,7 @@ func place_building():
  if move_uid!="":success=progress.relocate(move_uid,build_pos,build_rotation)
  else:success=not progress.build(build_kind,build_pos,build_rotation).is_empty()
  if not success:update_ghost();return
+ if move_uid=="":progress.tutorial_event("build")
  save();tone("equip")
  if build_kind=="wall" and move_uid=="":
   var pos=build_pos;var rot=build_rotation;var pan=world.pan
@@ -522,10 +497,18 @@ func place_building():
 func cancel_build():
  build_kind="";move_uid="";world.build_focus=false;close_dialog();sim.home();world.setup(sim);build_hud()
 func open_upgrades():
- open_building("hall")
+ var p=open_dialog("progression","Dein Ausbaupfad","Haupthaus %d · Freischaltungen und Voraussetzungen"%progress.data.hall)
+ var scroll=ScrollContainer.new();scroll.position=Vector2(28,123);scroll.size=Vector2(802,330);scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;p.add_child(scroll)
+ var list=VBoxContainer.new();list.size_flags_horizontal=Control.SIZE_EXPAND_FILL;list.add_theme_constant_override("separation",12);scroll.add_child(list)
+ for lv in range(1,11):
+  var row=Panel.new();row.custom_minimum_size=Vector2(776,116);row.add_theme_stylebox_override("panel",skin("blue" if lv==int(progress.data.hall)+1 else "panel"));list.add_child(row)
+  icon(row,"hall",Rect2(12,18,76,76))
+  label(row,"HAUPTHAUS %d · %s"%[lv,"FREIGESCHALTET" if lv<=int(progress.data.hall) else "ALS NÄCHSTES" if lv==int(progress.data.hall)+1 else "SPÄTER"],Rect2(105,6,650,36),24,GOLD)
+  label(row," • ".join(Catalog.HALL_UNLOCKS[lv]),Rect2(105,42,640,68),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"HAUPTHAUS AUSBAUEN",Rect2(245,471,580,52),func():open_building("hall"),true)
 func upgrade_building(uid:String,from:String="detail"):
  if progress.upgrade(uid):
-  save();refresh_home();tone("equip")
+  progress.tutorial_event("upgrade");save();refresh_home();tone("equip")
   if from=="list":open_upgrades()
   else:open_building(uid)
 func open_building(uid:String):
@@ -542,14 +525,25 @@ func open_building(uid:String):
   stat_row(p,"collect","Vorrat",str(140*level),str(140*next),239)
  elif b.kind=="hall":
   stat_row(p,"collect","Lager",str(1200*level),str(1200*next),195)
-  label(p,"NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(next,[])),Rect2(342,238,470,58),15,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+
  elif b.kind=="barracks":
   stat_row(p,"melee","Angriff",str(18+5*level),str(18+5*next),195)
-  label(p,"NEU: Bogenschützen · Haupthaus 2" if level==1 else "Alle Soldaten: +30 Leben",Rect2(344,239,450,42),19,GOLD)
+
  elif b.kind=="smithy":stat_row(p,"melee","Heldenangriff","+%d"%(8*(level-1)),"+%d"%(8*(next-1)),195)
  elif b.kind=="tower":stat_row(p,"attack","Schaden",str(12+8*level),str(12+8*next),195)
  elif b.kind=="camp":stat_row(p,"army","Plätze",str(2+2*level),str(2+2*next),195)
- elif b.kind=="hero_hall":label(p,"Heldenprofil & Soforttraining",Rect2(346,199,460,48),20,GOLD)
+ elif b.kind=="hero_hall":label(p,"Held: +15 Leben je Hallenstufe",Rect2(346,199,460,48),20,GOLD)
+ label(p,"DAS BRINGT STUFE %d"%next if level<Progress.MAX_LEVEL else "VOLL AUSGEBAUT",Rect2(345,278,660,33),24,GOLD)
+ var benefit_scroll=ScrollContainer.new();benefit_scroll.position=Vector2(345,316);benefit_scroll.size=Vector2(680,111);benefit_scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED;p.add_child(benefit_scroll)
+ var benefits=VBoxContainer.new();benefits.size_flags_horizontal=Control.SIZE_EXPAND_FILL;benefit_scroll.add_child(benefits)
+ var entries=Catalog.HALL_UNLOCKS.get(next,[]) if b.kind=="hall" else [Catalog.upgrade_benefit(b.kind,next)]
+ if level>=Progress.MAX_LEVEL:entries=["Alle Vorteile dieser Gebäudestufe sind aktiv."]
+ for entry in entries:
+  var row=Control.new();row.custom_minimum_size=Vector2(650,64 if entry.length()>50 else 36);benefits.add_child(row)
+  var key="upgrade"
+  for pair in [["Bogen","archers"],["Mauer","wall"],["Wachturm","tower"],["Schild","shield"],["Goldmine","goldmine"],["Heerlager","camp"],["Bauarbeiter","worker"],["Steinwerfer","siege"],["Heldenhalle","hero_hall"]]:
+   if pair[0] in entry:key=pair[1];break
+  icon(row,key,Rect2(0,2,32,32));label(row,entry,Rect2(48,0,602,64 if entry.length()>50 else 36),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  var cc=progress.cost(uid);var job=progress.job_for(uid);var reason=""
  if not job.is_empty():reason="Bau läuft: %d s"%ceili(maxf(0,float(job.finish)-Time.get_unix_time_from_system()))
  elif level>=Progress.MAX_LEVEL:reason="MAXIMALE STUFE"
@@ -557,15 +551,16 @@ func open_building(uid:String):
  elif b.kind!="hall" and level>=progress.data.hall+1:reason="Benötigt Haupthaus %d"%level
  elif not progress.affordable(cc):reason="Rohstoffe fehlen"
  if level<Progress.MAX_LEVEL:
-  costs(p,cc,Vector2(344,314),450)
-  icon(p,"clock",Rect2(348,360,30,30));label(p,"%d s"%progress.build_seconds(b.kind,next),Rect2(385,359,110,34),20)
- label(p,reason,Rect2(344,395,470,32),17,Color("f3b080"),true)
- var up=icon_button(p,"upgrade","AUSBAUEN",Rect2(527,441,286,76),func():upgrade_building(uid),true);up.disabled=reason!=""
- if not job.is_empty():icon_button(p,"gems","%d · SOFORT"%progress.speedup_cost(uid),Rect2(35,441,232,76),func():
+  costs(p,cc,Vector2(344,441),680,25)
+  icon(p,"clock",Rect2(348,483,30,30));label(p,"%d s"%progress.build_seconds(b.kind,next),Rect2(390,480,190,34),20)
+ label(p,reason,Rect2(585,478,440,40),22,Color("a84632"),true)
+ var up=icon_button(p,"upgrade","AUSBAUEN",Rect2(695,532,340,76),func():upgrade_building(uid),true);up.disabled=reason!=""
+ if not job.is_empty():icon_button(p,"gems","%d · SOFORT"%progress.speedup_cost(uid),Rect2(35,532,300,76),func():
   if progress.speedup(uid):save();refresh_home();open_building(uid),true)
- elif Catalog.RESOURCES.has(b.kind):icon_button(p,"collect","SAMMELN",Rect2(35,441,232,76),func():collect_building_resource(uid))
- elif b.kind in ["barracks","camp"]:icon_button(p,"army","ARMEE",Rect2(35,441,232,76),func():open_army())
- elif b.kind in ["smithy","hero_hall"]:icon_button(p,"training","TRAINING",Rect2(35,441,232,76),func():open_training())
+ elif Catalog.RESOURCES.has(b.kind):icon_button(p,"collect","SAMMELN",Rect2(35,532,300,76),func():collect_building_resource(uid))
+ elif b.kind=="barracks":icon_button(p,"army","TRUPPEN",Rect2(35,532,300,76),func():open_barracks_guide())
+ elif b.kind=="camp":icon_button(p,"army","ARMEE",Rect2(35,532,300,76),func():open_army())
+ elif b.kind in ["smithy","hero_hall"]:icon_button(p,"training","TRAINING",Rect2(35,532,300,76),func():open_training())
 func confirm_remove(uid:String):
  var b=progress.find_building(uid)
  var p=open_dialog("remove",Catalog.BUILD[b.kind].name+" abbauen?","Dieser Bauplatz wird frei. Du erhältst keine Rohstoffe zurück.")
@@ -573,28 +568,45 @@ func confirm_remove(uid:String):
  button(p,"Behalten",Rect2(32,488,468,68),func():open_building(uid),true)
  button(p,"Gebäude abbauen",Rect2(526,488,517,68),func():progress.demolish(uid);save();close_dialog();refresh_home())
 func open_army():
- var p=open_dialog("army","Armee","Plätze %d / %d"%[int(progress.data.melee)+int(progress.data.archers),progress.capacity()])
- var count=int(progress.data.melee)+int(progress.data.archers)
- for i in range(2):
-  var k=["melee","archers"][i];var y=126+i*145;var unlocked=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
-  panel(p,Rect2(28,y,804,130),Color("34545b"));icon(p,k,Rect2(43,y+18,88,88))
-  label(p,"Schwertkämpfer" if i==0 else "Bogenschützen",Rect2(148,y+13,340,37),24,GOLD)
-  label(p,"Nahkampf" if i==0 else "Fernkampf",Rect2(149,y+51,310,28),17)
-  if not unlocked:label(p,"Benötigt Haupthaus 2 + Kaserne 2",Rect2(148,y+87,430,27),15,Color("f1b479"))
-  var minus=button(p,"−",Rect2(548,y+34,72,66),func():progress.army(k,-1);save();refresh_home();open_army());minus.disabled=progress.data[k]==0
-  label(p,str(progress.data[k]),Rect2(625,y+34,72,66),28,CREAM,true)
-  var plus=button(p,"+",Rect2(712,y+34,94,66),func():progress.army(k,1);save();refresh_home();open_army(),true);plus.disabled=count>=progress.capacity() or not unlocked
- button(p,"FERTIG",Rect2(545,447,282,65),func():close_dialog(),true)
-func open_training():
- var key=sim.hero_key();var p=open_dialog("training","Soforttraining","")
- var kinds=["power","vitality","skill","melee","archers"];var names=["Kraft","Leben","Fähigkeit","Schwerter","Bogenschützen"];var effects=["+6 Angriff","+25 Leben","+12% / −0,4s","+20 HP / +4 Angriff","+20 HP / +4 Angriff"]
- for i in range(5):
-  var group="heroes" if i<3 else "troops";var who=key if i<3 else kinds[i];var attribute=kinds[i] if i<3 else "";var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=87+i*86
-  panel(p,Rect2(23,y,814,78),Color("34545b"));icon(p,kinds[i],Rect2(31,y+13,46,46));label(p,names[i]+"  %d/5"%rank,Rect2(86,y+7,259,29),19,GOLD);label(p,effects[i],Rect2(86,y+40,260,28),15)
-  costs(p,cost,Vector2(355,y+24),310,15)
-  var b=icon_button(p,"upgrade","",Rect2(725,y+8,95,61),func():
-   if progress.train(group,who,attribute):save();refresh_home();open_training();tone("equip"),true)
-  b.disabled=rank>=5 or not progress.affordable(cost) or (group=="troops" and not Catalog.troop_unlocked(who,int(progress.data.hall),int(progress.data.barracks)))
+ var p=open_dialog("army","Armee","Plätze %d / %d · Zusammenstellen kostenlos"%[Catalog.army_slots(progress.data),progress.capacity()])
+ var count=Catalog.army_slots(progress.data)
+ for i in range(Catalog.TROOP_ORDER.size()):
+  var k=Catalog.TROOP_ORDER[i];var d=Catalog.TROOPS[k];var y=121+i*83;var unlocked=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
+  panel(p,Rect2(28,y,804,78));icon(p,k,Rect2(43,y+10,65,65))
+  label(p,d.name,Rect2(125,y+2,402,30),23,GOLD)
+  label(p,d.role if unlocked else "Haupthaus %d + Kaserne %d"%[d.hall,d.barracks],Rect2(125,y+36,410,38),17)
+  var minus=button(p,"−",Rect2(550,y+12,65,62),func():progress.army(k,-1);save();refresh_home();open_army());minus.disabled=int(progress.data.get(k,0))==0
+  label(p,str(progress.data.get(k,0)),Rect2(625,y+12,65,62),27,CREAM,true)
+  var plus=button(p,"+",Rect2(712,y+12,94,62),func():progress.army(k,1);save();refresh_home();open_army(),true);plus.disabled=count+int(d.slots)>progress.capacity() or not unlocked
+ button(p,"FERTIG",Rect2(545,471,282,55),func():close_dialog(),true)
+ button(p,"TRUPPEN FREISCHALTEN",Rect2(28,471,495,55),func():open_barracks_guide()).add_theme_font_size_override("font_size",23)
+func open_barracks_guide():
+ var p=open_dialog("troop_progression","Kaserne · neue Truppen","Deine Kaserne: Level %d · Dein Haupthaus: Level %d"%[progress.data.barracks,progress.data.hall])
+ for i in range(Catalog.TROOP_ORDER.size()):
+  var k=Catalog.TROOP_ORDER[i];var d=Catalog.TROOPS[k];var y=119+i*80
+  var unlocked=Catalog.troop_unlocked(k,int(progress.data.hall),int(progress.data.barracks))
+  panel(p,Rect2(25,y,810,76));icon(p,k,Rect2(36,y+6,64,64))
+  label(p,d.name+" · "+("VERFÜGBAR" if unlocked else "LEVEL %d"%d.barracks),Rect2(113,y+2,700,31),21,GOLD)
+  label(p,d.role,Rect2(113,y+32,700,24),18)
+  label(p,"Haupthaus %d + Kaserne %d"%[d.hall,d.barracks],Rect2(113,y+54,700,22),16)
+ label(p,"Jede Kasernenstufe zusätzlich: +30 Leben und +5 Angriff für Truppen.",Rect2(28,440,805,30),18,GOLD)
+ button(p,"KASERNE AUSBAUEN",Rect2(28,476,394,50),func():open_building("barracks"),true).add_theme_font_size_override("font_size",22)
+ button(p,"ARMEE AUFSTELLEN",Rect2(438,476,394,50),func():open_army()).add_theme_font_size_override("font_size",22)
+func open_training(troops:bool=false):
+ var key=sim.hero_key();var p=open_dialog("training","Soforttraining","Dauerhafte Verbesserung · keine Wartezeit")
+ button(p,"HELD",Rect2(28,117,388,51),func():open_training(false),not troops)
+ button(p,"TRUPPEN",Rect2(432,117,388,51),func():open_training(true),troops)
+ var kinds=Catalog.TROOP_ORDER if troops else ["power","vitality","skill"]
+ for i in range(kinds.size()):
+  var kind=kinds[i];var group="troops" if troops else "heroes";var who=kind if troops else key;var attribute="" if troops else kind
+  var rank=progress.training_level(group,who,attribute);var cost=progress.training_cost(group,who,attribute);var y=175+i*86
+  var title=Catalog.TROOPS[kind].name if troops else {"power":"Kraft","vitality":"Leben","skill":"Fähigkeit"}[kind]
+  var effect="+20 Leben / +4 Angriff" if troops else {"power":"+6 Angriff","vitality":"+25 Leben","skill":"+12% / −0,4s"}[kind]
+  panel(p,Rect2(23,y,814,83));icon(p,kind,Rect2(31,y+17,46,46));label(p,title+"  %d/5"%rank,Rect2(86,y+4,320,32),22,GOLD);label(p,effect,Rect2(86,y+40,310,29),19)
+  costs(p,cost,Vector2(410,y+24),280,21)
+  var b=icon_button(p,"upgrade","",Rect2(725,y+10,95,61),func():
+   if progress.train(group,who,attribute):progress.tutorial_event("train");save();refresh_home();open_training(troops);tone("equip"),true)
+  b.disabled=rank>=5 or not progress.affordable(cost) or (troops and not Catalog.troop_unlocked(who,int(progress.data.hall),int(progress.data.barracks)))
 func priority_name(key:String) -> String:return {"nearest":"Nächstes Ziel","defenses":"Verteidigung","hall":"Haupthaus","resources":"Rohstoffe"}.get(key,"Nächstes Ziel")
 func open_attack_plan():
  close_dialog()
@@ -619,7 +631,7 @@ func open_heroes():
   label(p,"Training ohne Wartezeit",Rect2(368,340,420,34),18,CREAM)
   icon_button(p,"training","TRAINING",Rect2(500,425,300,82),func():open_training(),true)
   return
- var p=open_dialog("heroes","Wähle deinen Helden","Diese Wahl ist dauerhaft.")
+ var p=open_dialog("heroes","Wähle deinen Helden","Dein Startheld begleitet dich. Weitere Helden kommen später.")
  for i in range(4):
   var key=Catalog.HERO_ORDER[i];var cc=Catalog.hero(key);var x=20+i*247
   panel(p,Rect2(x,126,239,430),Color("20323d"))
@@ -631,12 +643,26 @@ func open_heroes():
   var model=world.hero_showcase(key,scene);model.rotation.y=-.28;var camera=Camera3D.new();scene.add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.size=4.6;camera.position=Vector3(2.2,2.7,6);camera.look_at(Vector3(0,1.7,0));camera.current=true;hero_views.append(viewport)
   label(p,cc.title,Rect2(x+10,397,219,52),15,CREAM,true)
   var choose=button(p,"WÄHLEN",Rect2(x+12,482,215, 60),func():
-   if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud(),true)
+   if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud();open_tutorial(),true)
 func open_raid():
+ sim.campaign_index=-1
  close_dialog();build_kind="";selected_building="";world.build_focus=false;sim.scout(sim.selected_village);world.setup(sim);build_hud()
+func open_campaign():
+ var p=open_dialog("campaign","Kampagne · 10 Lager","")
+ label(p,"Ein Stern öffnet das nächste Lager. Feste Stärke · beste Sterne bleiben gespeichert.",Rect2(28,78,795,40),19).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ for i in range(10):
+  var stage=i;var camp=Catalog.campaign(stage);var unlocked=Catalog.campaign_unlocked(progress.data,stage)
+  var best=int(progress.data.get("campaign_stars",{}).get(str(stage),0))
+  var caption="%02d  %s\n%s"%[stage+1,camp.name,("★".repeat(best)+"☆".repeat(3-best)) if unlocked else "Vorheriges Lager besiegen"]
+  var b=button(p,caption,Rect2(28+(i%2)*407,126+int(i/2)*76,390,68),func():open_campaign_stage(stage),unlocked)
+  b.add_theme_font_size_override("font_size",21);b.disabled=not unlocked
+func open_campaign_stage(index:int):
+ if not sim.scout_campaign(index):toast("Gewinne zuerst einen Stern im vorherigen Lager.");return
+ close_dialog();build_kind="";selected_building="";world.build_focus=false;world.setup(sim);build_hud()
 func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
 func start_raid():
- if sim.start(-1,true):close_dialog();result_shown=false;deploying="melee" if sim.reserve.melee>0 else "archers";world.setup(sim);build_hud();tone("equip")
+ deploy_group=false
+ if sim.start(-1,true):close_dialog();result_shown=false;deploying=Catalog.TROOP_ORDER.filter(func(k):return int(sim.reserve.get(k,0))>0)[0];world.setup(sim);build_hud();tone("equip")
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
 func end_raid():
@@ -668,6 +694,267 @@ func open_menu():
  var rows=[["hero","WASD / Stick","Held bewegen"],["move","Ziehen / zwei Finger","Kamera / Zoom"],["attack","J / Angriff halten","Schlagen"],["skill","K · Leertaste · H","Fähigkeit · Rolle · Trank"]]
  for i in range(rows.size()):
   var y=191+i*53;icon(p,rows[i][0],Rect2(34,y,38,38));label(p,rows[i][1],Rect2(88,y,336,40),19,GOLD);label(p,rows[i][2],Rect2(450,y,356,40),18)
- label(p,"Spielstand lokal gespeichert · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
+ label(p,(account.status if account_active else "Lokaler Spielstand")+" · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
+ button(p,"Spielstand sichern / laden",Rect2(28,459,441,59),func():open_save_tools())
  if sim.active():button(p,"Angriff beenden",Rect2(500,459,328,59),func():close_dialog();end_raid())
  elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(500,459,328,59),func():return_home())
+
+func open_local_overview(status:bool=false):
+ var p=open_dialog("local_status" if status else "tasks","Dorfstatus" if status else "Nächste Schritte","")
+ var rows=[]
+ if status:
+  rows=[["worker","Bauarbeiter","%d frei von %d"%[progress.free_builders(),progress.builders()]], ["collect","Lager","%d Kapazität je Rohstoff"%progress.storage()], ["star","Siege",str(progress.data.wins)]]
+ else:
+  rows=[["upgrade","Dorf erweitern","Gebäude antippen und Ausbau prüfen"], ["army","Armee vorbereiten","%d / %d Armeeplätze belegt"%[Catalog.army_slots(progress.data),progress.capacity()]], ["attack","Beute sammeln","Gegner ansehen und gezielt angreifen"]]
+ for i in range(rows.size()):
+  var y=106+i*104;panel(p,Rect2(28,y,804,91));icon(p,rows[i][0],Rect2(45,y+17,53,53));label(p,rows[i][1],Rect2(117,y+9,655,32),24,GOLD);label(p,rows[i][2],Rect2(118,y+49,660,30),20)
+ label(p,"Lokaler Spielstand · kein Online-Postfach",Rect2(29,437,803,28),18,CREAM,true)
+ button(p,"Weiter",Rect2(543,474,279,51),func():close_dialog(),true)
+
+func open_save_tools():
+ if art_preview:toast("Grafikprobe: Dein echtes Dorf und deine Sicherungen bleiben unverändert.");return
+ var p=open_dialog("saves","Dein lokaler Spielstand","")
+ label(p,"Held, Gebäude, Training und Bauzeiten bleiben bei Updates erhalten.",Rect2(29,102,800,59),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Kontodorf: Auf einem anderen Gerät mit demselben Konto anmelden. Warte vorher auf CLOUD GESICHERT. Die Datei ist eine zusätzliche Sicherung." if account_active else "Ein anderer Browser hat einen eigenen lokalen Speicher. Sichere dein Dorf als Datei, bevor du den Ort wechselst.",Rect2(29,183,800,103),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,progress.warning if progress.write_blocked else ("Kontostand · "+account.status if account_active else "Du spielst lokal. Konto und Cloud findest du im Dorfprofil."),Rect2(29,317,800,60),20,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Sicherung speichern",Rect2(28,427,394,72),func():export_save(),true)
+ button(p,"Sicherung laden",Rect2(442,427,390,72),func():request_save_import())
+func export_save():
+ if OS.has_feature("web"):
+  var text=FileAccess.get_file_as_string(save_path) if progress.write_blocked else JSON.stringify(progress.data,"  ")
+  JavaScriptBridge.eval("(()=>{const b=new Blob(["+JSON.stringify(text)+"],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='Glutwacht-Spielstand.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);})();",true)
+  toast("Sicherungsdatei wurde angefordert.")
+ else:
+  var path="user://Glutwacht-Spielstand.json";var f=FileAccess.open(path,FileAccess.WRITE)
+  if f:f.store_string(FileAccess.get_file_as_string(save_path) if progress.write_blocked else JSON.stringify(progress.data,"  "));f.close();toast("Sicherung: "+ProjectSettings.globalize_path(path))
+func request_save_import():
+ if OS.has_feature("web"):
+  JavaScriptBridge.eval("(()=>{const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{const f=i.files[0];if(f&&f.size<1048576)window.__glutwachtImportText=await f.text();};i.click();})();",true)
+ else:toast("Sicherungsimport im Browser öffnen.")
+func prepare_save_import(text:String):
+ if art_preview:return
+ if text.length()>1048576:toast("Datei ist zu groß.");return
+ var parser=JSON.new();var status=parser.parse(text)
+ var raw=parser.data if status==OK else null
+ if not Progress.validate_save(raw).is_empty():toast("Ungültige oder neuere Sicherung; nichts wurde verändert.");return
+ var temp="user://import-validation.json";var f=FileAccess.open(temp,FileAccess.WRITE)
+ if f==null:toast("Datei konnte nicht geprüft werden.");return
+ f.store_string(text);f.close();var probe=Progress.new();var valid=probe.load_file(temp);DirAccess.remove_absolute(temp)
+ if not valid:toast("Sicherung unlesbar; nichts wurde verändert.");return
+ pending_import=probe
+ var p=open_dialog("import_confirm","Sicherung wiederherstellen?","")
+ label(p,"Haupthaus %d · %s\nHolz %d · Stein %d · Gold %d"%[probe.data.hall,Catalog.hero(probe.data.hero).name,probe.data.wood,probe.data.stone,probe.data.gold],Rect2(32,121,790,128),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Die Datei ersetzt das lokale Dorf an dieser Adresse.\nDer bisherige Stand wird vorher als Sicherheitskopie behalten.",Rect2(32,283,790,87),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Abbrechen",Rect2(28,427,386,71),func():pending_import=null;close_dialog())
+ button(p,"Wiederherstellen",Rect2(437,427,391,71),func():confirm_save_import(),true)
+func confirm_save_import():
+ if pending_import==null:return
+ if FileAccess.file_exists(save_path) and DirAccess.copy_absolute(save_path,save_path+".before-import")!=OK:toast("Backup fehlgeschlagen; Import wurde abgebrochen.");return
+ if not pending_import.store_file(save_path):toast("Speichern fehlgeschlagen; Import abgebrochen.");return
+ progress=pending_import;pending_import=null;sim=Battle.new(progress.data);return_home();toast("Sicherung geladen.")
+
+func open_profile():
+ var p=open_dialog("profile","Dein Dorf","")
+ label(p,"Dorfname",Rect2(32,102,790,40),27,GOLD)
+ var field=LineEdit.new();field.position=Vector2(32,156);field.size=Vector2(790,64);field.max_length=24;field.text=progress.data.get("player_name","Mein Dorf");p.add_child(field)
+ label(p,account.status if account_active else "Gastdorf · lokal gespeichert",Rect2(32,237,790,35),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Namen speichern",Rect2(32,345,790,65),func():
+  var value=field.text.strip_edges()
+  if value.is_empty():toast("Bitte einen Dorfnamen eingeben.");return
+  progress.data.player_name=value;save();close_dialog();build_hud(),true)
+ button(p,"Konto / Cloud",Rect2(32,430,380,65),func():open_account())
+ button(p,"Freunde einladen",Rect2(32,279,790,53),func():share_test_link())
+ button(p,"Sicherung",Rect2(430,430,392,65),func():open_save_tools())
+func open_tasks():
+ var p=open_dialog("tasks","Deine ersten Ziele","Belohnungen können einmalig abgeholt werden.")
+ var tasks=progress.tasks()
+ for i in range(tasks.size()):
+  var task=tasks[i];var y=107+i*94
+  label(p,task.title,Rect2(28,y,535,38),25)
+  label(p,"+%d Gold"%task.gold,Rect2(28,y+38,400,32),21,GOLD)
+  var claimed=task.id in progress.data.claimed_tasks
+  var claim=button(p,"Erledigt" if claimed else ("Abholen" if task.done else "Offen"),Rect2(600,y+4,226,67),func():
+   if progress.claim_task(task.id):save();open_tasks()
+   else:toast("Erst Gold ausgeben: Dein Lager ist voll."),task.done and not claimed)
+  claim.disabled=claimed or not task.done
+func open_inbox():
+ var p=open_dialog("inbox","Dorfchronik","")
+ label(p,"%s · %d Siege"%[progress.data.get("player_name","Mein Dorf"),progress.data.wins],Rect2(32,108,790,60),29,GOLD)
+ label(p,"%d abgeschlossene Ziele\n%d Gebäude im Dorf\n%d freie Bauarbeiter"%[progress.data.claimed_tasks.size(),progress.all_buildings().size(),progress.free_builders()],Rect2(32,194,790,148),27)
+ label(p,"Hier siehst du deinen Dorfstatus. Nachrichten anderer Spieler sind noch nicht verfügbar.",Rect2(32,374,790,100),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+
+func open_account():
+ if art_preview:toast("Grafikprobe ohne Konto. Dein gespeichertes Dorf liegt unter dem normalen Spiellink.");return
+ if account.recovering:open_recovery_password();return
+ var p=open_dialog("account","Konto und Cloud","")
+ if not account.configured():
+  label(p,"Die Konten-Anbindung ist für diesen Build noch nicht eingerichtet. Dein lokales Dorf bleibt spielbar und gespeichert.",Rect2(32,125,790,185),27).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+  button(p,"Lokale Sicherung",Rect2(32,415,790,70),func():open_save_tools());return
+ if account.signed_in():
+  label(p,account.status+"\nPrivates Dorf · ohne Rangliste",Rect2(32,110,790,95),26,GOLD)
+  button(p,"Cloud-Stand laden",Rect2(32,231,790,67),func():load_cloud())
+  var upload=button(p,"Jetzt sichern",Rect2(32,318,790,67),func():sync_cloud(),true);upload.disabled=not account_active
+  button(p,"Abmelden" if require_login else "Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
+ if OS.has_feature("web") and bool(JavaScriptBridge.eval("!!window.GlutwachtAccount",true)):
+  JavaScriptBridge.eval("window.GlutwachtAccount.show("+JSON.stringify(account_notice)+")");return
+ if OS.has_feature("ios"):
+  var form=load("res://game3d/ui/native_account_form.gd").new();p.add_child(form);form.configure(self,p.size);return
+ var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
+ var password=LineEdit.new();password.placeholder_text="Passwort · bei Registrierung mindestens 12 Zeichen";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
+ label(p,account_notice if account_notice!="" else "Melde dich an oder erstelle ein Konto. Dein Dorf wird automatisch diesem Konto zugeordnet und gespeichert.",Rect2(32,286,790,82),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Anmelden",Rect2(32,378,380,65),func():authenticate(email.text,password.text,false),true)
+ button(p,"Registrieren",Rect2(434,378,388,65),func():authenticate(email.text,password.text,true))
+ button(p,"Passwort vergessen",Rect2(32,461,790,54),func():request_account_recovery(email.text))
+func authenticate(email:String,password:String,register:bool):
+ if art_preview:return
+ if account.busy:return
+ if email.strip_edges().is_empty() or password.is_empty():account_notice="Bitte E-Mail und Passwort eingeben.";open_account();return
+ account_notice="Verbindung wird hergestellt …";open_account()
+ var result=await account.login(email,password,register,web_redirect())
+ if not result.ok:account_notice=result.get("message","Anmeldung fehlgeschlagen.");open_account();return
+ account_notice=""
+ await load_cloud(true)
+func load_cloud(automatic:bool=false):
+ if account.busy:return
+ cloud_sync_paused=true
+ var result=await account.fetch_save()
+ if not result.ok:account.status=result.message;open_account();return
+ if not result.empty and not Progress.validate_save(result.snapshot).is_empty():account.status="Cloud-Stand ungültig; dein Dorf bleibt unverändert.";open_account();return
+ var local_path="user://account-"+account.user_id+".json"
+ var meta=account.read_metadata()
+ var local_exists=FileAccess.file_exists(local_path)
+ if automatic and not account_active:
+  if local_exists and bool(meta.get("dirty",true)):
+   if not meta.is_empty() and int(meta.get("revision",-1))==int(result.revision):
+    activate_local_account(meta);return
+   account.status="Speicherkonflikt · Auswahl erforderlich"
+  else:
+   activate_cloud(result);return
+ var p=open_dialog("cloud_confirm","Kontodorf öffnen?","")
+ if local_exists and bool(meta.get("dirty",true)):
+  button(p,"Lokalen Kontostand als Datei sichern",Rect2(32,350,790,52),func():download_snapshot(FileAccess.get_file_as_string(local_path)))
+ label(p,"Neues Kontodorf erstellen." if result.empty else "Gespeichertes Kontodorf von der Cloud laden.",Rect2(32,110,790,80),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ label(p,"Auf diesem Gerät liegt ein möglicherweise neuerer Stand. Cloud laden behält vorher eine lokale Sicherheitskopie. Abbrechen verändert nichts." if local_exists and bool(meta.get("dirty",true)) else "Dein Gastdorf bleibt separat erhalten. Dieses Konto lädt ausschließlich sein eigenes Dorf.",Rect2(32,229,790,128),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ button(p,"Zurück",Rect2(32,420,380,65),func():open_account())
+ button(p,"Dorf öffnen",Rect2(434,420,388,65),func():activate_cloud(result),true)
+func activate_cloud(result:Dictionary):
+ if not account.signed_in() or account.busy:return
+ var uid=account.user_id
+ if uid.length()!=36 or uid.replace("-","").length()!=32 or not uid.replace("-","").is_valid_hex_number():toast("Ungültige Konto-ID.");return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ var path="user://account-"+uid+".json"
+ if FileAccess.file_exists(path) and DirAccess.copy_absolute(path,path+".before-cloud")!=OK:toast("Sicherheitskopie fehlgeschlagen.");return
+ var candidate=Progress.new()
+ if not result.empty:
+  var temp="user://cloud-validation.json";var file=FileAccess.open(temp,FileAccess.WRITE)
+  if file==null:toast("Cloud-Stand konnte nicht geprüft werden.");return
+  file.store_string(JSON.stringify(result.snapshot));file.close()
+  var valid=candidate.load_file(temp);DirAccess.remove_absolute(temp)
+  if not valid:toast("Cloud-Stand konnte nicht geladen werden.");return
+ if not candidate.store_file(path):toast(candidate.warning);return
+ account.revision=int(result.revision);account.loaded=true;account.pending.clear();cloud_sync_paused=false
+ progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
+ if progress.data.hero=="":open_tutorial()
+ sync_cloud()
+func sync_cloud():
+ if not account_active or account.busy or progress.write_blocked:return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ account.status="Wird mit Cloud synchronisiert …"
+ var result=await account.upload(progress.data)
+ if not result.ok:
+  cloud_sync_paused=result.get("code","")=="revision_conflict"
+  if result.get("code","")=="other_device_active":cloud_clock=-90
+  account.status=result.get("message","Offline · lokal gesichert, erneuter Versuch folgt")
+  if cloud_sync_paused:toast(account.status)
+ else:
+  cloud_sync_paused=false
+  account.dirty=JSON.stringify(result.get("saved_snapshot",{}))!=JSON.stringify(progress.data)
+  account.status="Lokal gesichert · Cloud ausstehend" if account.dirty else "Cloud gesichert"
+ account.save_metadata()
+func leave_account():
+ if account.busy:toast("Bitte die laufende Sicherung abwarten.");return
+ save()
+ if account_active:
+  await sync_cloud()
+  if account.dirty:
+   toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
+ await account.sign_out();account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
+ if auth_locked():update_access();open_account()
+ elif progress.write_blocked:open_save_tools()
+ elif progress.data.hero=="":open_tutorial()
+func activate_local_account(meta:Dictionary):
+ var path="user://account-"+account.user_id+".json"
+ var candidate=Progress.new()
+ if not candidate.load_file(path):toast("Lokale Kontosicherung unlesbar; nichts verändert.");return
+ if not progress.store_file(save_path):toast(progress.warning);return
+ account.revision=int(meta.revision);account.loaded=true;account.pending=meta.get("pending",{});account.dirty=true;cloud_sync_paused=false
+ progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
+ if progress.data.hero=="":open_tutorial()
+ await sync_cloud()
+func restore_account_start():
+ if art_preview:return
+ if OS.has_feature("web") and JavaScriptBridge.eval("!!window.__glutwachtEmailLink",true):
+  await check_email_link();return
+ var result=await account.restore_session()
+ if result.ok:
+  await load_cloud(true)
+ elif account.signed_in():
+  account.status="Verbindung fehlt · Konto noch nicht geladen";open_account()
+ elif auth_locked():open_account()
+ elif progress.data.hero=="" and not progress.write_blocked:open_tutorial()
+
+func web_redirect() -> String:
+ if OS.has_feature("web"):return String(JavaScriptBridge.eval("window.location.origin+window.location.pathname",true))
+ if OS.has_feature("ios"):return "https://glutwacht-spieltest.mg-automobile24.chatgpt.site/v08/"
+ return ""
+func request_account_recovery(email:String):
+ if account.busy:return
+ var result=await account.request_recovery(email,web_redirect())
+ account_notice="Falls ein Konto vorhanden ist, erhältst du einen Wiederherstellungslink." if result.ok else result.message
+ open_account()
+func check_email_link():
+ if not OS.has_feature("web"):return
+ var raw=JavaScriptBridge.eval("(()=>{const r=window.__glutwachtEmailLink;delete window.__glutwachtEmailLink;return r?JSON.stringify(r):null;})()",true)
+ if not raw is String:return
+ var payload=JSON.parse_string(raw)
+ if not payload is Dictionary:return
+ if not account.configured():toast("Dieser Build ist noch nicht für Konten eingerichtet.");return
+ var result=await account.accept_email_link(payload)
+ if not result.ok:toast(result.message);open_account();return
+ if account.recovering:open_recovery_password()
+ else:await load_cloud(true)
+func open_recovery_password():
+ var p=open_dialog("recovery","Neues Passwort","")
+ label(p,"Mindestens 12 Zeichen. Dein Dorf bleibt unverändert.",Rect2(32,103,790,65),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var password=LineEdit.new();password.secret=true;password.placeholder_text="Neues Passwort";password.position=Vector2(32,191);password.size=Vector2(790,65);p.add_child(password)
+ var repeated=LineEdit.new();repeated.secret=true;repeated.placeholder_text="Passwort wiederholen";repeated.position=Vector2(32,282);repeated.size=Vector2(790,65);p.add_child(repeated)
+ button(p,"Passwort speichern",Rect2(32,421,790,70),func():
+  if account.busy:return
+  if password.text!=repeated.text:toast("Die Passwörter stimmen nicht überein.");return
+  var result=await account.change_recovered_password(password.text)
+  if result.ok:close_dialog();toast("Passwort geändert.");await load_cloud(true)
+  else:toast(result.message),true)
+
+func open_tutorial():
+ var step=progress.tutorial_step()
+ if step=="done":toast("Einführung abgeschlossen. Dein Dorf wartet auf dich.");return
+ var titles={"hero":"Willkommen in Glutwacht","build":"Dein erstes Bauprojekt","upgrade":"Mache dein Dorf stärker","train":"Bereite deinen Helden vor","battle":"Dein erster Angriff"}
+ var details={"hero":"1. Vergleiche die vier Helden.\n2. Tippe bei deinem Favoriten auf WÄHLEN.\nEr bleibt dein Startheld; weitere Helden kommen später.","build":"1. Tippe unten auf SÄGEWERK PLATZIEREN.\n2. Wähle eine freie, grün markierte Stelle.\n3. Bestätige mit HIER BAUEN. Danach liefert es Holz.","upgrade":"1. Öffne das Haupthaus über den Knopf unten.\n2. Vergleiche Nutzen, Kosten und Bauzeit.\n3. Tippe auf AUSBAUEN. Kaserne 2 ermöglicht dann Bogenschützen – beide Gebäude brauchen Level 2.","train":"1. Öffne HELDENTRAINING.\n2. Wähle Angriff, Leben oder Fähigkeit und tippe auf den Upgrade-Pfeil. Es kostet Rohstoffe und wirkt sofort.\nTruppen stellst du kostenlos unter ARMEE zusammen.","battle":"1. Wähle ein Lager und starte den Angriff.\n2. Tippe außerhalb der roten Zone, um Truppen einzusetzen.\n3. Bewege den Helden mit dem Stick; nutze rechts seine Fähigkeiten. Danach geht es zurück ins Dorf."}
+ var order=["hero","build","upgrade","train","battle"]
+ var p=open_dialog("tutorial",titles[step],"Einführung · Schritt %d von 5"%(order.find(step)+1))
+ icon(p,"hero" if step=="hero" else ("attack" if step=="battle" else step if step!="train" else "training"),Rect2(355,100,140,140))
+ label(p,details[step],Rect2(52,245,750,164),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var callbacks={"hero":open_heroes,"build":func():begin_build("lumber"),"upgrade":func():open_building("hall"),"train":open_training,"battle":open_campaign}
+ var actions={"hero":"HELD AUSWÄHLEN","build":"SÄGEWERK PLATZIEREN","upgrade":"HAUPTHAUS ÖFFNEN","train":"HELDENTRAINING","battle":"LAGER AUSWÄHLEN"}
+ var next=button(p,actions[step],Rect2(175,427,500,72),callbacks[step],true);next.add_theme_font_size_override("font_size",24)
+func share_test_link():
+ if OS.has_feature("web"):
+  JavaScriptBridge.eval("(()=>{const u=location.origin; if(navigator.share){navigator.share({title:'Glutwacht',url:u}).catch(()=>{});}else{navigator.clipboard.writeText(u).catch(()=>window.prompt('Testlink kopieren',u));}})()")
+  toast("Teile den Link mit deinen Freunden. Jeder erstellt sein eigenes Konto.")
+
+func download_snapshot(text:String):
+ if OS.has_feature("web"):
+  JavaScriptBridge.eval("(()=>{const u=URL.createObjectURL(new Blob(["+JSON.stringify(text)+"],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download='Glutwacht-Kontobackup.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)})()")
+ else:
+  var f=FileAccess.open("user://Glutwacht-Kontobackup.json",FileAccess.WRITE)
+  if f:f.store_string(text);f.close()

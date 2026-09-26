@@ -77,6 +77,12 @@ func run():
  await click_button(game.deployment_buttons.archers);before=game.sim.reserve.archers;await touch(point,true);await drag(point+Vector2(12,0),Vector2(12,0));await touch(point+Vector2(12,0),false)
  
  check(game.sim.reserve.archers==before-1,"edge drag emits one before repeat delay")
+ game.sim.reserve.melee=5;game.sim.reserve.archers=0;game.update_hud()
+ check(not game.deployment_buttons.archers.visible,"empty archers disappear during raid")
+ await click_button(game.deployment_buttons.melee);await click_button(game.hud_widgets.deploy_group)
+ check(game.deploy_group,"touch selects squad mode")
+ var allies_before=game.sim.allies.size();point=edge_point();await tap(point)
+ check(game.sim.reserve.melee==0 and game.sim.allies.size()==allies_before+5,"one ground tap deploys all five warriors")
  game.end_raid();game._process(.01);await frames();check(game.dialog=="result","abort opens result screen")
  game.return_home();game.modal_guard_until=0;await frames();game.open_building("hall");await frames();var close=game.modal.find_child("CloseDialog",true,false);await click_button(close);check(game.modal==null,"upgrade closes reliably")
  game.queue_free();await frames();DirAccess.remove_absolute("user://qa-input-v08.json");print("INPUT_TESTS ",checks-failures,"/",checks);quit(1 if failures else 0)
