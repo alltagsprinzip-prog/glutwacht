@@ -3,6 +3,9 @@ const Catalog=preload("res://game3d/catalog.gd")
 # Same filename permits a non-destructive migration of the already played version.
 const SAVE="user://glutwacht_dorf_v2.json"
 const MAX_LEVEL=10
+# Extend inland; keep the eastern river bank and every existing coordinate.
+const VILLAGE_MIN=Vector2(-39,-39)
+const VILLAGE_MAX=Vector2(31,39)
 const TITLES={"hall":"Haupthaus","barracks":"Kaserne","smithy":"Schmiede"}
 var data:Dictionary
 var warning=""
@@ -126,7 +129,7 @@ func placement_error(kind:String,pos:Vector2,ignore_uid:String="") -> String:
  if not Catalog.BUILD.has(kind) or (TITLES.has(kind) and ignore_uid==""):return "Kein Bauplatz."
  if not Catalog.unlocked(kind,int(data.hall)):return "Freischaltung ab Haupthaus-Stufe %d."%Catalog.required_hall(kind)
  var radius=float(Catalog.BUILD[kind].radius)
- if absf(pos.x)>31-radius or absf(pos.y)>31-radius:return "Außerhalb deiner Dorfgrenze."
+ if pos.x<VILLAGE_MIN.x+radius or pos.x>VILLAGE_MAX.x-radius or pos.y<VILLAGE_MIN.y+radius or pos.y>VILLAGE_MAX.y-radius:return "Außerhalb deiner Dorfgrenze."
  if ignore_uid=="" and count_kind(kind)>=Catalog.building_limit(kind,int(data.hall)):return "Maximale Anzahl dieses Gebäudes erreicht."
  if pos.distance_to(Vector2(0,18))<4.5:return "Der Sammelplatz der Armee muss frei bleiben."
  for o in data.get("obstacles",[]):
@@ -305,7 +308,7 @@ func load_file(path:String=SAVE) -> bool:
     if not Catalog.BUILD.has(kind) or TITLES.has(kind) or uid=="" or seen.has(uid) or TITLES.has(uid):continue
     if clean.structures.size()>=256:break
     seen[uid]=true
-    clean.structures.append({"uid":uid,"kind":kind,"level":clampi(int(b.get("level",1)),1,MAX_LEVEL),"x":clampf(float(b.get("x",0)),-29,29),"z":clampf(float(b.get("z",0)),-29,29),"rotation":posmod(int(b.get("rotation",0)),2),"stock":clampf(float(b.get("stock",0)),0,140*clampi(int(b.get("level",1)),1,MAX_LEVEL))})
+    clean.structures.append({"uid":uid,"kind":kind,"level":clampi(int(b.get("level",1)),1,MAX_LEVEL),"x":clampf(float(b.get("x",0)),VILLAGE_MIN.x+1,VILLAGE_MAX.x-1),"z":clampf(float(b.get("z",0)),VILLAGE_MIN.y+1,VILLAGE_MAX.y-1),"rotation":posmod(int(b.get("rotation",0)),2),"stock":clampf(float(b.get("stock",0)),0,140*clampi(int(b.get("level",1)),1,MAX_LEVEL))})
   clean.next_uid=maxi(3,int(parsed.get("next_uid",3)))
   while seen.has("s"+str(clean.next_uid)):clean.next_uid+=1
  if int(parsed.get("version",0))>=6:
@@ -330,7 +333,7 @@ func load_file(path:String=SAVE) -> bool:
  var positions=parsed.get("core_positions",{})
  if positions is Dictionary:
   for key in TITLES:
-   if positions.get(key) is Dictionary:clean.core_positions[key]={"x":clampf(float(positions[key].get("x",Catalog.CORE_POS[key].x)),-26,26),"z":clampf(float(positions[key].get("z",Catalog.CORE_POS[key].y)),-26,26)}
+   if positions.get(key) is Dictionary:clean.core_positions[key]={"x":clampf(float(positions[key].get("x",Catalog.CORE_POS[key].x)),VILLAGE_MIN.x+Catalog.BUILD[key].radius,VILLAGE_MAX.x-Catalog.BUILD[key].radius),"z":clampf(float(positions[key].get("z",Catalog.CORE_POS[key].y)),VILLAGE_MIN.y+Catalog.BUILD[key].radius,VILLAGE_MAX.y-Catalog.BUILD[key].radius)}
  data=clean
  # Restore the roster only after camp capacity is known. Never truncate a valid old army.
  var saved_melee=maxi(0,int(parsed.get("melee",5)));var saved_archers=maxi(0,int(parsed.get("archers",0)))

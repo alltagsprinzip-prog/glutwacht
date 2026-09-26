@@ -16,7 +16,7 @@ func run():
   var buttons=game.hud.find_children("*","Button",true,false)
   for i in range(buttons.size()):
    var b:Button=buttons[i]
-   check(Rect2(0,0,1280,720).encloses(b.get_global_rect()),mode+": control inside viewport "+b.name)
+   check(game.safe_rect().encloses(b.get_global_rect()),mode+": control inside viewport "+b.name)
    for j in range(i):check(not b.get_global_rect().intersects(buttons[j].get_global_rect()),mode+": nonoverlapping controls "+b.name)
    if game.stick:check(not b.get_global_rect().intersects(game.stick.get_global_rect()),mode+": stick separated from buttons")
  game.return_home()

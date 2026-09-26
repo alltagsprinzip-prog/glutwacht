@@ -19,6 +19,7 @@ var target_zoom=42.0
 var focus=Vector3.ZERO
 var pan=Vector2.ZERO
 var follow_hero=true
+var deployment_marker:MeshInstance3D
 var build_focus=false
 var ghost:Node3D
 var shown_buildings:Array=[]
@@ -53,7 +54,7 @@ func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMa
  color.a=roundf(color.a*16.0)/16.0
  var key=str(color)+str(emission)
  if materials.has(key):return materials[key]
- var m=StandardMaterial3D.new();m.albedo_color=color.darkened(.06) if not emission else color;m.roughness=rough
+ var m=StandardMaterial3D.new();m.albedo_color=color.darkened(.13) if not emission else color;m.roughness=rough
  if color.a<1:m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
  if emission:m.emission_enabled=true;m.emission=color;m.emission_energy_multiplier=.7
  materials[key]=m;return m
@@ -90,7 +91,11 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
     elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("aa7444")
     elif "leaf" in matname:mat.albedo_color=Color("69b53e") if rng.randf()>.25 else Color("97cd52")
     elif "grass" in matname:mat.albedo_color=Color("649447")
-    mat.albedo_color=mat.albedo_color.darkened(.04)
+    if name.begins_with("rock_"):
+     mat.vertex_color_use_as_albedo=false;mat.albedo_texture=null;mat.albedo_color=Color("727c7e")
+    if name.begins_with("bridge_"):
+     mat.vertex_color_use_as_albedo=false;mat.albedo_texture=null;mat.albedo_color=Color("8e6c49")
+    mat.albedo_color=mat.albedo_color.darkened(.12)
     n.set_surface_override_material(surface,mat);asset_materials[palette_key]=mat
   var box:AABB=holder.global_transform.affine_inverse()*n.global_transform*n.get_aabb()
   if first:bounds=box;first=false
@@ -110,6 +115,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  holder.set_meta("height",bounds.size.y*factor)
  return holder
 func setup(sim):
+ follow_hero=true
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
  boats.clear();effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
@@ -125,7 +131,7 @@ func setup(sim):
  elif sim.active():target_zoom=48;focus=Vector3.ZERO
  else:target_zoom=46;focus=Vector3(0,0,1)
  if mode=="home":
-  sky_env.ambient_light_energy=.62;sun.light_energy=.85;sun.light_color=Color("ffe6ba")
+  sky_env.ambient_light_energy=.52;sun.light_energy=.72;sun.light_color=Color("ffe6ba")
  if art_preview and mode=="home":
   target_zoom=36;pan=Vector2(0,-3);focus=Vector3(0,0,-3)
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
@@ -140,6 +146,7 @@ func setup(sim):
  for u in sim.enemies:create_actor(u)
  fx=Node3D.new();add_child(fx)
  selection=disc(1,Color(.1,.75,1,.2),Vector3.ZERO,fx);selection.visible=false
+ deployment_marker=disc(1.4,Color(.2,.9,.5,.5),Vector3.ZERO,fx);deployment_marker.visible=false
  edges=Node3D.new();fx.add_child(edges)
  for axis in range(4):
   var p=Vector3(0,.065,27) if axis==0 else (Vector3(0,.065,-27) if axis==1 else (Vector3(27,.065,0) if axis==2 else Vector3(-27,.065,0)))
@@ -183,23 +190,22 @@ func village_paths(sim):
   var end:Vector2=b.pos+Vector2(0,float(b.radius)*.72)
   var start=Vector2(0,8)
   var length=start.distance_to(end)
-  for i in range(int(length/1.1)+1):
-   var point=start.lerp(end,float(i)/maxf(1,int(length/1.1)))
-   var paving=disc(1.03,Color("d9bd7c"),Vector3(point.x,.022,point.y),landscape)
-   paving.scale.z=.84
+  if length>.1:
+   var path=PlaneMesh.new();path.size=Vector2(2.0,length)
+   var gravel=ShaderMaterial.new();gravel.shader=load("res://game3d/path.gdshader")
+   var middle=(start+end)*.5;var paving=mesh_node(path,Vector3(middle.x,.025,middle.y),gravel,landscape);paving.rotation.y=atan2(end.x-start.x,end.y-start.y)
  # A small meeting place rather than a square tile under each house.
- disc(3.4,Color("e3c88d"),Vector3(0,.026,8),landscape)
+ disc(3.4,Color("928163"),Vector3(0,.026,8),landscape)
  for i in range(9):
   var angle=float(i)*TAU/9.0
   asset("flower_yellowC.glb" if i%2 else "flower_purpleA.glb",landscape,Vector3(4.1*cos(angle),.03,8+4.1*sin(angle)),.6,"height",angle)
 func scenery(sim):
  for i in range(95):
   var p=Vector3(rng.randf_range(-58,56),0,rng.randf_range(-52,46))
-  if absf(p.x)<34 and absf(p.z)<35:continue
+  if p.x>-42 and p.x<34 and absf(p.z)<42:continue
   if p.x>35 and p.x<44:continue
   var names=["tree_default.glb","tree_fat.glb","tree_tall.glb","tree_pineTallA_detailed.glb"]
-  if i%4==0:asset("tree_pineTallA_detailed.glb",landscape,p,rng.randf_range(7,11))
-  else:Nature.tree(landscape,p,rng.randf_range(6,10),i+742)
+  Nature.tree(landscape,p,rng.randf_range(5,11),i+742)
  for i in range(48):
   var edge=26.0+rng.randf_range(0,4)
   var p=Vector2(edge*(1 if i%2==0 else -1),rng.randf_range(-27,27)) if i%3 else Vector2(rng.randf_range(-27,27),edge*(1 if i%2==0 else -1))
@@ -207,11 +213,13 @@ func scenery(sim):
   asset(plants[i%4],landscape,Vector3(p.x,.01,p.y),rng.randf_range(.35,.8),"height",rng.randf()*TAU)
  for i in range(14):asset("rock_largeA.glb",landscape,Vector3(rng.randf_range(43,49),-.1,rng.randf_range(-34,34)),rng.randf_range(1,3),"height",rng.randf()*TAU)
  for i in range(4):
-  var p=Vector3(-20+i*13.5,0,-34)
+  var p=Vector3(-20+i*13.5,0,-44)
   asset("House_4.obj" if i%2 else "House_1.obj",landscape,p,5.5,"width",PI)
  # Kasernenhof: Feuer, Bänke und Vorräte geben der wartenden Armee einen klaren Platz.
  if mode=="home":
   var bp:Vector2=Catalog.CORE_POS.barracks
+  for site in sim.buildings:
+   if site.uid=="barracks":bp=site.pos
   asset("Bonfire_Lit.obj",landscape,Vector3(bp.x+1.5,.03,bp.y+6.2),1.5,"width")
   asset("Bench_1.obj",landscape,Vector3(bp.x-3.0,.02,bp.y+5.5),2.3,"width",PI/2)
   asset("Barrel.obj",landscape,Vector3(bp.x+4.0,.02,bp.y+4.8),1.2,"height")
@@ -220,7 +228,7 @@ func scenery(sim):
   asset("Bonfire_Lit.obj",landscape,Vector3(-5,.05,16),1.6,"width")
  var fire=OmniLight3D.new();fire.position=Vector3(-10,1,8);fire.light_color=Color("ffad57");fire.light_energy=1.15;fire.omni_range=5;landscape.add_child(fire)
  for i in range(9):
-  for z in [-32.5,32.5]:asset("rock_smallA.glb",landscape,Vector3(-30+i*7.5,.01,z),.4,"height")
+  for z in [-40.5,40.5]:asset("rock_smallA.glb",landscape,Vector3(-30+i*7.5,.01,z),.4,"height")
 func create_obstacle(o:Dictionary,jobs:Array):
  var uid=String(o.get("uid",""));if uid=="":return
  var kind=String(o.get("kind","tree"));var root=Node3D.new();root.position=Vector3(float(o.x),.02,float(o.z));landscape.add_child(root)
@@ -293,8 +301,10 @@ func create_worker(b:Dictionary,job:Dictionary):
 func banner(parent:Node,pos:Vector3,height:float,enemy:bool):
  var pole=CylinderMesh.new();pole.top_radius=.045;pole.bottom_radius=.07;pole.height=height
  mesh_node(pole,pos+Vector3(0,height/2,0),material(Color("705b3f")),parent)
- box(parent,pos+Vector3(.35,height-.6,0),Vector3(.75,1.15,.06),Color("9a3f35") if enemy else Color("28617a"))
- box(parent,pos+Vector3(.35,height-.6,.04),Vector3(.12,.48,.035),Color("e5c47c"))
+ var cloth=PlaneMesh.new();cloth.size=Vector2(.85,1.15);cloth.subdivide_width=8;cloth.subdivide_depth=4
+ var fabric=ShaderMaterial.new();fabric.shader=load("res://game3d/banner.gdshader");fabric.set_shader_parameter("fabric",Color("b44532") if enemy else Color("174a91"))
+ var flag=mesh_node(cloth,pos+Vector3(.42,height-.6,0),fabric,parent);flag.rotation.x=PI/2
+
 func disc(radius:float,color:Color,pos:Vector3,parent:Node) -> MeshInstance3D:
  var mesh=CylinderMesh.new();mesh.top_radius=radius;mesh.bottom_radius=radius;mesh.height=.025;mesh.radial_segments=40
  return mesh_node(mesh,pos,material(color,.8,false),parent)
@@ -317,6 +327,10 @@ func create_actor(u:Dictionary):
   var shield=box(holder,Vector3(0,1.35,.6),Vector3(1.45,1.75,.22),Color("398edd"))
   box(shield,Vector3(0,0,.15),Vector3(.18,1.3,.1),Color("ffe091"))
  if u.kind=="siege":
+  box(holder,Vector3(0,.5,-.65),Vector3(1.5,.2,1.3),Color("9f7346"))
+  for x in [-.78,.78]:
+   var wheel=CylinderMesh.new();wheel.top_radius=.42;wheel.bottom_radius=.42;wheel.height=.15;wheel.radial_segments=12
+   var axle=mesh_node(wheel,Vector3(x,.4,-.65),material(Color("63442d")),holder);axle.rotation.z=PI/2
   var rock=SphereMesh.new();rock.radius=.42;rock.height=.84
   mesh_node(rock,Vector3(.45,1.7,.5),material(Color("a9aca4")),holder)
  var anims=holder.find_children("*","AnimationPlayer",true,false);var anim:AnimationPlayer=anims[0] if not anims.is_empty() else null
@@ -327,6 +341,8 @@ func create_actor(u:Dictionary):
  var color=Color(Catalog.hero(u.class_key).color) if u.kind=="hero" else (Color("ed8465") if u.team=="enemy" else Color("a2c5e0"))
  var ring=disc(.72 if u.kind=="hero" else .5,color,Vector3(0,.035,0),holder)
  if u.kind=="hero":
+  var crest=PrismMesh.new();crest.size=Vector3(.42,.5,.18)
+  mesh_node(crest,Vector3(0,size+.5,0),material(Color("ffdf78"),.3,true),holder)
   var torus=TorusMesh.new();torus.inner_radius=.8;torus.outer_radius=.86;torus.rings=40;torus.ring_segments=6
   mesh_node(torus,Vector3(0,.065,0),material(color,.4,true),holder)
  var bar=Label3D.new();bar.font_size=24;bar.pixel_size=.017;bar.position.y=size+.3;bar.billboard=BaseMaterial3D.BILLBOARD_ENABLED;bar.modulate=color;bar.outline_size=6;bar.no_depth_test=true;holder.add_child(bar)
@@ -451,7 +467,7 @@ func sync(sim,dt:float):
  if selected_obstacle!="" and obstacles.has(selected_obstacle):
   var o=obstacles[selected_obstacle];var root:Node3D=o.root
   selection.visible=true;selection.position=Vector3(root.position.x,.08,root.position.z);selection.scale=Vector3.ONE*(float(o.radius)+.45)
- edges.visible=mode=="scout" or (mode=="raid" and sim.manual_deployment and sim.reserve.melee+sim.reserve.archers>0)
+ edges.visible=mode=="scout" or (mode=="raid" and sim.manual_deployment and (not sim.hero_deployed or Catalog.army_count(sim.reserve)>0))
  update_camera(sim,dt)
 func effect_id(e:Dictionary) -> int:
  if not e.has("visual_id"):effect_serial+=1;e.visual_id=effect_serial
@@ -516,6 +532,10 @@ func update_camera(sim,dt:float):
 func manual_camera():
  if follow_hero:pan=Vector2(focus.x,focus.z)
  follow_hero=false
+func preview_deployment(pos:Vector2,valid:bool):
+ if not is_instance_valid(deployment_marker):return
+ deployment_marker.visible=true;deployment_marker.position=Vector3(pos.x,.12,pos.y)
+ deployment_marker.material_override=material(Color(.15,.9,.5,.5) if valid else Color(1,.18,.12,.5))
 func change_zoom(amount:float):
  manual_camera();target_zoom=clampf(target_zoom+amount,17,66)
 func screen_to_direction(v:Vector2) -> Vector2:
@@ -525,7 +545,7 @@ func ground_position(screen:Vector2) -> Vector2:
  var hit=Plane(Vector3.UP,0).intersects_ray(camera.project_ray_origin(screen),camera.project_ray_normal(screen))
  return Vector2(hit.x,hit.z) if hit!=null else Vector2.ZERO
 func pan_camera(delta:Vector2):
- manual_camera();pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(Vector2(-26,-26),Vector2(26,26))
+ manual_camera();pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(Vector2(-34,-34),Vector2(26,34))
 func building_at(screen:Vector2):
  var origin=camera.project_ray_origin(screen);var direction=camera.project_ray_normal(screen)
  var chosen=null;var best=INF

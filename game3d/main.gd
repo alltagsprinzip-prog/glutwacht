@@ -260,6 +260,11 @@ func _process(dt):
    var imported=JavaScriptBridge.eval("window.__glutwachtImportText || null",true)
    if imported is String and imported!="":
     JavaScriptBridge.eval("window.__glutwachtImportText=null",true);prepare_save_import(imported)
+  var completed_sites=[]
+  for job in progress.data.jobs:
+   if float(job.finish)<=Time.get_unix_time_from_system():
+    var site=progress.find_building(String(job.get("uid","")))
+    if not site.is_empty():completed_sites.append(Vector2(site.x,site.z))
   var old_hall=int(progress.data.hall)
   var finished=progress.production();production_clock=0
   if finished:
@@ -267,6 +272,7 @@ func _process(dt):
    if sim.mode=="home":
     var old_dialog=dialog;var old_building=selected_building;var gems_earned=progress.recent_gems
     refresh_home()
+    for site in completed_sites:sim.effects.append({"kind":"skill","pos":site,"life":1.1,"max":1.1,"color":Color("ffdf80")})
     if old_dialog=="building":open_building(old_building)
     elif old_dialog=="upgrades":open_upgrades()
     toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else ("NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(int(progress.data.hall),[])) if int(progress.data.hall)>old_hall else "Bau abgeschlossen!"))
@@ -309,15 +315,18 @@ func blocks_world_at(pos:Vector2,node:Node=null) -> bool:
   if child is Control and child.is_visible_in_tree() and blocks_world_at(pos,child):return true
  return false
 func cancel_gestures():
+ if is_instance_valid(world) and is_instance_valid(world.deployment_marker):world.deployment_marker.visible=false
  gestures.clear();pinch_distance=0;dragging=false;pointer_dragged=false
 func pointer_begin(id:int,pos:Vector2,camera_only:bool=false):
  if paused or Time.get_ticks_msec()<modal_guard_until or blocks_world_at(pos):return
  var ground=world.ground_position(pos)
+ if sim.mode=="raid" and deploying!="":world.preview_deployment(ground,sim.deployment_valid(ground))
  var role="pending"
  if camera_only:role="camera"
  elif sim.mode=="raid" and deploying!="" and sim.deployment_valid(ground) and (not sim.hero_deployed or ground.distance_to(sim.hero.pos)>1.6):role="deploy"
  gestures[id]={"start":pos,"last":pos,"role":role,"age":0.0,"next":.30,"dragged":false,"placed":false}
  if gestures.size()>1:
+  world.deployment_marker.visible=false
   for g in gestures.values():g.role="pinch";g.dragged=true
   var points=gestures.values();pinch_distance=points[0].last.distance_to(points[1].last)
 func pointer_move(id:int,pos:Vector2):
@@ -328,16 +337,18 @@ func pointer_move(id:int,pos:Vector2):
   if pinch_distance>10 and d>10:world.manual_camera();world.target_zoom=clampf(world.target_zoom*pinch_distance/d,17,66)
   pinch_distance=d;return
  if g.role=="pinch":return
+ if g.role=="deploy":
+  var ground=world.ground_position(pos);world.preview_deployment(ground,sim.deployment_valid(ground))
  if pos.distance_to(g.start)>10:g.dragged=true
  if g.dragged and g.role=="pending":g.role="camera"
- if g.role=="camera" and g.dragged:world.pan_camera(-delta)
+ if g.role=="camera" and g.dragged:world.deployment_marker.visible=false;world.pan_camera(-delta)
  elif g.role=="deploy" and g.dragged and not g.placed:
   deploy_at_screen(pos);g.placed=true;g.next=g.age+.16
 func pointer_end(id:int,pos:Vector2):
  if not gestures.has(id):return
  var g:Dictionary=gestures[id];gestures.erase(id)
  if not paused and g.role!="pinch" and not g.placed and not g.dragged and not blocks_world_at(pos):world_tap(pos)
- if gestures.is_empty():pinch_distance=0
+ if gestures.is_empty():pinch_distance=0;world.deployment_marker.visible=false
 func update_gestures(dt:float):
  for g in gestures.values():
   g.age+=dt

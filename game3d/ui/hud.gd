@@ -32,7 +32,7 @@ static func top(g):
  var profile=action(g,"portrait","",Rect2(20,18,306,88),func():g.open_profile())
  profile.get_child(0).position=Vector2(0,0);profile.get_child(0).size=Vector2(88,88)
  var village_name=g.label(profile,name,Rect2(93,9,200,35),25,TEXT);village_name.clip_text=true;village_name.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
- g.label(profile,"LV. %d · Dorf %d"%[g.Catalog.level(g.progress.data,g.sim.hero_key()),g.progress.data.hall],Rect2(95,48,199,28),21,GOLD)
+ g.label(profile,"LV. %d · Dorf %d"%[g.Catalog.level(g.progress.data,g.sim.hero_key()),g.progress.data.hall],Rect2(95,39,199,26),21,GOLD)
  plate(g,Rect2(20,115,306,41))
  g.icon(g.hud,"worker",Rect2(30,118,33,33));g.builder_text=text(g,"",Rect2(68,117,110,34),19,TEXT,true)
  g.hud_widgets.timer=text(g,"",Rect2(178,119,138,30),18,GOLD,true)
@@ -47,7 +47,7 @@ static func top(g):
  action(g,"menu","",Rect2(1180,18,80,62),func():g.open_menu())
  action(g,"tasks","ZIELE",Rect2(20,173,86,82),func():g.open_tasks())
  action(g,"shop","SHOP",Rect2(1174,100,86,82),func():g.open_shop())
- g.hud_widgets.sync=text(g,"",Rect2(22,91,302,22),15,TEXT)
+ g.hud_widgets.sync=text(g,"",Rect2(114,82,205,22),15,TEXT)
  g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 static func home(g):
  g.button(g.hud,"FREUNDE",Rect2(20,286,138,54),func():g.open_social())

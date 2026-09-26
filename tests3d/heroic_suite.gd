@@ -18,6 +18,13 @@ func run():
  g=load("res://game3d/main.gd").new();g.require_login=false;g.save_path="user://qa-heroic.json";root.add_child(g);await frames()
  g.progress.choose_hero("warrior");g.close_dialog(true);g.cloud_sync_paused=true;g.progress.data.tutorial_done=["hero","build","upgrade","train","battle"]
  g.progress.data.melee=5;g.progress.data.archers=0;g.refresh_home();g.set_process(false)
+ check(g.progress.placement_error("lumber",Vector2(-35,30))=="","expanded inland terrain accepts building")
+ check(g.progress.placement_error("lumber",Vector2(36,0))!="","river bank remains outside build area")
+ var saved=g.progress.data.duplicate(true);g.progress.data.structures[0].x=-35;g.progress.data.structures[0].z=30
+ g.progress.store_file("user://qa-expanded.json")
+ var loaded=load("res://game3d/progress.gd").new();loaded.load_file("user://qa-expanded.json")
+ check(loaded.data.structures[0].x==-35 and loaded.data.structures[0].z==30,"new village coordinates survive save reload")
+ DirAccess.remove_absolute("user://qa-expanded.json");g.progress.data=saved;g.refresh_home()
  var save_before=JSON.stringify(g.progress.data)
  for viewport in [Vector2i(1280,720),Vector2i(1560,720),Vector2i(1710,720),Vector2i(1440,900)]:
   root.size=viewport;await frames();g.layout_art_preview();g.build_hud()
@@ -29,7 +36,12 @@ func run():
   var panel=g.modal.get_child(1)
   check(g.safe_rect().encloses(panel.get_global_rect()),"upgrade fits viewport "+str(viewport));g.close_dialog(true)
  check(JSON.stringify(g.progress.data)==save_before,"layout and dialogs preserve complete save")
- root.size=Vector2i(1560,720);await frames();g.layout_art_preview();g.build_hud();g.world.sync(g.sim,.016);await shot("village-hud")
+ root.size=Vector2i(1560,720);await frames();g.layout_art_preview();g.selected_building="";g.build_hud();g.world.sync(g.sim,.016);await shot("village-hud")
+ if not out.is_empty():
+  var started=Time.get_ticks_usec()
+  for i in range(60):g.world.sync(g.sim,1.0/60);await process_frame
+  var metrics={"renderer":RenderingServer.get_video_adapter_name(),"viewport":str(root.get_visible_rect().size),"frames":60,"elapsed_ms":(Time.get_ticks_usec()-started)/1000.0,"draw_calls":Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),"conditions":"Linux CI software rendering, village fixture, 60 animation replay frames; not iPhone performance"}
+  var file=FileAccess.open(out+"/render-metrics.json",FileAccess.WRITE);file.store_string(JSON.stringify(metrics,"  "));file.close()
  g.open_building("hall");await shot("building-upgrade");g.close_dialog(true)
  var site=g.progress.data.structures[0];site.stock=37;var key=g.Catalog.RESOURCES[site.kind];var balance=g.progress.data[key]
  g.world.sync(g.sim,.016);g.collect_building_resource(site.uid);await shot("resource-collection")
@@ -55,7 +67,7 @@ func run():
  g.world.follow_hero=true;g.world.change_zoom(-3);check(not g.world.follow_hero,"manual zoom suspends follow")
  g.hud_widgets.follow.pressed.emit();check(g.world.follow_hero,"Zum Helden restores follow")
  check(g.sim.deploy_squad("melee",Vector2(-27,0))==5,"five warriors deploy as one group")
- g.update_hud();check(not g.deployment_buttons.archers.visible,"unavailable archers hidden")
+ g.deploying="";g.update_hud();check(not g.deployment_buttons.archers.visible,"unavailable archers hidden")
  g.world.sync(g.sim,.016);await shot("combat")
  g.queue_free();await frames();DirAccess.remove_absolute("user://qa-heroic.json")
  print("HEROIC_TESTS ",checks-failed,"/",checks);quit(1 if failed else 0)

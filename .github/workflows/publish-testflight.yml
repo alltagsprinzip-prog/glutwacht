@@ -38,6 +38,17 @@ jobs:
         run: |
           python3 tools/check_godot.py logs/campaign.log godot --headless --path . --script tests3d/campaign_suite.gd
           python3 tools/check_godot.py logs/onboarding.log godot --headless --path . --script tests3d/onboarding_sync_suite.gd
+      - name: Preserve saves and verify village expansion
+        run: |
+          python3 tools/check_godot.py logs/release.log godot --headless --path . --script tests3d/release_suite.gd
+          python3 tools/check_godot.py logs/hud-layout.log godot --headless --path . --script tests3d/hud_layout_suite.gd
+      - name: Render Heroic gameplay and verify manual hero deployment
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/heroic
+        run: |
+          mkdir -p logs/heroic
+          python3 tools/check_godot.py logs/heroic.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/heroic_suite.gd
       - name: Render social and recovery screens and verify touch controls
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'

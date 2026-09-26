@@ -275,7 +275,8 @@ func move(u:Dictionary,direction:Vector2,speed:float,dt:float):
   if delta.length()<r:
    if delta.length()<.01:delta=Vector2(1,0)
    next=b.pos+delta.normalized()*r
- next.x=clampf(next.x,-30,30);next.y=clampf(next.y,-30,30)
+ if mode in ["home","defense"]:next=next.clamp(Progress.VILLAGE_MIN+Vector2.ONE,Progress.VILLAGE_MAX-Vector2.ONE)
+ else:next=next.clamp(Vector2(-30,-30),Vector2(30,30))
  u.pos=next;u.facing=dir
  if u.attack_time<=0:u.anim="Run"
 func approach(u:Dictionary,goal:Dictionary,speed:float,dt:float):

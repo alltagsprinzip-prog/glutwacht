@@ -52,11 +52,11 @@ func _initialize():
  b.start(0,true);b.time=179.99;b.step(.02,Vector2.ZERO);check(b.result=="timeout","three minute time limit")
  b.start(0,true);b.time=179.0;b.step(.05,Vector2.ZERO,1.1)
  check(b.result=="timeout","slow rendered frame does not extend the raid deadline")
- b.start(0,true);var t=b.unit("guard",b.hero.pos+Vector2(0,-1),10000,0,"enemy");b.enemies=[t];b.buildings=[]
+ b.start(0,true);b.deploy_hero(b.entry_position());var t=b.unit("guard",b.hero.pos+Vector2(0,-1),10000,0,"enemy");b.enemies=[t];b.buildings=[]
  b.strike();check(t.hp==10000,"melee windup has no immediate damage")
  ticks(b,.10);check(t.hp==10000,"melee remains harmless before hit frame")
  ticks(b,.16);check(t.hp<10000,"melee damage after hit frame")
- p.data.hero="mage";p.data.hero_id="mage";b=B.new(p.data);b.start(0,true);t=b.unit("guard",b.hero.pos+Vector2(0,-8),10000,0,"enemy");b.enemies=[t];b.buildings=[]
+ p.data.hero="mage";p.data.hero_id="mage";b=B.new(p.data);b.start(0,true);b.deploy_hero(b.entry_position());t=b.unit("guard",b.hero.pos+Vector2(0,-8),10000,0,"enemy");b.enemies=[t];b.buildings=[]
  b.strike();ticks(b,.37);check(t.hp==10000,"ranged projectile release deals no damage")
  ticks(b,.5);check(t.hp<10000,"ranged damage arrives at impact")
  var names={}
