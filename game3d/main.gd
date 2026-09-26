@@ -1049,7 +1049,8 @@ func draw_cloud_versions():
 func confirm_cloud_version(entry:Dictionary):
  var p=open_dialog("cloud_restore_confirm","Früheren Dorfstand wiederherstellen?","")
  label(p,"Sicherung Nr. %s · Haupthaus %s"%[entry.revision,entry.get("hall",1)],Rect2(32,110,790,60),26,GOLD)
- label(p,"Dein aktuelles Dorf wird vorher gesichert. Danach wird der gewählte frühere Stand aktiv. Freunde, Clan und Konto bleiben unverändert. Die Wiederherstellung braucht eine Verbindung.",Rect2(32,190,790,185),25).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var explanation=label(p,"Dein aktuelles Dorf wird vorher gesichert.\nDanach wird der gewählte frühere Stand aktiv.\nFreunde, Clan und Konto bleiben unverändert.\nDie Wiederherstellung braucht eine Verbindung.",Rect2(32,190,790,185),25)
+ explanation.name="RestoreExplanation"
  button(p,"Abbrechen",Rect2(32,420,380,68),func():draw_cloud_versions())
  button(p,"Wiederherstellen",Rect2(434,420,388,68),func():restore_cloud_version(int(entry.revision)),true)
 func restore_cloud_version(target:int):

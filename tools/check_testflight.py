@@ -68,7 +68,7 @@ def summarize(response, target):
         rel = build.get('relationships',{})
         version = rel.get('preReleaseVersion',{}).get('data') or {}
         marketing = included.get(('preReleaseVersions',version.get('id')),{}).get('version')
-        if marketing != target:
+        if marketing != target or (os.environ.get('TARGET_BUILD') and build['attributes']['version'] != os.environ['TARGET_BUILD']):
             continue
         attrs = build['attributes']
         groups = [included.get(('betaGroups',x['id']),{}).get('name','Unknown group') for x in rel.get('betaGroups',{}).get('data',[])]
