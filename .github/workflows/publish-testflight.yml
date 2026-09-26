@@ -30,7 +30,7 @@ jobs:
           python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
           python3 tools/check_godot.py logs/native-account.log godot --headless --path . --script tests3d/native_account_suite.gd
           python3 tools/check_godot.py logs/account-save.log godot --headless --path . --script tests3d/account_save_suite.gd
-      - name: Cloud recovery and retry safety
+      - name: Cloud recovery, retry safety and restoration freeze
         run: python3 tools/check_godot.py logs/cloud-recovery.log godot --headless --path . --script tests3d/cloud_recovery_suite.gd
       - name: Quest progression and battle reports
         run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd

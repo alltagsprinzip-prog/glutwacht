@@ -79,8 +79,9 @@ var require_login=OS.has_feature("web") or OS.has_feature("ios")
 var account_notice=""
 var cloud_versions:Array=[]
 var cloud_version_page=0
+var restore_preparing=false
 func auth_locked() -> bool:
- return (require_login and not art_preview and not account_active) or (account!=null and not account.pending_restore.is_empty())
+ return restore_preparing or (require_login and not art_preview and not account_active) or (account!=null and not account.pending_restore.is_empty())
 func update_access():
  world.visible=not auth_locked();hud.visible=not auth_locked()
  if auth_locked():paused=true
@@ -1055,9 +1056,12 @@ func confirm_cloud_version(entry:Dictionary):
  button(p,"Wiederherstellen",Rect2(434,420,388,68),func():restore_cloud_version(int(entry.revision)),true)
 func restore_cloud_version(target:int):
  if account.busy or not account_active:return
+ restore_preparing=true
  await sync_cloud()
- if account.dirty or not account.pending.is_empty():toast("Aktuellen Stand zuerst vollständig sichern.");open_account();return
+ if account.dirty or not account.pending.is_empty():
+  restore_preparing=false;toast("Aktuellen Stand zuerst vollständig sichern.");open_account();return
  cloud_sync_paused=true
  var result=await account.restore_version(target)
+ restore_preparing=false
  if not result.ok:account.status=result.message;open_account();return
  await load_cloud(true)
