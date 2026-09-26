@@ -2,6 +2,8 @@
 
 URL: `/v08/?atelier=1`. Der normale Spiellink bleibt unverändert.
 
+Ab Spielcode `29731b5` sind Haupthaus, Kaserne, Schmiede und Sägewerk auch im normalen Kontodorf durch diese neuen Modelle ersetzt. Dort bleiben gespeicherte Positionen, Hindernisse, Geländewege und Fortschritte erhalten; keine Übernahme der festen Testdorf-Anordnung. Die Grafikprobe enthält zusätzlich die arrangierte Landschaft mit Brunnen und Pflaster.
+
 Diese kleine Echtzeit-Szene dient der visuellen Abnahme, nicht als fertige Umsetzung des KI-Konzeptbilds. Sie verwendet neue, direkt in Godot modellierte Geometrie: mehrteiliger Palas mit hinterem Turm, runde Ecktürme, Steinlagen, Dachziegel, Fensterrahmen, Torbogen, Fachwerkhäuser, Pflaster, Brunnen und Baumgruppen. Die Geometrie wird pro Modell in einen Mesh zusammengefasst statt pro Stein einen Draw Call auszulösen. Kein statisches Hintergrundbild.
 
 ## Isolation

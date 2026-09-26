@@ -101,6 +101,8 @@ const cloud=require('./mock_cloud.cjs');
   assert.equal(cloud.saves.size,2,'separate account snapshots');
   assert.equal(cloud.saves.get(cloud.users.get('player-a@example.test')).snapshot.hero,'warrior');
   await second.close();
+  await page.bringToFront();await page.waitForTimeout(500);
+  if((await state()).dialog==='menu')await tap(1025,129);
   await tap(160,50);await wait(()=>window.__glutwacht?.dialog==='profile');
   await tap(425,550);await wait(()=>window.__glutwacht?.dialog==='account');
   await tap(600,540);await wait(()=>window.__glutwacht?.mode==='login');

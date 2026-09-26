@@ -20,6 +20,7 @@ func run():
  game.open_building("hall");await shot("upgrade-modern");game.close_dialog()
  game.open_upgrades();await shot("progression-modern");game.close_dialog()
  game.open_tutorial();await shot("tutorial-modern");game.close_dialog()
+ game.open_barracks_guide();await shot("barracks-guide");check(game.dialog=="troop_progression","barracks unlock guide opens");game.close_dialog()
  var prior_pan=game.world.pan;game.world.pan=Vector2(31,15)
  for i in range(90):game.world.sync(game.sim,1.0/60)
  await shot("river-modern");game.world.pan=prior_pan
@@ -59,7 +60,10 @@ func run():
   var previous_count=0
   for level in [1,3,5,7,10]:
    var visual=Node3D.new();container.add_child(visual);game.World.Architecture.draw(game.world,{"kind":kind,"level":level,"team":"ally","rotation":0},visual)
-   var mesh_count=visual.find_children("*","GeometryInstance3D",true,false).size()
-   check(mesh_count>previous_count,kind+" tier "+str(level)+" has distinct geometry");previous_count=mesh_count;visual.queue_free();await frame()
+   # Count actual geometry, not scene nodes: batched models use one mesh per building.
+   var vertex_count=0
+   for model in visual.find_children("*","MeshInstance3D",true,false):
+    for surface in range(model.mesh.get_surface_count()):vertex_count+=model.mesh.surface_get_array_len(surface)
+   check(vertex_count>previous_count,kind+" tier "+str(level)+" has distinct geometry");previous_count=vertex_count;visual.queue_free();await frame()
  container.queue_free();game.queue_free();await frame();DirAccess.remove_absolute("user://qa-visual-release.json")
  print("VISUAL_RELEASE_TESTS ",checks-failures,"/",checks);quit(1 if failures else 0)
