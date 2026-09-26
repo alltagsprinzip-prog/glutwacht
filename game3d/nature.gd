@@ -28,4 +28,5 @@ static func tree(parent:Node3D,p:Vector3,height:float,seed_value:int):
  if leaf_material==null:
   leaf_material=StandardMaterial3D.new();leaf_material.albedo_texture=load("res://assets3d/nature/oak-leaves.webp");leaf_material.vertex_color_use_as_albedo=true
   leaf_material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR;leaf_material.alpha_scissor_threshold=.42;leaf_material.cull_mode=BaseMaterial3D.CULL_DISABLED;leaf_material.roughness=.92
+  leaf_material.albedo_color=Color(.80,.88,.76);leaf_material.metallic_specular=.15
  var leaves=MeshInstance3D.new();leaves.name="Oak_Leaves";leaves.mesh=mesh.commit();leaves.material_override=leaf_material;holder.add_child(leaves)

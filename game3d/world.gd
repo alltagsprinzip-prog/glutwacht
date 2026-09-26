@@ -159,7 +159,7 @@ func terrain():
   mat.set_shader_parameter("grass_dark",Color("30442c"));mat.set_shader_parameter("grass_light",Color("718454"))
  var water=SurfaceTool.new();water.begin(Mesh.PRIMITIVE_TRIANGLES)
  for i in range(132):
-  for point in [Vector2(0,i),Vector2(0,i+1),Vector2(1,i),Vector2(1,i),Vector2(0,i+1),Vector2(1,i+1)]:
+  for point in [Vector2(0,i),Vector2(1,i),Vector2(0,i+1),Vector2(1,i),Vector2(1,i+1),Vector2(0,i+1)]:
    var z=point.y-66;var x=Nature.river_x(z)+(point.x-.5)*Nature.river_width(z)
    water.set_uv(Vector2(point.x,z*.15));water.set_normal(Vector3.UP);water.add_vertex(Vector3(x,.09,z))
  mesh_node(water.commit(),Vector3.ZERO,water_material(),landscape)

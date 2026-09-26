@@ -9,6 +9,9 @@ func run():
  var g=load("res://game3d/main.gd").new();g.art_preview=true;root.add_child(g)
  for i in range(15):await process_frame
  await shot("atelier-village")
+ g.world.pan=Vector2(28,0);g.world.target_zoom=32
+ for i in range(30):g.world.sync(g.sim,1.0/30);await process_frame
+ await shot("atelier-river")
  g.world.target_zoom=23;g.world.pan=Vector2(0,-7)
  for i in range(30):g.world.sync(g.sim,1.0/30);await process_frame
  await shot("atelier-closeup")
