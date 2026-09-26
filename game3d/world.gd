@@ -35,6 +35,7 @@ var boats:Array=[]
 var village_clock=0.0
 var art_preview=false
 const ArtVillage=preload("res://game3d/art_village.gd")
+const Nature=preload("res://game3d/nature.gd")
 func health_bar(parent:Node3D,height:float,width:float,color:Color) -> Dictionary:
  var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height,0)
  var parts=[]
@@ -153,15 +154,21 @@ func terrain():
     surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise).srgb_to_linear());surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
  var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+ mat.set_shader_parameter("meadow",load("res://assets3d/nature/meadow-grass.webp"))
  if mode=="home":
   mat.set_shader_parameter("grass_dark",Color("30442c"));mat.set_shader_parameter("grass_light",Color("718454"))
- var water=PlaneMesh.new();water.size=Vector2(9,132);water.subdivide_depth=120
- mesh_node(water,Vector3(39,.09,0),water_material(),landscape)
+ var water=SurfaceTool.new();water.begin(Mesh.PRIMITIVE_TRIANGLES)
+ for i in range(132):
+  for point in [Vector2(0,i),Vector2(0,i+1),Vector2(1,i),Vector2(1,i),Vector2(0,i+1),Vector2(1,i+1)]:
+   var z=point.y-66;var x=Nature.river_x(z)+(point.x-.5)*Nature.river_width(z)
+   water.set_uv(Vector2(point.x,z*.15));water.set_normal(Vector3.UP);water.add_vertex(Vector3(x,.09,z))
+ mesh_node(water.commit(),Vector3.ZERO,water_material(),landscape)
  asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),10.2,"width",PI/2)
- for bank in [33.8,44.2]:
-  for i in range(45):
-   var stone=SphereMesh.new();stone.radius=.36;stone.height=.55;stone.radial_segments=8;stone.rings=4
-   mesh_node(stone,Vector3(bank+sin(i*1.3)*.3,.02,-64+i*2.9),material(Color("c7cbb3")),landscape)
+ for side in [-1,1]:
+  for i in range(32):
+   var z=-64+i*4+rng.randf_range(-1.3,1.3);var bank=Nature.river_x(z)+side*(Nature.river_width(z)*.5+rng.randf_range(.1,1.3))
+   var stone=SphereMesh.new();stone.radius=rng.randf_range(.3,.85);stone.height=stone.radius*1.3;stone.radial_segments=12;stone.rings=6
+   var rock=mesh_node(stone,Vector3(bank,.02,z),material(Color("7b8071")),landscape);rock.scale=Vector3(1.4,.8,1);rock.rotation.y=rng.randf()*TAU
  if mode=="home":
   create_boat(-1,Color("eee5bd"));create_boat(1,Color("f2a14b"))
  for i in range(10):
@@ -190,7 +197,7 @@ func scenery(sim):
   if absf(p.x)<34 and absf(p.z)<35:continue
   if p.x>35 and p.x<44:continue
   var names=["tree_default.glb","tree_fat.glb","tree_tall.glb","tree_pineTallA_detailed.glb"]
-  asset(names[i%4],landscape,p,rng.randf_range(6,11),"height",rng.randf()*TAU)
+  Nature.tree(landscape,p,rng.randf_range(6,10),i+742)
  for i in range(18):
   var edge=26.0+rng.randf_range(0,4)
   var p=Vector2(edge*(1 if i%2==0 else -1),rng.randf_range(-27,27)) if i%3 else Vector2(rng.randf_range(-27,27),edge*(1 if i%2==0 else -1))
@@ -217,7 +224,7 @@ func create_obstacle(o:Dictionary,jobs:Array):
  var kind=String(o.get("kind","tree"));var root=Node3D.new();root.position=Vector3(float(o.x),.02,float(o.z));landscape.add_child(root)
  var radius=1.6;var height=4.0
  if kind=="tree":
-  asset("tree_fat.glb",root,Vector3.ZERO,6.6,"height");radius=1.8;height=6.5
+  Nature.tree(root,Vector3.ZERO,6.6,int(o.x*123+o.z*37));radius=1.8;height=6.5
  elif kind=="rock":
   asset("rock_largeA.glb",root,Vector3.ZERO,2.6,"height",.3);radius=1.5;height=2.7
  else:
@@ -327,7 +334,8 @@ func sync(sim,dt:float):
  village_clock+=dt
  for boat in boats:
   var t=village_clock*.65+boat.phase
-  boat.root.position=Vector3(39+sin(t*.25)*.5,.24+sin(t*2)*.06,boat.side*(13+fposmod(t,44)))
+  var z=boat.side*(13+fposmod(t,44))
+  boat.root.position=Vector3(Nature.river_x(z)+sin(t*.25)*.35,.24+sin(t*2)*.06,z)
   boat.root.rotation=Vector3(sin(t*1.6)*.022,0 if boat.side>0 else PI,sin(t*1.3)*.035)
 
  for u in ([sim.hero]+sim.allies if mode!="scout" else [])+sim.enemies:

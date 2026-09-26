@@ -63,7 +63,7 @@ func run():
    # Count actual geometry, not scene nodes: batched models use one mesh per building.
    var vertex_count=0
    for model in visual.find_children("*","MeshInstance3D",true,false):
-    for surface in range(model.mesh.get_surface_count()):vertex_count+=model.mesh.surface_get_array_len(surface)
+    for surface in range(model.mesh.get_surface_count()):vertex_count+=model.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX].size()
    check(vertex_count>previous_count,kind+" tier "+str(level)+" has distinct geometry");previous_count=vertex_count;visual.queue_free();await frame()
  container.queue_free();game.queue_free();await frame();DirAccess.remove_absolute("user://qa-visual-release.json")
  print("VISUAL_RELEASE_TESTS ",checks-failures,"/",checks);quit(1 if failures else 0)

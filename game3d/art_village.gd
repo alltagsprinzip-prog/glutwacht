@@ -181,7 +181,7 @@ func landscape(parent:Node3D,buildings:Array):
  cylinder(Vector3(0,1.83,8),.56,.06,Color("568f99"),24)
  for i in range(26):
   var a=TAU*i/26;var r=26+rng.randf_range(-1.8,4)
-  tree(Vector3(cos(a)*r,0,-3+sin(a)*r),4.8+rng.randf()*3.4)
+  load("res://game3d/nature.gd").tree(parent,Vector3(cos(a)*r,0,-3+sin(a)*r),4.8+rng.randf()*3.4,i+71)
  for side in [-1,1]:
   for i in range(13):
    var p=Vector3(side*20.0,.3,-20+i*3.2)

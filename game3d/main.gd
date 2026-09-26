@@ -201,6 +201,13 @@ func movement() -> Vector2:
  v+=Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
  return world.screen_to_direction(v.limit_length(1))
 func _process(dt):
+ if OS.has_feature("web") and not art_preview:
+  var request=JavaScriptBridge.eval("window.GlutwachtAccount?.take()",true)
+  if request is String:
+   var submitted=JSON.parse_string(request)
+   if submitted is Dictionary and dialog=="account" and not account.busy:
+    if submitted.get("action","")=="recover":request_account_recovery(String(submitted.get("email","")))
+    elif submitted.get("action","") in ["login","register"]:authenticate(String(submitted.get("email","")),String(submitted.get("password","")),submitted.action=="register")
  var frame_tick=Time.get_ticks_usec()
  var elapsed=float(frame_tick-last_frame_tick)/1000000.0 if last_frame_tick>0 else dt
  last_frame_tick=frame_tick
@@ -423,6 +430,7 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  return p
 func close_dialog(force:bool=false):
  if auth_locked() and not force:return
+ if OS.has_feature("web"):JavaScriptBridge.eval("window.GlutwachtAccount?.hide()")
  if is_inside_tree():get_viewport().set_input_as_handled()
  modal_guard_until=Time.get_ticks_msec()+350
  hero_views.clear()
@@ -780,6 +788,8 @@ func open_account():
   button(p,"Cloud-Stand laden",Rect2(32,231,790,67),func():load_cloud())
   var upload=button(p,"Jetzt sichern",Rect2(32,318,790,67),func():sync_cloud(),true);upload.disabled=not account_active
   button(p,"Abmelden" if require_login else "Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
+ if OS.has_feature("web") and bool(JavaScriptBridge.eval("!!window.GlutwachtAccount",true)):
+  JavaScriptBridge.eval("window.GlutwachtAccount.show("+JSON.stringify(account_notice)+")");return
  var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
  var password=LineEdit.new();password.placeholder_text="Passwort · bei Registrierung mindestens 12 Zeichen";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
  label(p,account_notice if account_notice!="" else "Melde dich an oder erstelle ein Konto. Dein Dorf wird automatisch diesem Konto zugeordnet und gespeichert.",Rect2(32,286,790,82),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART

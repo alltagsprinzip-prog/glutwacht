@@ -11,6 +11,23 @@ concurrency:
   group: glutwacht-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  native-account-input:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: |
+          npm install --prefix "$RUNNER_TEMP/account-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/account-browser/node_modules/playwright/cli.js" install --with-deps chromium webkit
+          NODE_PATH="$RUNNER_TEMP/account-browser/node_modules" node tools/web_account.test.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-account-input
+          path: logs/account-browser
   art-review:
     runs-on: ubuntu-latest
     timeout-minutes: 8
