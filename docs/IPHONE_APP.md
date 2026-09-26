@@ -8,12 +8,12 @@
 - Cloud-API, UUID-getrennte Saves, Hero/Tutorial und Schema bleiben erhalten. Keine Migration/Spielstandlöschung.
 - E-Mail-Bestätigung und Passwortwiederherstellung über bestehenden HTTPS-Webendpunkt; anschließend in der App anmelden.
 - Bestehendes Sichern bei Fokusverlust bleibt aktiv. Hintergrundabbruch vor Cloudbestätigung muss am Gerät getestet werden.
-- Manueller Mac-Buildworkflow `.github/workflows/build-ios.yml`, keine automatische Veröffentlichung. Liefert zunächst Xcode-Projekt, keine installierbare oder signierte IPA.
+- Mac-Buildworkflow für manuelle Starts und Pull Requests aus diesem Repository `.github/workflows/build-ios.yml`, keine automatische Veröffentlichung. Exportiert das Xcode-Projekt und kompiliert ein unsigniertes iPhone-Archiv, keine installierbare oder signierte IPA.
 - Repository ist öffentlich. Standard-GitHub-Mac-Runner sind laut GitHub kostenfrei für öffentliche Repositories; keine kostenpflichtigen größeren Runner verwenden.
 
 ## Apple-Schritt
 Morat registriert sich selbst im Apple Developer Program (Identitätsprüfung, Vertrag, Jahresgebühr). Danach echte 10-stellige Team-ID unter Membership details übernehmen. Kein Apple-Passwort oder 2FA-Code im Chat nötig.
-Workflow verlangt diese Team-ID, `prepare_ios.gd` prüft Format vor jeder Änderung. Signierung, Bundle-Registrierung, App-Store-Connect-Datensatz und TestFlight-Einladung sind noch nicht eingerichtet. Zertifikat/Provisioning Profile bzw. App-Store-Connect-Schlüssel ausschließlich über sichere Secret-Eingabe einrichten, niemals im Repository oder Chat speichern.
+Team-ID `B6VJUWV5CH` wurde vom Nutzer übermittelt und im Export hinterlegt; dies bestätigt weder Mitgliedschaft noch Signierungszugriff. Workflow verwendet diese Team-ID oder eine manuelle Eingabe; `prepare_ios.gd` prüft Format vor jeder Änderung. Signierung, Bundle-Registrierung, App-Store-Connect-Datensatz und TestFlight-Einladung sind noch nicht eingerichtet. Zertifikat/Provisioning Profile bzw. App-Store-Connect-Schlüssel ausschließlich über sichere Secret-Eingabe einrichten, niemals im Repository oder Chat speichern.
 
 ## Vor erstem TestFlight-Test
 1. Export auf macOS mit echter Team-ID ausführen und Xcode-Build prüfen.
