@@ -1,5 +1,13 @@
 # Glutwacht: iPhone-App auf Basis des bestehenden Projekts
 
+## Build-Nachweis – 26.09.2026
+- Team-ID: `B6VJUWV5CH`, vom Nutzer geliefert.
+- Commit: `bf20534cc03e15ea75f185e9a589be16d53e05bb`.
+- GitHub Actions: https://github.com/alltagsprinzip-prog/glutwacht/actions/runs/36238792604
+- Native Konto-/Save-Vorprüfung erfolgreich; Xcode-Projektexport und unsigniertes arm64-Archiv mit Xcode 26.3 erfolgreich kompiliert.
+- Vorläufiges opakes App-Icon aus bestehendem Kasernen-SVG ergänzt. Finale Gestaltung offen.
+- Kein signierter Build, keine TestFlight-Veröffentlichung und noch kein physischer iPhone-Test.
+
 ## Vorbereitet
 - Godot 4.7.2 iOS-Export, arm64, Mindestversion iOS 16, Versionsnummer 0.12.0.
 - Vorgesehene Bundle-ID `com.moratgalla.glutwacht`; Verfügbarkeit bei Apple noch prüfen und dann dauerhaft beibehalten.

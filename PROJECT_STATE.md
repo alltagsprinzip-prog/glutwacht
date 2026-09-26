@@ -1,3 +1,6 @@
+# iPhone-Build – 26.09.2026
+Team-ID B6VJUWV5CH eingetragen. Unsigned native iOS archive compiled successfully in run 36238792604, code bf20534cc03e15ea75f185e9a589be16d53e05bb. Godot 4.7.2, Xcode 26.3. Native account/save preflight passed. Signing, App Store Connect registration, TestFlight and physical device tests remain open. See docs/IPHONE_APP.md. Web deployment unchanged.
+
 # Glutwacht – aktueller Stand 26.09.2026
 
 ## iPhone-App-Vorbereitung (nach 12:58 Berlin)
