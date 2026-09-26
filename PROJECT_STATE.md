@@ -1,5 +1,11 @@
 # Glutwacht – aktueller Stand 26.09.2026
 
+## iPhone-App-Vorbereitung (nach 12:58 Berlin)
+
+Nutzer hat nur Windows+iPhone, erlaubt App-Vorbereitung, möchte kurze Antworten und weniger Wartezeit. Referenzbild Heroic Pop erneut als verbindliches Ziel verlangt; bisherige Türkisänderung ist keine 1:1-Umsetzung. Details in `docs/IPHONE_APP.md`. Vorbereitet: iOS-Exportpreset, validierte echte Team-ID als Voraussetzung, manueller macOS-Xcode-Exportworkflow, Linux-Vorabprüfung, native Kontopflicht, native scrollbare Formulare mit E-Mail-/Passworttastatur und an Keyboardhöhe angepasstem sichtbaren Bereich, erweiterte iOS-Spielwelt statt festem Letterbox-Viewport, bestehender Web-E-Mail-Rückkanal. Native Sitzungen bewusst nur im RAM bis geprüfte Keychain-Anbindung vorhanden; nach vollständigem Neustart erneut anmelden, Cloud-Spielstände bleiben bestehen.
+
+Lokal: Ressourcen-/Scriptimport und native_account_suite 9/9 bestanden. Kein Apple-Account, keine echte Team-ID, keine Signierung vorhanden: KEINE installierbare App/IPA oder TestFlight-Link behaupten. Kein kostenpflichtiger Dienst gestartet. Repository ist öffentlich, Standard-GitHub-Mac-Runner laut GitHub kostenfrei; Workflow verwendet nur Standardrunner und startet macOS nur manuell. Neuer Workflow auf Arbeitsbranch; für dauerhafte manuelle Bedienung auf Defaultbranch später regulär PR prüfen/übernehmen (nicht ohne bisherige Freigabe mergen). Web-Liveversion 10 bleibt unverändert; dies ist native App-Vorbereitung, kein Sites-Deployment. Nächster Nutzer-Schritt ist Apple-Developer-Registrierung und echte Team-ID; Schlüssel/Passwörter nie im Chat anfordern. Danach signierter Gerätebuild, Keyboard/Safe-Area/Sessions/Cloud auf echtem iPhone und TestFlight. Grafikassets/Referenz-HUD noch nicht umgesetzt.
+
 ## Neuester Live-Stand: 12:34 Berlin – freundlichere Oberfläche und Truppeneinsatz
 
 Nutzer bestätigt Anmeldung funktioniert. Neuer Auftrag: freundlicher/kreativer/lebensfroher, fünf Krieger gemeinsam einsetzen, keine Bogenschützenkarte ohne Bogenschützen. Umgesetzt und veröffentlicht als Sites-Version 10; Deployment `appgdep_6ab79fb7ea10819183b00eebc737ae71` succeeded. Build `df5d3bd2cc08`, Sites-Source `300d8473a8b24d0e8794ec842e6e0d79954da8e3`, Spielcode `a12774863c793e5bcbe03af75ecb9299ad3c804c`.

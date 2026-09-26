@@ -1,0 +1,59 @@
+name: Prepare iPhone app
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'game3d/ui/native_account_form.gd'
+      - 'tests3d/native_account_suite.gd'
+      - 'tools/prepare_ios.gd'
+      - 'export_presets.cfg'
+      - '.github/workflows/build-ios.yml'
+  workflow_dispatch:
+    inputs:
+      apple_team_id:
+        description: Actual 10-character Apple Developer Team ID
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: glutwacht-ios-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  native-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+      - run: |
+          godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/native-account.log godot --headless --path . --script tests3d/native_account_suite.gd
+          python3 tools/check_godot.py logs/account-save.log godot --headless --path . --script tests3d/account_save_suite.gd
+  xcode-project:
+    if: github.event_name == 'workflow_dispatch'
+    needs: native-preflight
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: true
+      - name: Configure real Apple team and unique build number
+        env:
+          APPLE_TEAM_ID: ${{ inputs.apple_team_id }}
+          GLUTWACHT_BUILD_NUMBER: ${{ github.run_number }}
+        run: godot --headless --path . --script tools/prepare_ios.gd
+      - name: Export Xcode project
+        run: |
+          godot --headless --editor --path . --import
+          godot --headless --path . --export-release iOS builds/ios/Glutwacht.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Glutwacht-Xcode-${{ github.run_number }}
+          path: builds/ios/
+          retention-days: 3

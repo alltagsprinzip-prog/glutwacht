@@ -72,7 +72,7 @@ var cloud_clock=0.0
 var cloud_sync_paused=false
 var pending_import
 var art_preview=false
-var require_login=OS.has_feature("web")
+var require_login=OS.has_feature("web") or OS.has_feature("ios")
 var account_notice=""
 func auth_locked() -> bool:
  return require_login and not art_preview and not account_active
@@ -96,7 +96,7 @@ func _ready():
  if art_preview:sim.hero.pos=Vector2(2,6)
  world=World.new();world.art_preview=art_preview;add_child(world);world.setup(sim)
  var layer=CanvasLayer.new();add_child(layer);ui=Control.new();ui.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);ui.mouse_filter=Control.MOUSE_FILTER_IGNORE;layer.add_child(ui)
- if art_preview:
+ if art_preview or OS.has_feature("ios"):
   get_window().content_scale_aspect=Window.CONTENT_SCALE_ASPECT_EXPAND
   get_viewport().size_changed.connect(layout_art_preview);layout_art_preview()
  var theme=Theme.new();theme.default_font_size=28;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
@@ -797,6 +797,8 @@ func open_account():
   button(p,"Abmelden" if require_login else "Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
  if OS.has_feature("web") and bool(JavaScriptBridge.eval("!!window.GlutwachtAccount",true)):
   JavaScriptBridge.eval("window.GlutwachtAccount.show("+JSON.stringify(account_notice)+")");return
+ if OS.has_feature("ios"):
+  var form=load("res://game3d/ui/native_account_form.gd").new();p.add_child(form);form.configure(self,p.size);return
  var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
  var password=LineEdit.new();password.placeholder_text="Passwort · bei Registrierung mindestens 12 Zeichen";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
  label(p,account_notice if account_notice!="" else "Melde dich an oder erstelle ein Konto. Dein Dorf wird automatisch diesem Konto zugeordnet und gespeichert.",Rect2(32,286,790,82),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -903,6 +905,7 @@ func restore_account_start():
 
 func web_redirect() -> String:
  if OS.has_feature("web"):return String(JavaScriptBridge.eval("window.location.origin+window.location.pathname",true))
+ if OS.has_feature("ios"):return "https://glutwacht-spieltest.mg-automobile24.chatgpt.site/v08/"
  return ""
 func request_account_recovery(email:String):
  if account.busy:return

@@ -1,0 +1,29 @@
+# Glutwacht: iPhone-App auf Basis des bestehenden Projekts
+
+## Vorbereitet
+- Godot 4.7.2 iOS-Export, arm64, Mindestversion iOS 16, Versionsnummer 0.12.0.
+- Vorgesehene Bundle-ID `com.moratgalla.glutwacht`; Verfügbarkeit bei Apple noch prüfen und dann dauerhaft beibehalten.
+- Kontopflicht auch unter iOS. Native scrollbare Eingabefelder mit E-Mail-/Passworttastatur; Form passt seine Höhe an die Bildschirmtastatur an.
+- Spielwelt nutzt erweiterten Bildschirm; zentrierte HUD-Fläche wie bestehende Grafikprobe. Safe-Area und physische Tastatur müssen auf iPhone geprüft werden.
+- Cloud-API, UUID-getrennte Saves, Hero/Tutorial und Schema bleiben erhalten. Keine Migration/Spielstandlöschung.
+- E-Mail-Bestätigung und Passwortwiederherstellung über bestehenden HTTPS-Webendpunkt; anschließend in der App anmelden.
+- Bestehendes Sichern bei Fokusverlust bleibt aktiv. Hintergrundabbruch vor Cloudbestätigung muss am Gerät getestet werden.
+- Manueller Mac-Buildworkflow `.github/workflows/build-ios.yml`, keine automatische Veröffentlichung. Liefert zunächst Xcode-Projekt, keine installierbare oder signierte IPA.
+- Repository ist öffentlich. Standard-GitHub-Mac-Runner sind laut GitHub kostenfrei für öffentliche Repositories; keine kostenpflichtigen größeren Runner verwenden.
+
+## Apple-Schritt
+Morat registriert sich selbst im Apple Developer Program (Identitätsprüfung, Vertrag, Jahresgebühr). Danach echte 10-stellige Team-ID unter Membership details übernehmen. Kein Apple-Passwort oder 2FA-Code im Chat nötig.
+Workflow verlangt diese Team-ID, `prepare_ios.gd` prüft Format vor jeder Änderung. Signierung, Bundle-Registrierung, App-Store-Connect-Datensatz und TestFlight-Einladung sind noch nicht eingerichtet. Zertifikat/Provisioning Profile bzw. App-Store-Connect-Schlüssel ausschließlich über sichere Secret-Eingabe einrichten, niemals im Repository oder Chat speichern.
+
+## Vor erstem TestFlight-Test
+1. Export auf macOS mit echter Team-ID ausführen und Xcode-Build prüfen.
+2. Apple-Signierung und TestFlight-Upload anbinden; App-Icon, Datenschutzangaben und Beta-Informationen vervollständigen.
+3. Anmeldung/Registrierung, erneutes Öffnen, zwei Konten, vorhandenes Cloud-Dorf, Tastatur, Safe-Area und Unterbrechen auf echtem iPhone testen.
+4. Cloud-Reload-Schutzdialog aus Webregression separat aufklären; Konfliktschutz nicht abschalten.
+
+Native Sitzungen liegen zunächst nur im Arbeitsspeicher: nach vollständigem App-Neustart erneut anmelden. Keine unsichere Token-Datei geschrieben. Für dauerhaftes Angemeldetbleiben ist eine geprüfte Keychain-Anbindung noch offen. Der Spielstand selbst liegt weiterhin im Konto. App-spezifischer Sicherungsimport/Teilen und direkte E-Mail-App-Rückkehr bleiben ebenfalls offen.
+
+## Verbindliche Gestaltungsvorlage
+Das erneut beigefügte Heroic-Pop-Bild ist das Ziel: oben links Held/Level, rechts Holz/Stein/Gold, unten vier Hauptaktionen und großer orangefarbener Angriffsknopf; dunkelblaue plastische Flächen mit Goldrahmen. Spielwelt: große blaue Burg, dichtes Dorf, warme Sonne, natürliche Flussufer, Hafen und Vegetation. Kein statisches Bild als vermeintlich interaktive Spielwelt einsetzen. HUD-Rekonstruktion und passende 3D-Assets sind eigene nächste Umsetzungsschritte; die aktuelle türkise Oberfläche ist keine 1:1-Umsetzung dieses Bilds.
+
+Quellen: https://docs.godotengine.org/en/4.7/tutorials/export/exporting_for_ios.html und https://docs.github.com/en/billing/concepts/product-billing/github-actions
