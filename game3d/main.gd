@@ -938,13 +938,18 @@ func load_cloud(automatic:bool=false):
  if restoring:
   var resumed=await account.restore_version()
   if not resumed.ok:account.status=resumed.message;open_account();return
+ var local_path="user://account-"+account.user_id+".json"
+ var meta=account.read_metadata()
+ var local_exists=FileAccess.file_exists(local_path)
+ if automatic and not account_active and not restoring and local_exists and bool(meta.get("dirty",true)) and meta.get("pending",{})!={}:
+  var resumed_save=await account.resume_pending_save(meta)
+  if not resumed_save.ok and resumed_save.get("code","")!="revision_conflict":
+   account.status=resumed_save.get("message","Sicherung wird beim nächsten Versuch fortgesetzt.");open_account();return
+  meta=account.read_metadata()
  var result=await account.fetch_save()
  if not result.ok:account.status=result.message;open_account();return
  if not result.empty and not Progress.validate_save(result.snapshot).is_empty():account.status="Cloud-Stand ungültig; dein Dorf bleibt unverändert.";open_account();return
  if restoring:activate_cloud(result);return
- var local_path="user://account-"+account.user_id+".json"
- var meta=account.read_metadata()
- var local_exists=FileAccess.file_exists(local_path)
  if automatic and not account_active:
   if local_exists and bool(meta.get("dirty",true)):
    if not meta.is_empty() and int(meta.get("revision",-1))==int(result.revision):

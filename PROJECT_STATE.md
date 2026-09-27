@@ -1,4 +1,8 @@
-# Current work: 0.13.1 recovery foundation
+# Current work: 0.14 continuation (27 September 2026)
+
+Read `docs/DEVELOPMENT_0_14.md` first. The current development branch is `update/masterplan-online-20260925`; `main` is historical. Verified TestFlight release: **0.14.0 (9.0.0)**, Apple VALID / IN_BETA_TESTING / Glutwacht test (run 36280416699). Latest continuation repairs automatic startup after an interrupted save acknowledgement; local regressions pass, browser gate and a native build with this follow-up still pending. Accounts, save schema 7, heroes, buildings, friends and clans are retained. No new backend migration or public website deployment in this continuation.
+
+# Historical: 0.13.1 recovery foundation
 
 See docs/DEVELOPMENT_0_13_1.md. This increments save safety before economic migration. Server-authoritative economy, trade, PvP and the full Heroic Pop redesign are still OPEN. Final build 0.13.1 (6.0.0) passed pipeline 36275562938, uploaded and Apple-verified VALID / IN_BETA_TESTING / Glutwacht test. Windows artifact 10916827580. No physical device test is claimed. See docs/DEVELOPMENT_0_13_1.md for exact scope and evidence.
 

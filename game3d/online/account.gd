@@ -145,6 +145,26 @@ func fetch_save() -> Dictionary:
  if not result.data is Array:return {"ok":false,"message":"Ungültige Serverantwort."}
  if result.data.is_empty():return {"ok":true,"empty":true,"revision":0}
  return {"ok":true,"empty":false,"revision":int(result.data[0].revision),"snapshot":result.data[0].snapshot}
+func resume_pending_save(meta:Dictionary) -> Dictionary:
+ # The server may have committed a save just before the app closed, while its
+ # acknowledgement never reached this device. Replay only that durable request.
+ var request=meta.get("pending",{})
+ if not request is Dictionary or request.is_empty():return {"ok":false,"message":"Sicherungsauftrag unlesbar; lokale Daten bleiben erhalten."}
+ if not request.get("p_snapshot") is Dictionary or not preload("res://game3d/progress.gd").validate_save(request.p_snapshot).is_empty():return {"ok":false,"message":"Sicherungsauftrag ungültig; lokale Daten bleiben erhalten."}
+ if not meta.get("revision") is float and not meta.get("revision") is int:return {"ok":false,"message":"Sicherungsstand unlesbar."}
+ if request.get("p_revision")!=meta.revision:return {"ok":false,"message":"Sicherungsauftrag passt nicht zum lokalen Stand."}
+ for key in ["p_request","p_device"]:
+  if not request.get(key) is String:return {"ok":false,"message":"Sicherungsauftrag unvollständig."}
+  var id=String(request[key])
+  if id.length()!=36 or id.replace("-","").length()!=32 or not id.replace("-","").is_valid_hex_number():return {"ok":false,"message":"Sicherungsauftrag ungültig."}
+ if busy or not signed_in() or not pending_restore.is_empty():return {"ok":false,"message":"Bitte die laufende Kontoprüfung abwarten."}
+ var was_loaded=loaded
+ revision=int(meta.revision);pending=request.duplicate(true);dirty=true;loaded=true
+ var result=await upload(request.p_snapshot)
+ loaded=was_loaded
+ # Never mark the local village clean: it may contain actions after the request.
+ if not save_metadata():return {"ok":false,"message":"Sicherungsbestätigung konnte lokal nicht gespeichert werden."}
+ return result
 func upload(snapshot:Dictionary) -> Dictionary:
  if not pending_restore.is_empty():return {"ok":false,"message":"Wiederherstellung zuerst abschließen.","code":"restore_pending"}
  if not signed_in() or not loaded:return {"ok":false,"message":"Zuerst den Cloud-Stand prüfen."}

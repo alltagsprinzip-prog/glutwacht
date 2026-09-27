@@ -1,5 +1,12 @@
 # Glutwacht 0.14.0 — playable Heroic pass
 
+## Continuation 27 September — interrupted save acknowledgements
+- Confirmed existing TestFlight 0.14.0 (9.0.0): Apple reports VALID / IN_BETA_TESTING / Glutwacht test in run 36280416699. Windows artifact 10918497167 comes from successful publication run 36279940485.
+- The browser gate in run 36280421191 stopped at `cloud_confirm` after reloading. A reproducible cause is a cloud write committed before shutdown whose acknowledgement was not retained locally.
+- Automatic startup now replays the exact persisted request before comparing revisions. The server's existing idempotent receipt prevents duplicate writes; later local actions remain dirty and untouched. A genuinely newer head still requires explicit conflict resolution. Network failure retains the request. No database or save-schema changes.
+- Local regression evidence: session resume 13/13, account/save 37/37, onboarding 19/19, cloud recovery 10/10, native sessions 13/13. Browser verification and a build containing this follow-up are pending; build 9 does not contain it.
+- The earlier visual and audio limitations still apply. Recorded combat Foley and physical iPhone acceptance remain open.
+
 Continues 0.13.1; no new account system, reset or replacement repository.
 
 ## Implemented

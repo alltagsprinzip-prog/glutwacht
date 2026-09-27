@@ -25,7 +25,7 @@ async function install(context,{compressed=false}={}){
    return send(saves.has(id)?[saves.get(id)]:[]);
   }
   if(url.pathname==='/rest/v1/rpc/save_private_village'){
-   if(requests.has(body.p_request))return send(requests.get(body.p_request));
+   if(requests.has(body.p_request))return send({...requests.get(body.p_request),head_revision:saves.get(id)?.revision||0,replayed:true});
    const revision=saves.get(id)?.revision||0;
    if(body.p_revision!==revision)return send({message:'revision_conflict'},409);
    const next={revision:revision+1};saves.set(id,{...next,snapshot:body.p_snapshot});requests.set(body.p_request,next);return send(next);

@@ -1,3 +1,10 @@
+# Aktuell: 27.09.2026 — Glutwacht 0.14
+
+Zuerst `docs/DEVELOPMENT_0_14.md` und den obersten Eintrag in `PROJECT_STATE.md` lesen. Gleicher Entwicklungsbranch `update/masterplan-online-20260925`, kein Neustart. TestFlight **0.14.0 (9.0.0)** ist für „Glutwacht test“ verfügbar. Nachträgliche Korrektur: bei verloren gegangener Speicherbestätigung denselben Auftrag erneut prüfen, damit der automatische Einstieg nicht fälschlich einen Konflikt verlangt. Echte Konflikte und neuere lokale Änderungen bleiben geschützt. Browser-Abnahme und nativer Build dieser Korrektur sind noch ausstehend. Synthetischer Ton ist weiterhin keine realistische Foley-Aufnahme; iPhone-Gerätetest nicht behaupten.
+
+---
+Die folgenden Einträge sind historische Arbeitsstände.
+
 # Weiterarbeit ab 26.09.2026 – Account-/Tutorial-Meilenstein
 
 Zuerst PROJECT_STATE.md und docs/CHANGE_2026-09-26_ACCOUNTS.md lesen. Neues Spielcode-Commit fd82fa6faf84223cb2508b7f02b7c2b1e47df47d; Branch update/masterplan-online-20260925, Draft-PR #4. Kein Neustart oder Save-Reset.
