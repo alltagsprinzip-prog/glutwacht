@@ -2,7 +2,7 @@ name: Publish Glutwacht to TestFlight
 on:
   workflow_dispatch:
   push:
-    branches: [update/masterplan-online-20260925]
+    branches: [update/masterplan-online-20260925, release/testflight-017-20260927]
     paths:
       - '.github/workflows/publish-testflight.yml'
       - 'tools/publish_testflight.py'
@@ -63,7 +63,7 @@ jobs:
         run: |
           mkdir -p logs/heroic
           python3 tools/check_godot.py logs/heroic.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/heroic_suite.gd
-      - name: Render social and recovery screens and verify touch controls
+      - name: Render social, dynamic quests and recovery screens and verify touch controls
         env:
           LIBGL_ALWAYS_SOFTWARE: '1'
           GLUTWACHT_QA_DIR: logs/social
