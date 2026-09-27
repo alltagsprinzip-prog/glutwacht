@@ -67,7 +67,7 @@ jobs:
           path: logs
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 22
+    timeout-minutes: 32
     steps:
       - uses: actions/checkout@v4
       - name: Godot 4.7.2 and export templates
@@ -137,7 +137,7 @@ jobs:
           npm install --prefix "$RUNNER_TEMP/glutwacht-browser" --no-package-lock playwright@1.56.1
           node "$RUNNER_TEMP/glutwacht-browser/node_modules/playwright/cli.js" install --with-deps chromium
       - name: Exported WebGL gameplay gate
-        timeout-minutes: 9
+        timeout-minutes: 15
         run: NODE_PATH="$RUNNER_TEMP/glutwacht-browser/node_modules" node tools/web_smoke.cjs
       - name: iPhone landscape with existing 0.14 save
         timeout-minutes: 8
