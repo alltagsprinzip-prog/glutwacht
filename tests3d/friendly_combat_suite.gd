@@ -12,7 +12,7 @@ func run():
  game.progress.choose_hero("warrior");game.progress.data.melee=5;game.progress.data.archers=0
  game.sim=game.Battle.new(game.progress.data);game.sim.start(0,true);game.deploying="melee";game.world.setup(game.sim);game.build_hud()
  check(game.deployment_buttons.melee.visible,"available warriors shown")
- check(game.deployment_buttons.archers.visible and game.deployment_buttons.archers.disabled,"zero archers disabled with zero count")
+ check(not game.deployment_buttons.archers.visible and game.deployment_buttons.archers.disabled,"zero archers are hidden and cannot be deployed")
  check(game.deployment_buttons.shield.disabled and game.deployment_buttons.siege.disabled,"all unavailable types disabled with zero count")
  check(game.hud_widgets.deploy_group.text=="Alle 5","squad count shown")
  check(not game.hud_widgets.deploy_group.get_global_rect().intersects(game.stick.get_global_rect()),"squad controls do not overlap joystick")
@@ -21,9 +21,9 @@ func run():
  check(game.sim.reserve.melee==0 and game.sim.allies.size()==5,"no loss or duplication")
  check(game.sim.deploy_squad("melee",Vector2(0,29))==0,"second tap cannot duplicate squad")
  game.update_hud()
- check(game.deployment_buttons.melee.disabled and not game.hud_widgets.deploy_group.visible,"depleted portrait remains stable, group control disappears")
+ check(not game.deployment_buttons.melee.visible and game.deployment_buttons.melee.disabled and not game.hud_widgets.deploy_group.visible,"depleted portrait and group control disappear")
  game.sim.reserve.archers=2;game.update_hud();game.choose_deploy("archers")
- check(game.deployment_buttons.archers.visible and game.deployment_buttons.archers.position==Vector2(112,185),"archer portrait retains fixed slot")
+ check(game.deployment_buttons.archers.visible and game.deployment_buttons.archers.position==Vector2(game.edge_left_inset(185,70),185+game.safe_rect().position.y),"available archers occupy first safe slot")
  check(game.sim.deploy("archers",Vector2(0,27)) and game.sim.reserve.archers==1,"single deployment retained")
  game.sim.result="complete";check(game.sim.deploy_squad("archers",Vector2(0,27))==0,"ended battle rejects deployment")
  game.queue_free();await process_frame

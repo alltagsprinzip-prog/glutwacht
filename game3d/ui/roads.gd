@@ -28,7 +28,7 @@ func draw_dialog():
   material_preview(card,key)
   var name_label=game.label(card,("✓ " if draft.surface==key else "")+Roads.NAMES[key],Rect2(10,78,240,28),22,game.Storybook.INK,true)
   game.fit_caption(name_label,Rect2(10,78,240,28),22)
- var tip="Start und Ende antippen. Mehrere Stücke ergeben deinen Weg. Ziehen bewegt die Kamera, zwei Finger zoomen."
+ var tip="Start und Ende antippen, um Wegstücke zu verbinden.\nKamera: ziehen · Zoom: zwei Finger."
  var label=game.label(p,tip,Rect2(28,390,804,48),19);label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  game.button(p,"Abbrechen",Rect2(28,446,216,66),abort)
  game.button(p,"Selbst zeichnen",Rect2(260,446,278,66),begin,true).name="RoadDraw"

@@ -90,7 +90,7 @@ func start_trial(response:Dictionary):
    if old is Dictionary and int(old.get("tick",-1))==ack:pending=old
    game.sim.apply_state()
  game.close_dialog();game.cancel_gestures();game.result_shown=false;game.deploying="hero" if not game.sim.hero_deployed else "";game.deploy_group=false
- game.world.setup(game.sim);game.world.follow_hero=false;game.world.pan=Vector2(1,0);game.world.target_zoom=55;game.build_hud();game.tone("battle_start")
+ game.world.setup(game.sim);game.world.follow_hero=false;game.world.pan=Vector2(1,0);game.world.target_zoom=55;game.world.sync(game.sim,0);game.build_hud();game.tone("battle_start")
  if trial.state.done:show_result()
 func _process(dt):
  if not active:return
@@ -163,13 +163,14 @@ func build_hud():
  g.create_stick()
  for i in range(5):
   var kind=(["hero"]+g.Catalog.TROOP_ORDER)[i]
-  var b=g.Hud.action(g,"face_"+("warrior" if kind=="hero" else kind),"Held" if kind=="hero" else "",Rect2(260+i*106,600,98,98),func():g.choose_deploy(kind))
+  var b=g.Hud.action(g,"face_"+("warrior" if kind=="hero" else kind),"",Rect2(260+i*106,600,98,98),func():g.choose_deploy(kind))
   b.name="TrialDeploy_"+kind;b.get_child(0).position=Vector2(19,8);b.get_child(0).size=Vector2(60,60)
   var count=g.label(b,"",Rect2(6,70,86,22),17,g.Storybook.INK,true);b.set_meta("count",count)
   troop_buttons[kind]=b
  var group=g.button(g.hud,"Alle einsetzen",Rect2(366,542,218,48),func():g.choose_deploy_group(not g.deploy_group));group.name="TrialDeployGroup"
  group.set_meta("trial_group",true)
  var hit=g.Hud.dock(g.Hud.action(g,"attack","Angriff",Rect2(1114,578,146,124),func():g.sim.strike(),true));g.Hud.attack_skin(g,hit)
+ hit.get_child(0).position=Vector2(37,10);hit.get_child(0).size=Vector2(72,72)
  hit.button_down.connect(func():g.held=true);hit.button_up.connect(func():g.held=false)
  skill_button=g.Hud.dock(g.Hud.action(g,"skill","Kampfruf",Rect2(1144,448,116,104),func():g.sim.skill(),true))
  heal_button=g.Hud.action(g,"heal","Heilen",Rect2(898,600,96,98),func():g.sim.heal());heal_button.set_meta("hud_right_gap",266.0)

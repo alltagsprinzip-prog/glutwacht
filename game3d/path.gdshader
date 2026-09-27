@@ -17,13 +17,20 @@ void fragment(){
   q.x*=mix(.78,1.25,hash(vec2(row,3.0)));
   vec2 cell=floor(q);vec2 f=fract(q);
   float edge=min(min(f.x,1.0-f.x),min(f.y,1.0-f.y));
-  float bevel=smoothstep(.025,.12,edge);
+  float bevel=smoothstep(.012,.085,edge);
   vec3 stone=mix(vec3(.40,.41,.34),vec3(.66,.63,.49),hash(cell));
-  color=mix(earth*.85,stone*(.86+.14*grain),bevel);
-  color+=vec3(.07)*smoothstep(.04,.11,edge)*(1.0-smoothstep(.11,.19,edge));
+  color=mix(earth,stone*(.90+.10*grain),bevel);
+  color+=vec3(.035)*smoothstep(.03,.085,edge)*(1.0-smoothstep(.085,.16,edge));
  }else if(surface_kind==1){
-  vec2 q=p*15.0;vec2 f=fract(q)-.5;float pebble=1.0-smoothstep(.25,.5,length(f));
-  color=mix(earth,mix(vec3(.40,.39,.31),vec3(.64,.60,.48),hash(floor(q))),pebble*.85);
+  vec2 q=p*10.0;vec2 cell=floor(q);float nearest=2.0;float tint=.5;
+  for(int y=-1;y<=1;y++){for(int x=-1;x<=1;x++){
+   vec2 n=cell+vec2(float(x),float(y));vec2 offset=vec2(hash(n),hash(n+vec2(37,91)));
+   float d=length(q-(n+.15+offset*.7));if(d<nearest){nearest=d;tint=hash(n+vec2(19,7));}
+  }}
+  float pebble=1.0-smoothstep(.22,.48,nearest);
+  vec3 detail=mix(earth,mix(vec3(.42,.41,.34),vec3(.62,.59,.49),tint),pebble*.8);
+  float fade=smoothstep(.15,.9,max(length(dFdx(q)),length(dFdy(q))));
+  color=mix(detail,mix(earth,vec3(.51,.49,.40),.55),fade);
  }else{color=earth*(.96+.04*sin(p.y*2.3+noise(p)*5.0));}
  float edge=min(UV.x,1.0-UV.x)*2.0;
  float feather=smoothstep(.04,.27,edge-(noise(p*6.0)-.5)*.17);

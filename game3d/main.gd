@@ -174,7 +174,7 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  p.add_theme_stylebox_override("panel",skin("panel"))
  parent.add_child(p);decorate(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
- var l=Label.new();l.clip_text=true;l.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ var l=Label.new();l.clip_text=true;l.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS if rect.size.y<font_size*2 else TextServer.OVERRUN_NO_TRIMMING;l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
  l.add_theme_color_override("font_shadow_color",Color(0,.03,.07,.8));l.add_theme_constant_override("shadow_offset_y",1)
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);l.size=rect.size;return l
@@ -482,14 +482,16 @@ func world_tap(pos:Vector2):
   else:
    var oid=world.obstacle_at(pos);selected_obstacle=oid;selected_building="";world.selected_uid="";world.selected_obstacle=oid
   build_hud()
- elif sim.mode=="raid" and deploying!="":
-  deploy_at_screen(pos)
  elif is_instance_valid(ranking_ui) and ranking_ui.active:
   var ground=world.ground_position(pos);var nearest=4.5;sim.target_id=-1
   for unit in sim.buildings+sim.enemies:
    var distance=ground.distance_to(unit.pos)
    if unit.hp>0 and distance<nearest:nearest=distance;sim.target_id=int(unit.id)
-  if sim.target_id!=-1:sim.effects.append({"kind":"invalid","pos":ground,"life":.5,"max":.5,"color":GOLD})
+  if sim.target_id!=-1:
+   deploying="";update_hud();sim.effects.append({"kind":"invalid","pos":ground,"life":.5,"max":.5,"color":GOLD})
+  elif deploying!="":deploy_at_screen(pos)
+ elif sim.mode=="raid" and deploying!="":
+  deploy_at_screen(pos)
 func _notification(what):
  if what==NOTIFICATION_APPLICATION_FOCUS_OUT and is_inside_tree() and sim:
   save()

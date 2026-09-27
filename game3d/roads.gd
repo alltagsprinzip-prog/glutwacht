@@ -112,6 +112,7 @@ static func draw(parent:Node3D,data:Dictionary,buildings:Array):
   var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES)
   for route in buckets[surface]:
    for i in range(route.size()-1):append_strip(st,route[i],route[i+1])
+   for point in route:append_cap(st,point)
   if buckets[surface].is_empty():continue
   var model=MeshInstance3D.new();model.mesh=st.commit();model.material_override=material(surface);model.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;parent.add_child(model)
 static func append_strip(st:SurfaceTool,a:Vector2,b:Vector2):
@@ -123,5 +124,10 @@ static func append_strip(st:SurfaceTool,a:Vector2,b:Vector2):
   st.set_normal(Vector3.UP);st.set_uv(uvs[i]);st.add_vertex(Vector3(points[i].x,.055,points[i].y))
 static func draw_segment(parent:Node3D,a:Vector2,b:Vector2,surface:String,preview:bool=false):
  if a.distance_to(b)<.1:return
- var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES);append_strip(st,a,b)
+ var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES);append_strip(st,a,b);append_cap(st,a);append_cap(st,b)
  var model=MeshInstance3D.new();model.mesh=st.commit();model.material_override=material(surface,preview);model.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;parent.add_child(model)
+static func append_cap(st:SurfaceTool,point:Vector2):
+ for i in range(12):
+  for j in range(3):
+   var p=point if j==0 else point+Vector2.from_angle(float(i+j-1)*TAU/12.0)*.96
+   st.set_normal(Vector3.UP);st.set_uv(Vector2(.5 if j==0 else 0,0));st.add_vertex(Vector3(p.x,.055,p.y))
