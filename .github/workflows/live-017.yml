@@ -1,7 +1,7 @@
 name: Live two-account acceptance 0.17
 on:
   push:
-    branches: [update/masterplan-online-20260925]
+    branches: [update/masterplan-online-20260925, release/testflight-017-20260927]
     paths: [.github/workflows/live-017.yml]
 permissions:
   contents: read

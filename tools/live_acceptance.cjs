@@ -52,6 +52,7 @@ const social=(i,a,p={})=>rpc(i,'glutwacht_social',a,p),rank=(i,a,p={})=>rpc(i,'g
   // The receiving browser retains the invitation across its real Auth login.
   if((await b.evaluate(()=>__glutwacht.dialog))!=='social')await tap(b,c=>c.text==='FREUNDE');
   await tap(b,c=>c.text==='Einladung ansehen');await tap(b,c=>c.text==='Freundschaft anfragen');
+  await b.waitForFunction(()=>GlutwachtInvite.peek()===''&&__glutwacht.dialog==='social',null,{timeout:45000});
   let a=await social(0,'state');assert.equal(a.incoming.length,1);assert.equal(a.incoming[0].tag,profiles[1].me.tag);
   console.log('Friend request received through real game UI.');
   await social(0,'accept',{tag:profiles[1].me.tag});assert.equal((await social(1,'state')).friends.length,1);
