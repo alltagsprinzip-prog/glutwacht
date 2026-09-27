@@ -12,6 +12,8 @@ class ResumeAccount extends Account:
  var sent={}
  var sent_json=""
  var offline=false
+ var disk_ready=true
+ func flush_pending_save() -> bool:return disk_ready
  func call_api(path:String,_method:int,body:Dictionary={}) -> Dictionary:
   if offline:return {"ok":false,"code":"transport_2","message":"offline"}
   if path.contains("save_private_village"):
@@ -90,6 +92,11 @@ func run():
  a.pending_json="";a.offline=false;a.receipt_revision=0
  var replayed=await a.resume_pending_save(durable)
  check(replayed.ok and a.sent_json==durable_json,"new-format request survives read and replay byte for byte")
+ a.pending.clear();a.pending_json="";a.sent={};a.disk_ready=false
+ var blocked=await a.upload(p.data)
+ check(not blocked.ok and blocked.get("code","")=="local_storage" and a.sent.is_empty(),"server is never called before durable local receipt")
+ check(not a.pending.is_empty() and not a.pending_json.is_empty(),"failed durability keeps exact retry request")
+ a.disk_ready=true
  var bad_meta=durable.duplicate(true);bad_meta.pending_json='{}';a.sent={}
  var mismatch=await a.resume_pending_save(bad_meta)
  check(not mismatch.ok and a.sent.is_empty(),"mismatched serialized body cannot be sent")

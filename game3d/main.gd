@@ -797,7 +797,7 @@ func building_limit_reason(kind:String) -> String:
  var current=Catalog.building_limit(kind,int(progress.data.hall))
  for level in range(int(progress.data.hall)+1,Progress.MAX_LEVEL+1):
   if Catalog.building_limit(kind,level)>current:return "Limit: %d. Haupthaus Stufe %d → %d %s möglich."%[current,level,Catalog.building_limit(kind,level),Catalog.BUILD[kind].name]
- return "Maximale Anzahl erreicht: %d. Kein weiteres Mengen-Upgrade."%current
+ return "Höchstzahl: %d. Keine weitere Erhöhung durch das Haupthaus."%current
 func open_help():
  load("res://game3d/ui/guidance.gd").help(self)
 func open_settings():
@@ -824,351 +824,139 @@ func open_menu():
  elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(500,459,328,59),func():return_home())
 
 func open_local_overview(status:bool=false):
- var p=open_dialog("local_status" if status else "tasks","Dorfstatus" if status else "Nächste Schritte","")
- var rows=[]
- if status:
-  rows=[["worker","Bauarbeiter","%d frei von %d"%[progress.free_builders(),progress.builders()]], ["collect","Lager","%d Kapazität je Rohstoff"%progress.storage()], ["star","Siege",str(progress.data.wins)]]
- else:
-  rows=[["upgrade","Dorf erweitern","Gebäude antippen und Ausbau prüfen"], ["army","Armee vorbereiten","%d / %d Armeeplätze belegt"%[Catalog.army_slots(progress.data),progress.capacity()]], ["attack","Beute sammeln","Gegner ansehen und gezielt angreifen"]]
- for i in range(rows.size()):
-  var y=106+i*104;panel(p,Rect2(28,y,804,91));icon(p,rows[i][0],Rect2(45,y+17,53,53));label(p,rows[i][1],Rect2(117,y+9,655,32),24,GOLD);label(p,rows[i][2],Rect2(118,y+49,660,30),20)
- label(p,"Lokaler Spielstand · kein Online-Postfach",Rect2(29,437,803,28),18,CREAM,true)
- button(p,"Weiter",Rect2(543,474,279,51),func():close_dialog(),true)
+ var p=open_dialog("local_status" if status else "tasks","Dorfstatus" if status else "Nächste Sch…9990 tokens truncated…len Stand."}
+ for key in ["p_request","p_device"]:
+  if not request.get(key) is String:return {"ok":false,"message":"Sicherungsauftrag unvollständig."}
+  var id=String(request[key])
+  if id.length()!=36 or id.replace("-","").length()!=32 or not id.replace("-","").is_valid_hex_number():return {"ok":false,"message":"Sicherungsauftrag ungültig."}
+ if busy or not signed_in() or not pending_restore.is_empty():return {"ok":false,"message":"Bitte die laufende Kontoprüfung abwarten."}
+ var original=meta.get("pending_json","")
+ if not original is String or original.is_empty() or JSON.parse_string(original)!=request:return {"ok":false,"message":"Original-Sicherungsauftrag fehlt; lokale Daten bleiben erhalten."}
+ var was_loaded=loaded
+ revision=int(meta.revision);pending=request.duplicate(true);pending_json=original;dirty=true;loaded=true
+ var result=await upload(request.p_snapshot)
+ loaded=was_loaded
+ # Never mark the local village clean: it may contain actions after the request.
+ if not save_metadata():return {"ok":false,"message":"Sicherungsbestätigung konnte lokal nicht gespeichert werden."}
+ return result
+func flush_pending_save() -> bool:
+ if not OS.has_feature("web") or not storage_enabled:return true
+ # FileAccess writes to Emscripten memory first. The immutable receipt and the
+ # village must reach IndexedDB BEFORE the server can accept another revision.
+ # A lost acknowledgement can then always be recovered with this exact request.
+ busy=true
+ JavaScriptBridge.eval("""
+ (()=>{
+  const state={done:false,ok:false};window.__glutwachtSaveFlush=state;
+  const flush=()=>{
+   if(typeof GodotFS==='undefined'||!GodotFS.is_persistent()){state.done=true;return;}
+   if(GodotFS._syncing){setTimeout(flush,10);return;}
+   GodotFS.sync().then(error=>{state.ok=!error;state.done=true;}).catch(()=>{state.done=true;});
+  };flush();
+ })()
+ """,false)
+ var start=Time.get_ticks_msec()
+ while not bool(JavaScriptBridge.eval("!!window.__glutwachtSaveFlush?.done",true)):
+  if Time.get_ticks_msec()-start>15000:busy=false;return false
+  await get_tree().process_frame
+ var ok=bool(JavaScriptBridge.eval("!!window.__glutwachtSaveFlush?.ok",true))
+ busy=false;return ok
+func upload(snapshot:Dictionary) -> Dictionary:
+ if not pending_restore.is_empty():return {"ok":false,"message":"Wiederherstellung zuerst abschließen.","code":"restore_pending"}
+ if not signed_in() or not loaded:return {"ok":false,"message":"Zuerst den Cloud-Stand prüfen."}
+ var session=await ensure_session()
+ if not session.ok:return session
+ if pending.is_empty():
+  pending={"p_snapshot":snapshot.duplicate(true),"p_revision":revision,"p_request":uuid(),"p_device":device_id}
+  pending_json=JSON.stringify(pending)
+ if not save_metadata():return {"ok":false,"message":"Sicherungsauftrag konnte lokal nicht gespeichert werden."}
+ if not await flush_pending_save():return {"ok":false,"code":"local_storage","message":"Lokale Sicherung noch nicht bestätigt. Bitte Speicherzugriff erlauben und erneut sichern."}
+ # Keep the exact request after a timeout: its committed response may have been lost.
+ var result=await call_api("/rest/v1/rpc/save_private_village",HTTPClient.METHOD_POST,pending)
+ if result.ok and result.data is Dictionary and result.data.has("revision"):
+  if int(result.data.get("head_revision",result.data.revision))>int(result.data.revision):
+   pending.clear();pending_json="";dirty=true;save_metadata()
+   return {"ok":false,"code":"revision_conflict","message":"Die Anfrage war bereits gesichert. Inzwischen liegt ein neuerer Cloud-Stand vor; bitte laden."}
+  result.saved_snapshot=pending.p_snapshot.duplicate(true)
+  revision=int(result.data.revision);pending.clear();pending_json="";status="Cloud gesichert"
+ else:status="Cloud-Sicherung ausstehend"
+ return result
+func logout():
+ if storage_enabled and not OS.has_feature("web"):native_store.clear()
+ if storage_enabled and OS.has_feature("web"):JavaScriptBridge.eval("try{localStorage.removeItem('glutwacht.auth.v1')}catch(e){}")
+ token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();pending_json="";pending_restore.clear();status="Nicht angemeldet"
 
-func open_save_tools():
- if art_preview:toast("Grafikprobe: Dein echtes Dorf und deine Sicherungen bleiben unverändert.");return
- var p=open_dialog("saves","Dein lokaler Spielstand","")
- label(p,"Held, Gebäude, Training und Bauzeiten bleiben bei Updates erhalten.",Rect2(29,102,800,59),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- label(p,"Kontodorf: Auf einem anderen Gerät mit demselben Konto anmelden. Warte vorher auf CLOUD GESICHERT. Die Datei ist eine zusätzliche Sicherung." if account_active else "Ein anderer Browser hat einen eigenen lokalen Speicher. Sichere dein Dorf als Datei, bevor du den Ort wechselst.",Rect2(29,183,800,103),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- label(p,progress.warning if progress.write_blocked else ("Kontostand · "+account.status if account_active else "Du spielst lokal. Konto und Cloud findest du im Dorfprofil."),Rect2(29,317,800,60),20,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"Sicherung speichern",Rect2(28,427,394,72),func():export_save(),true)
- button(p,"Sicherung laden",Rect2(442,427,390,72),func():request_save_import())
-func export_save():
- if OS.has_feature("web"):
-  var text=FileAccess.get_file_as_string(save_path) if progress.write_blocked else JSON.stringify(progress.data,"  ")
-  JavaScriptBridge.eval("(()=>{const b=new Blob(["+JSON.stringify(text)+"],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='Glutwacht-Spielstand.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),10000);})();",true)
-  toast("Sicherungsdatei wurde angefordert.")
- else:
-  var path="user://Glutwacht-Spielstand.json";var f=FileAccess.open(path,FileAccess.WRITE)
-  if f:f.store_string(FileAccess.get_file_as_string(save_path) if progress.write_blocked else JSON.stringify(progress.data,"  "));f.close();toast("Sicherung: "+ProjectSettings.globalize_path(path))
-func request_save_import():
- if OS.has_feature("web"):
-  JavaScriptBridge.eval("(()=>{const i=document.createElement('input');i.type='file';i.accept='.json,application/json';i.onchange=async()=>{const f=i.files[0];if(f&&f.size<1048576)window.__glutwachtImportText=await f.text();};i.click();})();",true)
- else:toast("Sicherungsimport im Browser öffnen.")
-func prepare_save_import(text:String):
- if art_preview:return
- if text.length()>1048576:toast("Datei ist zu groß.");return
- var parser=JSON.new();var status=parser.parse(text)
- var raw=parser.data if status==OK else null
- if not Progress.validate_save(raw).is_empty():toast("Ungültige oder neuere Sicherung; nichts wurde verändert.");return
- var temp="user://import-validation.json";var f=FileAccess.open(temp,FileAccess.WRITE)
- if f==null:toast("Datei konnte nicht geprüft werden.");return
- f.store_string(text);f.close();var probe=Progress.new();var valid=probe.load_file(temp);DirAccess.remove_absolute(temp)
- if not valid:toast("Sicherung unlesbar; nichts wurde verändert.");return
- pending_import=probe
- var p=open_dialog("import_confirm","Sicherung wiederherstellen?","")
- label(p,"Haupthaus %d · %s\nHolz %d · Stein %d · Gold %d"%[probe.data.hall,Catalog.hero(probe.data.hero).name,probe.data.wood,probe.data.stone,probe.data.gold],Rect2(32,121,790,128),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- label(p,"Die Datei ersetzt das lokale Dorf an dieser Adresse.\nDer bisherige Stand wird vorher als Sicherheitskopie behalten.",Rect2(32,283,790,87),21).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"Abbrechen",Rect2(28,427,386,71),func():pending_import=null;close_dialog())
- button(p,"Wiederherstellen",Rect2(437,427,391,71),func():confirm_save_import(),true)
-func confirm_save_import():
- if pending_import==null:return
- if FileAccess.file_exists(save_path) and DirAccess.copy_absolute(save_path,save_path+".before-import")!=OK:toast("Backup fehlgeschlagen; Import wurde abgebrochen.");return
- if not pending_import.store_file(save_path):toast("Speichern fehlgeschlagen; Import abgebrochen.");return
- progress=pending_import;pending_import=null;sim=Battle.new(progress.data);return_home();toast("Sicherung geladen.")
-
-func open_social():
- if social_ui==null:
-  social_ui=load("res://game3d/ui/social.gd").new();add_child(social_ui);social_ui.setup(self)
- social_ui.open()
-func open_profile():
- var p=open_dialog("profile","Dein Dorf","")
- label(p,"Dorfname",Rect2(32,102,790,40),27,GOLD)
- var field=LineEdit.new();field.position=Vector2(32,156);field.size=Vector2(790,64);field.max_length=24;field.text=progress.data.get("player_name","Mein Dorf");p.add_child(field)
- label(p,account.status if account_active else "Gastdorf · lokal gespeichert",Rect2(32,237,790,35),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"Namen speichern",Rect2(32,345,790,65),func():
-  var value=field.text.strip_edges()
-  if value.is_empty():toast("Bitte einen Dorfnamen eingeben.");return
-  progress.data.player_name=value;save();close_dialog();build_hud(),true)
- button(p,"Konto / Cloud",Rect2(32,430,380,65),func():open_account())
- button(p,"Freunde & Clans",Rect2(32,279,790,53),func():open_social())
- button(p,"Sicherung",Rect2(430,430,392,65),func():open_save_tools())
-func task_destination(action:String):
- match action:
-  "hero":open_heroes()
-  "hall":open_building("hall")
-  "barracks":open_building("barracks")
-  "training":open_training()
-  "build":open_catalog()
-  "army":open_army()
-  _:open_campaign()
-func open_tasks():
- var p=open_dialog("tasks","Dein Weg durch Glutwacht","Einmalige Ziele · Belohnungen bleiben bis zum Abholen verfügbar.")
- var tasks=progress.tasks();var pages=ceili(tasks.size()/4.0);task_page=clampi(task_page,0,pages-1)
- for i in range(4):
-  var index=task_page*4+i
-  if index>=tasks.size():break
-  var task=tasks[index];var y=119+i*82;var claimed=task.id in progress.data.claimed_tasks
-  panel(p,Rect2(22,y,816,76),Color("294f5b"))
-  label(p,task.title+"  %d/%d"%[task.current,task.target],Rect2(35,y+3,590,29),22,GOLD if task.done else CREAM)
-  label(p,task.hint,Rect2(35,y+34,550,37),15).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-  var claim=button(p,"Erledigt" if claimed else ("+%d Gold"%task.gold if task.done else "Los geht’s"),Rect2(629,y+9,194,57),func():
-   if not task.done:task_destination(task.action)
-   elif progress.claim_task(task.id):save();open_tasks()
-   else:toast("Dein Goldlager braucht Platz für die ganze Belohnung."),task.done and not claimed)
-  claim.disabled=claimed
- button(p,"←",Rect2(28,465,100,54),func():task_page=maxi(0,task_page-1);open_tasks()).disabled=task_page==0
- label(p,"Kapitel %d / %d"%[task_page+1,pages],Rect2(146,471,550,37),21,CREAM,true)
- button(p,"→",Rect2(730,465,100,54),func():task_page=mini(pages-1,task_page+1);open_tasks()).disabled=task_page==pages-1
-func open_battle_reports():
- var history=progress.data.get("battle_history",[])
- var p=open_dialog("reports","Deine letzten Kämpfe","Die letzten 20 Angriffe bleiben gespeichert.")
- var pages=maxi(1,ceili(history.size()/4.0));report_page=clampi(report_page,0,pages-1)
- if history.is_empty():label(p,"Nach deinem nächsten Angriff erscheint hier dein Bericht.",Rect2(40,200,780,120),28,CREAM,true).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- for i in range(4):
-  var index=report_page*4+i
-  if index>=history.size():break
-  var entry=history[index];var y=122+i*80
-  label(p,entry.name+" · "+"★".repeat(int(entry.stars))+"☆".repeat(3-int(entry.stars))+" · %d%%"%entry.destruction,Rect2(35,y,780,33),25,GOLD)
-  label(p,"Holz %d · Stein %d · Gold %d · EP %d"%[entry.wood,entry.stone,entry.gold,entry.xp],Rect2(35,y+34,780,29),21)
- button(p,"←",Rect2(28,465,100,54),func():report_page-=1;open_battle_reports()).disabled=report_page==0
- label(p,"Seite %d / %d"%[report_page+1,pages],Rect2(146,471,550,37),21,CREAM,true)
- button(p,"→",Rect2(730,465,100,54),func():report_page+=1;open_battle_reports()).disabled=report_page==pages-1
-func open_inbox():
- var p=open_dialog("inbox","Dorfchronik","")
- label(p,"%s · %d Siege"%[progress.data.get("player_name","Mein Dorf"),progress.data.wins],Rect2(32,108,790,60),29,GOLD)
- label(p,"%d abgeschlossene Ziele\n%d Gebäude im Dorf\n%d freie Bauarbeiter"%[progress.data.claimed_tasks.size(),progress.all_buildings().size(),progress.free_builders()],Rect2(32,194,790,148),27)
- label(p,"Hier siehst du deinen Dorfstatus. Nachrichten anderer Spieler sind noch nicht verfügbar.",Rect2(32,374,790,100),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-
-func open_account():
- if art_preview:toast("Grafikprobe ohne Konto. Dein gespeichertes Dorf liegt unter dem normalen Spiellink.");return
- if account.recovering:open_recovery_password();return
- var p=open_dialog("account","Konto und Cloud","")
- if not account.configured():
-  label(p,"Die Konten-Anbindung ist für diesen Build noch nicht eingerichtet. Dein lokales Dorf bleibt spielbar und gespeichert.",Rect2(32,125,790,185),27).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-  button(p,"Lokale Sicherung",Rect2(32,415,790,70),func():open_save_tools());return
- if account.signed_in():
-  label(p,account.status+"\nPrivates Dorf · ohne Rangliste",Rect2(32,110,790,95),26,GOLD)
-  button(p,"Wiederherstellung fortsetzen" if not account.pending_restore.is_empty() else "Cloud-Stand laden",Rect2(32,217,790,62),func():load_cloud())
-  var upload=button(p,"Jetzt sichern",Rect2(32,289,385,62),func():sync_cloud(),true);upload.disabled=not account_active or not account.pending_restore.is_empty()
-  var history=button(p,"Sicherungsverlauf",Rect2(437,289,385,62),func():open_cloud_versions());history.disabled=not account_active or not account.pending_restore.is_empty()
-  button(p,"Abmelden" if require_login else "Abmelden · lokales Dorf öffnen",Rect2(32,415,790,67),func():leave_account());return
- if OS.has_feature("web") and bool(JavaScriptBridge.eval("!!window.GlutwachtAccount",true)):
-  JavaScriptBridge.eval("window.GlutwachtAccount.show("+JSON.stringify(account_notice)+")");return
- if not OS.has_feature("web"):
-  var form=load("res://game3d/ui/native_account_form.gd").new();p.add_child(form);form.configure(self,p.size);return
- var email=LineEdit.new();email.placeholder_text="E-Mail";email.position=Vector2(32,110);email.size=Vector2(790,65);p.add_child(email)
- var password=LineEdit.new();password.placeholder_text="Passwort · bei Registrierung mindestens 12 Zeichen";password.secret=true;password.position=Vector2(32,199);password.size=Vector2(790,65);p.add_child(password)
- label(p,account_notice if account_notice!="" else "Melde dich an oder erstelle ein Konto. Dein Dorf wird automatisch diesem Konto zugeordnet und gespeichert.",Rect2(32,286,790,82),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"Anmelden",Rect2(32,378,380,65),func():authenticate(email.text,password.text,false),true)
- button(p,"Registrieren",Rect2(434,378,388,65),func():authenticate(email.text,password.text,true))
- button(p,"Passwort vergessen",Rect2(32,461,790,54),func():request_account_recovery(email.text))
-func authenticate(email:String,password:String,register:bool):
- if art_preview:return
- if account.busy:return
- if email.strip_edges().is_empty() or password.is_empty():account_notice="Bitte E-Mail und Passwort eingeben.";open_account();return
- account_notice="Verbindung wird hergestellt …";open_account()
- var result=await account.login(email,password,register,web_redirect())
- if not result.ok:account_notice=result.get("message","Anmeldung fehlgeschlagen.");open_account();return
- account_notice=""
- await load_cloud(true)
-func load_cloud(automatic:bool=false):
- if account.busy:return
- cloud_sync_paused=true
- if account.pending_restore.is_empty():account.pending_restore=account.read_metadata().get("pending_restore",{})
- var restoring=not account.pending_restore.is_empty()
- if restoring:
-  var resumed=await account.restore_version()
-  if not resumed.ok:account.status=resumed.message;open_account();return
- var local_path="user://account-"+account.user_id+".json"
- var meta=account.read_metadata()
- var local_exists=FileAccess.file_exists(local_path)
- if automatic and not account_active and not restoring and local_exists and bool(meta.get("dirty",true)) and meta.get("pending",{})!={}:
-  var resumed_save=await account.resume_pending_save(meta)
-  if not resumed_save.ok and resumed_save.get("code","")!="revision_conflict":
-   account.status=resumed_save.get("message","Sicherung wird beim nächsten Versuch fortgesetzt.");open_account();return
-  meta=account.read_metadata()
- var result=await account.fetch_save()
- if not result.ok:account.status=result.message;open_account();return
- if not result.empty and not Progress.validate_save(result.snapshot).is_empty():account.status="Cloud-Stand ungültig; dein Dorf bleibt unverändert.";open_account();return
- if restoring:activate_cloud(result);return
- if automatic and not account_active:
-  if local_exists and bool(meta.get("dirty",true)):
-   if not meta.is_empty() and int(meta.get("revision",-1))==int(result.revision):
-    activate_local_account(meta);return
-   account.status="Speicherkonflikt · Auswahl erforderlich"
-  else:
-   activate_cloud(result);return
- var p=open_dialog("cloud_confirm","Kontodorf öffnen?","")
- if local_exists and bool(meta.get("dirty",true)):
-  button(p,"Lokalen Kontostand als Datei sichern",Rect2(32,350,790,52),func():download_snapshot(FileAccess.get_file_as_string(local_path)))
- label(p,"Neues Kontodorf erstellen." if result.empty else "Gespeichertes Kontodorf von der Cloud laden.",Rect2(32,110,790,80),27,GOLD).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- label(p,"Auf diesem Gerät liegt ein möglicherweise neuerer Stand. Cloud laden behält vorher eine lokale Sicherheitskopie. Abbrechen verändert nichts." if local_exists and bool(meta.get("dirty",true)) else "Dein Gastdorf bleibt separat erhalten. Dieses Konto lädt ausschließlich sein eigenes Dorf.",Rect2(32,229,790,128),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- button(p,"Zurück",Rect2(32,420,380,65),func():open_account())
- button(p,"Dorf öffnen",Rect2(434,420,388,65),func():activate_cloud(result),true)
-func activate_cloud(result:Dictionary):
- if not account.signed_in() or account.busy:return
- var uid=account.user_id
- if uid.length()!=36 or uid.replace("-","").length()!=32 or not uid.replace("-","").is_valid_hex_number():toast("Ungültige Konto-ID.");return
- if not progress.store_file(save_path):toast(progress.warning);return
- var path="user://account-"+uid+".json"
- if FileAccess.file_exists(path) and DirAccess.copy_absolute(path,path+".before-cloud")!=OK:toast("Sicherheitskopie fehlgeschlagen.");return
- var candidate=Progress.new()
- if not result.empty:
-  var temp="user://cloud-validation.json";var file=FileAccess.open(temp,FileAccess.WRITE)
-  if file==null:toast("Cloud-Stand konnte nicht geprüft werden.");return
-  file.store_string(JSON.stringify(result.snapshot));file.close()
-  var valid=candidate.load_file(temp);DirAccess.remove_absolute(temp)
-  if not valid:toast("Cloud-Stand konnte nicht geladen werden.");return
- if not candidate.store_file(path):toast(candidate.warning);return
- account.revision=int(result.revision);account.loaded=true;account.pending.clear();account.pending_json="";account.pending_restore.clear();account.dirty=false;account.save_metadata();cloud_sync_paused=false
- progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
- if progress.data.hero=="":open_tutorial()
- sync_cloud()
-func sync_cloud():
- if not account_active or account.busy or progress.write_blocked:return
- if not progress.store_file(save_path):toast(progress.warning);return
- account.status="Wird mit Cloud synchronisiert …"
- var result=await account.upload(progress.data)
+func accept_session(payload:Dictionary,expected_user:String="") -> bool:
+ var incoming_token=String(payload.get("access_token",""))
+ if not payload.get("user",{}) is Dictionary:return false
+ var incoming_user=String(payload.get("user",{}).get("id",""))
+ if incoming_token.is_empty() or incoming_user.is_empty():return false
+ if not expected_user.is_empty() and incoming_user!=expected_user:return false
+ token=incoming_token;user_id=incoming_user
+ refresh_token=String(payload.get("refresh_token",""))
+ expires_at=Time.get_unix_time_from_system()+clampf(float(payload.get("expires_in",3600)),1,86400)
+ persist_session()
+ return true
+func ensure_session() -> Dictionary:
+ if not signed_in():return {"ok":false,"message":"Bitte anmelden."}
+ if expires_at==0 or Time.get_unix_time_from_system()<expires_at-60:return {"ok":true}
+ if refresh_token.is_empty():return {"ok":false,"message":"Sitzung abgelaufen. Bitte erneut anmelden; dein Dorf bleibt lokal erhalten."}
+ var result=await call_api("/auth/v1/token?grant_type=refresh_token",HTTPClient.METHOD_POST,{"refresh_token":refresh_token})
  if not result.ok:
-  cloud_sync_paused=result.get("code","")=="revision_conflict"
-  if result.get("code","")=="other_device_active":cloud_clock=-90
-  account.status=result.get("message","Offline · lokal gesichert, erneuter Versuch folgt")
-  if cloud_sync_paused:toast(account.status)
- else:
-  cloud_sync_paused=false
-  account.dirty=JSON.stringify(result.get("saved_snapshot",{}))!=JSON.stringify(progress.data)
-  account.status="Lokal gesichert · Cloud ausstehend" if account.dirty else "Cloud gesichert"
- account.save_metadata()
-func leave_account():
- if not account.pending_restore.is_empty():toast("Bitte zuerst die Wiederherstellung fortsetzen.");return
- if account.busy:toast("Bitte die laufende Sicherung abwarten.");return
- save()
- if account_active:
-  await sync_cloud()
-  if account.dirty:
-   toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
- await account.sign_out();
- if social_ui!=null:social_ui.clear()
- account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
- if auth_locked():update_access();open_account()
- elif progress.write_blocked:open_save_tools()
- elif progress.data.hero=="":open_tutorial()
-func activate_local_account(meta:Dictionary):
- var path="user://account-"+account.user_id+".json"
- var candidate=Progress.new()
- if not candidate.load_file(path):toast("Lokale Kontosicherung unlesbar; nichts verändert.");return
- if not progress.store_file(save_path):toast(progress.warning);return
- account.revision=int(meta.revision);account.loaded=true;account.pending=meta.get("pending",{});account.pending_json=String(meta.get("pending_json",""));account.dirty=true;cloud_sync_paused=false
- progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
- if progress.data.hero=="":open_tutorial()
- await sync_cloud()
-func restore_account_start():
- if art_preview:return
- if OS.has_feature("web") and JavaScriptBridge.eval("!!window.__glutwachtEmailLink",true):
-  await check_email_link();return
- var result=await account.restore_session()
- if result.ok:
-  await load_cloud(true)
- elif account.signed_in():
-  account.status="Verbindung fehlt · Konto noch nicht geladen";open_account()
- elif auth_locked():open_account()
- elif progress.data.hero=="" and not progress.write_blocked:open_tutorial()
+  if int(result.get("http_status",0)) in [400,401]:logout()
+  return result
+ if not result.data is Dictionary or not accept_session(result.data,user_id):return {"ok":false,"message":"Sitzung konnte nicht sicher erneuert werden."}
+ return {"ok":true}
+func request_recovery(email:String,redirect:String) -> Dictionary:
+ if email.strip_edges().is_empty():return {"ok":false,"message":"Bitte deine E-Mail eingeben."}
+ if not redirect.begins_with("https://"):return {"ok":false,"message":"Wiederherstellung bitte in der veröffentlichten HTTPS-Webversion öffnen."}
+ return await call_api("/auth/v1/recover?redirect_to="+redirect.uri_encode(),HTTPClient.METHOD_POST,{"email":email.strip_edges()})
+func accept_recovery(payload:Dictionary) -> Dictionary:
+ if payload.get("type","")!="recovery":return {"ok":false,"message":"Ungültiger Wiederherstellungslink."}
+ return await accept_email_link(payload)
+func accept_email_link(payload:Dictionary) -> Dictionary:
+ if busy:return {"ok":false,"message":"Bitte die laufende Anfrage abwarten."}
+ if signed_in():return {"ok":false,"message":"Zuerst das aktuelle Konto abmelden."}
+ var link_type=String(payload.get("type",""))
+ var incoming=String(payload.get("access_token",""))
+ if incoming.is_empty() or link_type not in ["signup","magiclink","recovery"]:
+  return {"ok":false,"message":"Link ungültig oder abgelaufen. Bitte erneut anmelden oder einen neuen Link anfordern."}
+ token=incoming
+ # Never trust identity claims in the URL. Resolve the token against Auth first.
+ var result=await call_api("/auth/v1/user",HTTPClient.METHOD_GET)
+ if not result.ok or not result.data is Dictionary or String(result.data.get("id","")).is_empty():
+  logout();return {"ok":false,"message":"Link ungültig oder abgelaufen. Bitte einen neuen Link anfordern."}
+ var session=payload.duplicate();session.user=result.data
+ if not accept_session(session):logout();return {"ok":false,"message":"Anmeldung fehlgeschlagen."}
+ recovering=link_type=="recovery";loaded=false;revision=0;pending.clear()
+ status="Passwort wiederherstellen" if recovering else "E-Mail bestätigt · angemeldet"
+ return {"ok":true}
+func change_recovered_password(password:String) -> Dictionary:
+ if not recovering or not signed_in():return {"ok":false,"message":"Bitte zuerst den Wiederherstellungslink öffnen."}
+ if password.length()<12:return {"ok":false,"message":"Bitte mindestens 12 Zeichen verwenden."}
+ var result=await call_api("/auth/v1/user",HTTPClient.METHOD_PUT,{"password":password})
+ if result.ok:recovering=false
+ return result
+func sign_out():
+ if signed_in():await call_api("/auth/v1/logout?scope=local",HTTPClient.METHOD_POST)
+ logout()
 
-func web_redirect() -> String:
- if OS.has_feature("web"):return String(JavaScriptBridge.eval("window.location.origin+window.location.pathname",true))
- if OS.has_feature("ios"):return "https://glutwacht-spieltest.mg-automobile24.chatgpt.site/v08/"
- return ""
-func request_account_recovery(email:String):
- if account.busy:return
- var result=await account.request_recovery(email,web_redirect())
- account_notice="Falls ein Konto vorhanden ist, erhältst du einen Wiederherstellungslink." if result.ok else result.message
- open_account()
-func check_email_link():
- if not OS.has_feature("web"):return
- var raw=JavaScriptBridge.eval("(()=>{const r=window.__glutwachtEmailLink;delete window.__glutwachtEmailLink;return r?JSON.stringify(r):null;})()",true)
- if not raw is String:return
- var payload=JSON.parse_string(raw)
- if not payload is Dictionary:return
- if not account.configured():toast("Dieser Build ist noch nicht für Konten eingerichtet.");return
- var result=await account.accept_email_link(payload)
- if not result.ok:toast(result.message);open_account();return
- if account.recovering:open_recovery_password()
- else:await load_cloud(true)
-func open_recovery_password():
- var p=open_dialog("recovery","Neues Passwort","")
- label(p,"Mindestens 12 Zeichen. Dein Dorf bleibt unverändert.",Rect2(32,103,790,65),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- var password=LineEdit.new();password.secret=true;password.placeholder_text="Neues Passwort";password.position=Vector2(32,191);password.size=Vector2(790,65);p.add_child(password)
- var repeated=LineEdit.new();repeated.secret=true;repeated.placeholder_text="Passwort wiederholen";repeated.position=Vector2(32,282);repeated.size=Vector2(790,65);p.add_child(repeated)
- button(p,"Passwort speichern",Rect2(32,421,790,70),func():
-  if account.busy:return
-  if password.text!=repeated.text:toast("Die Passwörter stimmen nicht überein.");return
-  var result=await account.change_recovered_password(password.text)
-  if result.ok:close_dialog();toast("Passwort geändert.");await load_cloud(true)
-  else:toast(result.message),true)
-
-func open_tutorial():
- var step=progress.tutorial_step()
- if step=="done":toast("Einführung abgeschlossen. Dein Dorf wartet auf dich.");return
- var titles={"hero":"Willkommen in Glutwacht","build":"Dein erstes Bauprojekt","upgrade":"Mache dein Dorf stärker","train":"Bereite deinen Helden vor","battle":"Dein erster Angriff"}
- var details={"hero":"1. Vergleiche die vier Helden.\n2. Tippe bei deinem Favoriten auf WÄHLEN.\nEr bleibt dein Startheld; weitere Helden kommen später.","build":"1. Tippe unten auf SÄGEWERK PLATZIEREN.\n2. Wähle eine freie, grün markierte Stelle.\n3. Bestätige mit HIER BAUEN. Danach liefert es Holz.","upgrade":"1. Öffne das Haupthaus über den Knopf unten.\n2. Vergleiche Nutzen, Kosten und Bauzeit.\n3. Tippe auf AUSBAUEN. Kaserne 2 ermöglicht dann Bogenschützen – beide Gebäude brauchen Level 2.","train":"1. Öffne HELDENTRAINING.\n2. Wähle Angriff, Leben oder Fähigkeit und tippe auf den Upgrade-Pfeil. Es kostet Rohstoffe und wirkt sofort.\nTruppen stellst du kostenlos unter ARMEE zusammen.","battle":"1. Wähle ein Lager und starte den Angriff.\n2. Tippe außerhalb der roten Zone, um Truppen einzusetzen.\n3. Bewege den Helden mit dem Stick; nutze rechts seine Fähigkeiten. Danach geht es zurück ins Dorf."}
- var order=["hero","build","upgrade","train","battle"]
- var p=open_dialog("tutorial",titles[step],"Einführung · Schritt %d von 5"%(order.find(step)+1))
- icon(p,"hero" if step=="hero" else ("attack" if step=="battle" else step if step!="train" else "training"),Rect2(355,100,140,140))
- label(p,details[step],Rect2(52,245,750,164),23).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- var callbacks={"hero":open_heroes,"build":func():begin_build("lumber"),"upgrade":func():open_building("hall"),"train":open_training,"battle":open_campaign}
- var actions={"hero":"HELD AUSWÄHLEN","build":"SÄGEWERK PLATZIEREN","upgrade":"HAUPTHAUS ÖFFNEN","train":"HELDENTRAINING","battle":"LAGER AUSWÄHLEN"}
- var next=button(p,actions[step],Rect2(175,427,500,72),callbacks[step],true);next.add_theme_font_size_override("font_size",24)
-func share_test_link():
- if OS.has_feature("web"):
-  JavaScriptBridge.eval("(()=>{const u=location.origin; if(navigator.share){navigator.share({title:'Glutwacht',url:u}).catch(()=>{});}else{navigator.clipboard.writeText(u).catch(()=>window.prompt('Testlink kopieren',u));}})()")
-  toast("Teile den Link mit deinen Freunden. Jeder erstellt sein eigenes Konto.")
-
-func download_snapshot(text:String):
- if OS.has_feature("web"):
-  JavaScriptBridge.eval("(()=>{const u=URL.createObjectURL(new Blob(["+JSON.stringify(text)+"],{type:'application/json'}));const a=document.createElement('a');a.href=u;a.download='Glutwacht-Kontobackup.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),10000)})()")
- else:
-  var f=FileAccess.open("user://Glutwacht-Kontobackup.json",FileAccess.WRITE)
-  if f:f.store_string(text);f.close()
-
-func open_cloud_versions():
- if account.busy or not account_active:return
- cloud_sync_paused=true
- account.status="Sicherungsverlauf wird geladen …"
- var result=await account.cloud_versions()
- cloud_sync_paused=false
- if not result.ok:account.status=result.message;open_account();return
- cloud_versions=result.data.get("versions",[]);cloud_version_page=0;draw_cloud_versions()
-func draw_cloud_versions():
- var p=open_dialog("cloud_versions","Cloud-Sicherungsverlauf","Privates PvE · Ursprungsstand und bis zu 48 weitere Sicherungen")
- var pages=maxi(1,ceili(cloud_versions.size()/4.0));cloud_version_page=clampi(cloud_version_page,0,pages-1)
- for i in range(4):
-  var index=cloud_version_page*4+i
-  if index>=cloud_versions.size():break
-  var entry:Dictionary=cloud_versions[index];var y=126+i*74
-  var title="Ursprungsstand" if entry.reason=="baseline" else ("Vor Wiederherstellung" if entry.reason=="before_restore" else "Automatische Sicherung")
-  label(p,title+" · Nr. "+str(entry.revision),Rect2(32,y,510,29),21,GOLD)
-  label(p,String(entry.created_at).left(19).replace("T"," ")+" UTC · Haupthaus "+str(entry.get("hall",1)),Rect2(32,y+30,510,26),17)
-  button(p,"Auswählen",Rect2(575,y+3,245,58),func():confirm_cloud_version(entry))
- if cloud_versions.is_empty():label(p,"Noch keine Cloud-Sicherung vorhanden.",Rect2(32,160,790,70),24)
- button(p,"Zurück",Rect2(32,452,220,58),func():cloud_version_page-=1;draw_cloud_versions()).disabled=cloud_version_page==0
- label(p,"%d / %d"%[cloud_version_page+1,pages],Rect2(280,465,280,36),23,CREAM,true)
- button(p,"Weiter",Rect2(600,452,220,58),func():cloud_version_page+=1;draw_cloud_versions()).disabled=cloud_version_page+1>=pages
-func confirm_cloud_version(entry:Dictionary):
- var p=open_dialog("cloud_restore_confirm","Früheren Dorfstand wiederherstellen?","")
- label(p,"Sicherung Nr. %s · Haupthaus %s"%[entry.revision,entry.get("hall",1)],Rect2(32,110,790,60),26,GOLD)
- var explanation=label(p,"Dein aktuelles Dorf wird vorher gesichert.\nDanach wird der gewählte frühere Stand aktiv.\nFreunde, Clan und Konto bleiben unverändert.\nDie Wiederherstellung braucht eine Verbindung.",Rect2(32,190,790,185),25)
- explanation.name="RestoreExplanation"
- button(p,"Abbrechen",Rect2(32,420,380,68),func():draw_cloud_versions())
- button(p,"Wiederherstellen",Rect2(434,420,388,68),func():restore_cloud_version(int(entry.revision)),true)
-func restore_cloud_version(target:int):
- if account.busy or not account_active:return
- restore_preparing=true
- await sync_cloud()
- if account.dirty or not account.pending.is_empty():
-  restore_preparing=false;toast("Aktuellen Stand zuerst vollständig sichern.");open_account();return
- cloud_sync_paused=true
- var result=await account.restore_version(target)
- restore_preparing=false
- if not result.ok:account.status=result.message;open_account();return
- await load_cloud(true)
+func cloud_versions() -> Dictionary:
+ var session=await ensure_session()
+ if not session.ok:return session
+ return await call_api("/rest/v1/rpc/private_save_history",HTTPClient.METHOD_POST,{"p_action":"list"})
+func restore_version(target:int=-1) -> Dictionary:
+ if not signed_in():return {"ok":false,"message":"Bitte anmelden."}
+ var session=await ensure_session()
+ if not session.ok:return session
+ if pending_restore.is_empty():
+  if target<0 or dirty or not pending.is_empty():return {"ok":false,"message":"Bitte zuerst den aktuellen Stand sichern."}
+  pending_restore={"p_action":"restore","p_revision":target,"p_expected":revision,"p_request":uuid(),"p_device":device_id}
+  if not save_metadata():
+   pending_restore.clear();return {"ok":false,"message":"Wiederherstellungsauftrag konnte nicht sicher gespeichert werden."}
+ # Always replay the original ID/device after an uncertain transport outcome.
+ var result=await call_api("/rest/v1/rpc/private_save_history",HTTPClient.METHOD_POST,pending_restore)
+ if not result.ok and String(result.get("code","")) in ["revision_conflict","other_device_active","version_not_found","invalid_request"]:
+  pending_restore.clear();save_metadata()
+ # Keep it after success until the downloaded replacement is durable locally.
+ return result

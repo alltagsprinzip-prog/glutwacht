@@ -149,7 +149,7 @@ static func update(g):
  if g.hud_widgets.has("timer"):
   var remaining=INF
   for job in g.progress.data.jobs+g.progress.data.obstacle_jobs:remaining=minf(remaining,float(job.finish)-Time.get_unix_time_from_system())
-  g.hud_widgets.timer.text="Bauarbeiter" if remaining==INF else "%02d:%02d"%[maxi(0,ceili(remaining))/60,maxi(0,ceili(remaining))%60]
+  g.hud_widgets.timer.text="Bauarbeiter" if remaining==INF else ("%d Tage"%ceili(remaining/86400.0) if remaining>=86400 else ("%dh %02dm"%[int(remaining)/3600,(int(remaining)%3600)/60] if remaining>=3600 else "%02d:%02d"%[maxi(0,ceili(remaining))/60,maxi(0,ceili(remaining))%60]))
  for key in g.loot_labels:g.loot_labels[key].text="%d / %d"%[g.sim.looted[key],g.sim.village[key]]
  if g.collect_button:
   var ready=g.progress.ready_resources();g.collect_button.disabled=ready.wood+ready.stone+ready.gold<=0
@@ -185,7 +185,7 @@ static func update(g):
   g.hud_widgets.deploy_group.text="Alle %d"%remaining
   g.hud_widgets.deploy_group.add_theme_stylebox_override("normal",g.skin("selected" if g.deploy_group else "gold"))
   g.hud_widgets.deploy_single.add_theme_stylebox_override("normal",g.skin("selected" if not g.deploy_group else "blue"))
-  g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf freies Gelände."%remaining if g.deploy_group else "Tippen oder halten: sofort einsetzen · »Alle %d« als Gruppe."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if g.Catalog.army_count(g.sim.reserve)>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
+  g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf freies Gelände."%remaining if g.deploy_group else "Tippen oder halten · »Alle %d« als Gruppe."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if g.Catalog.army_count(g.sim.reserve)>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
   if g.deploying=="hero":g.hud_widgets.deploy_hint.text="Held einsetzen: Tippe auf freies Gelände."
 static func format_number(value) -> String:
  var s=str(int(value));var parts=[]

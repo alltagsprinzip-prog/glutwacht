@@ -1,6 +1,6 @@
 extends RefCounted
 static func paragraph(g,p,value:String,rect:Rect2,size:int=22,color:Color=Color("fff5df")):
- var l=g.label(p,value,rect,size,color);l.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;return l
+ var l=g.label(p,"",rect,size,color);l.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;l.text=value;l.size=rect.size;return l
 static func building(g,kind:String):
  var d=g.Catalog.BUILD[kind];var p=g.open_dialog("build_info",d.name+" · Gebäudeinfo","")
  g.building_preview(p,kind,Rect2(24,90,215,167))
@@ -20,7 +20,7 @@ static func recommendation(g) -> Dictionary:
  if int(p.data.barracks)<hall:
   var target=int(p.data.barracks)+1
   return {"title":"Kaserne auf Stufe %d"%target,"body":g.Catalog.upgrade_benefit("barracks",target),"action":"Kaserne ausbauen","callback":func():g.open_building("barracks")}
- if hall>=4 and p.count_kind("camp")==0:return {"title":"Heerlager bauen → mehr Armeeplätze","body":"Schon freigeschaltet: Haupthaus Stufe 4. Das erste Lager schafft 4 zusätzliche Plätze; jeder Ausbau weitere 2.","action":"Heerlager ansehen","callback":func():g.open_build_info("camp")}
+ if hall>=4 and p.count_kind("camp")==0:return {"title":"Heerlager bauen → mehr Armeeplätze","body":"Schon freigeschaltet: Haupthaus Stufe 4. Das erste Lager erhöht die Kapazität von 10 auf 12 Plätze; jeder Ausbau weitere 2.","action":"Heerlager ansehen","callback":func():g.open_build_info("camp")}
  if hall<g.Progress.MAX_LEVEL:return {"title":"Haupthaus auf Stufe %d"%(hall+1),"body":"Freischaltungen: "+g.Catalog.upgrade_benefit("hall",hall+1),"action":"Kosten & Ausbau ansehen","callback":func():g.open_building("hall")}
  return {"title":"Helden und Armee weiter trainieren","body":"Haupthaus auf Maximalstufe. Verbessere Angriff, Leben und Fähigkeiten und schließe die Kampagne ab.","action":"Zum Training","callback":g.open_training}
 static func help(g):
@@ -44,8 +44,12 @@ static func settings(g):
   paragraph(g,p,row[1],Rect2(28,y,235,40),23,g.GOLD)
   var amount=g.label(p,"%d %%"%roundi(float(settings[row[0]])*100),Rect2(709,y,120,42),22,g.CREAM,true)
   var slider=HSlider.new();slider.name="Setting_"+row[0];slider.position=Vector2(276,y);slider.size=Vector2(414,48);slider.min_value=row[2];slider.max_value=row[3];slider.step=.05;slider.value=settings[row[0]];p.add_child(slider)
-  slider.add_theme_stylebox_override("slider",g.style(Color("0a2039"),Color("a1c1de"),1,6))
-  slider.add_theme_stylebox_override("grabber_area",g.style(Color("e9b14d"),Color("ffdda0"),1,6))
+  var track=g.style(Color("0a2039"),Color("a1c1de"),1,6);track.content_margin_top=5;track.content_margin_bottom=5
+  var fill=g.style(Color("e9b14d"),Color("ffdda0"),1,6);fill.content_margin_top=5;fill.content_margin_bottom=5
+  slider.add_theme_stylebox_override("slider",track);slider.add_theme_stylebox_override("grabber_area",fill);slider.add_theme_stylebox_override("grabber_area_highlight",fill)
+  var knob=GradientTexture2D.new();knob.width=36;knob.height=36;knob.fill=GradientTexture2D.FILL_RADIAL;knob.fill_from=Vector2(.5,.5);knob.fill_to=Vector2(1,.5)
+  knob.gradient=Gradient.new();knob.gradient.offsets=PackedFloat32Array([0,.7,.8,.92,1]);knob.gradient.colors=PackedColorArray([Color("fff0bf"),Color("e9b14d"),Color("173550"),Color("ffd784"),Color(0,0,0,0)])
+  slider.add_theme_icon_override("grabber",knob);slider.add_theme_icon_override("grabber_highlight",knob)
   slider.value_changed.connect(func(value):amount.text="%d %%"%roundi(value*100);g.change_setting(row[0],value))
  paragraph(g,p,"Deine Einstellungen werden automatisch gespeichert.",Rect2(28,428,804,38),20)
  g.button(p,"Ton: "+("AN" if g.progress.data.sound else "AUS"),Rect2(28,476,380,46),func():g.progress.data.sound=not g.progress.data.sound;g.apply_settings();g.save();g.open_settings()).add_theme_font_size_override("font_size",21)

@@ -47,6 +47,8 @@ func run():
  game.open_build_info("hero_hall");check(game.dialog=="build_info","locked building info opens")
  await shot("iphone-building-info")
  game.open_help();check(game.dialog=="help" and Guide.recommendation(game).title.contains("Stufe 4"),"recommendation respects existing lower barracks level")
+ for child in game.modal.get_child(1).get_children():
+  if child is Label:check(child.position.x+child.size.x<=game.modal.get_child(1).size.x,"help text stays inside its panel")
  await shot("iphone-help")
  game.open_settings();check(game.modal.find_children("Setting_*","HSlider",true,false).size()==3,"brightness, music and effect sliders available")
  await shot("iphone-settings")

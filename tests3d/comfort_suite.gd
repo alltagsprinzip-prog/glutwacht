@@ -25,11 +25,11 @@ func run():
  form.show_suggestions(g,"pla");check(form.suggestions.visible and form.suggestions.get_child_count()==1,"saved email suggested from prefix")
  form.suggestions.get_child(0).pressed.emit();check(form.email.text=="player@example.test" and form.password.text.is_empty(),"suggestion fills email without retaining password")
  for cue in ["swing","bow","shield","siege","hit","battle_start","build_done"]:
-  check(g.sound.sounds.has(cue) and g.sound.sounds[cue].size()==3,"three audio variants for "+cue)
-  check(g.sound.sounds[cue][0].data!=g.sound.sounds[cue][1].data,"audio variants differ for "+cue)
- var sample=g.sound.sounds.hit[0].data;var peak=0
- for i in range(0,sample.size(),2):peak=maxi(peak,absi(sample.decode_s16(i)))
- check(peak>1000 and peak<32767,"impact waveform is audible without clipping")
+  check(g.sound.sounds.has(cue) and g.sound.sounds[cue].size()>=2,"multiple audio variants for "+cue)
+  var first=g.sound.sounds[cue][0];var second=g.sound.sounds[cue][1]
+  check(first.get_length()>0 and second.get_length()>0,"decoded audio has a playable duration: "+cue)
+  check(first.data!=second.data if first is AudioStreamWAV else first.resource_path!=second.resource_path,"audio variants differ for "+cue)
+ check(g.sound.sounds.hit[0] is AudioStreamOggVorbis,"impact uses bundled recorded Foley")
  var played_before=g.sound.last_played.duplicate();g.sound.muted=true;g.sound.play("hit");check(g.sound.last_played==played_before,"mute prevents cue playback")
  g.queue_free();await process_frame;DirAccess.remove_absolute("user://qa-comfort.json")
  print("COMFORT_TESTS ",checks-failed,"/",checks);quit(1 if failed else 0)
