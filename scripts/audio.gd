@@ -1,6 +1,6 @@
 extends Node
-# Original procedural Foley: filtered noise, impacts and metallic resonances.
-# No third-party recording or runtime download. Per-cue cooldown limits combat clutter.
+# Bundled Kenney CC0 Foley plus original musical/UI synthesis.
+# Per-cue cooldown limits combat clutter; no runtime asset downloads.
 var muted=false
 var sounds={}
 var players:Array=[]

@@ -9,8 +9,10 @@ func check(ok:bool,title:String):
 func _initialize():call_deferred("run")
 func frames(n:int=2):
  for i in range(n):await process_frame
+func emit_touch(pos:Vector2,down:bool,id:int=0):
+ var e=InputEventScreenTouch.new();e.index=id;e.position=pos;e.pressed=down;Input.parse_input_event(e)
 func touch(pos:Vector2,down:bool,id:int=0):
- var e=InputEventScreenTouch.new();e.index=id;e.position=pos;e.pressed=down;Input.parse_input_event(e);await frames()
+ emit_touch(pos,down,id);await frames()
 func tap(pos:Vector2):
  await touch(pos,true);await touch(pos,false)
 func drag(pos:Vector2,relative:Vector2,id:int=0):
@@ -65,8 +67,10 @@ func run():
  check(game.sim.reserve.melee+game.sim.reserve.archers==remain,"ability controls never deploy")
  var center=game.world.camera.unproject_position(Vector3.ZERO);await tap(center)
  check(game.sim.reserve.melee+game.sim.reserve.archers==remain,"invalid ground tap consumes nothing")
- await click_button(game.deployment_buttons.melee);await touch(point,true,0)
- var second=point+Vector2(90,0);await touch(second,true,1);await drag(second+Vector2(30,0),Vector2(30,0),1);await touch(point,false,0);await touch(second+Vector2(30,0),false,1)
+ await click_button(game.deployment_buttons.melee)
+ # Both fingers land in one input frame. Waiting two rendered software-GPU
+ # frames between them can exceed the deliberate 180 ms hold threshold.
+ var second=point+Vector2(90,0);emit_touch(point,true,0);emit_touch(second,true,1);await frames();await drag(second+Vector2(30,0),Vector2(30,0),1);await touch(point,false,0);await touch(second+Vector2(30,0),false,1)
  check(game.sim.reserve.melee+game.sim.reserve.archers==remain,"pinch never deploys")
  check(game.world.target_zoom<48,"pinch changes zoom")
  await frames(30);game.set_process(false);game.world.target_zoom=48;game.world.zoom=48;game.world.sync(game.sim,.05)

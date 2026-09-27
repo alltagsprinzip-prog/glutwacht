@@ -185,7 +185,7 @@ static func update(g):
   g.hud_widgets.deploy_group.text="Alle %d"%remaining
   g.hud_widgets.deploy_group.add_theme_stylebox_override("normal",g.skin("selected" if g.deploy_group else "gold"))
   g.hud_widgets.deploy_single.add_theme_stylebox_override("normal",g.skin("selected" if not g.deploy_group else "blue"))
-  g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf freies Gelände."%remaining if g.deploy_group else "Tippen oder halten: sofort einsetzen · »Alle %d« als Gruppe."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if slot>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
+  g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf freies Gelände."%remaining if g.deploy_group else "Tippen oder halten: sofort einsetzen · »Alle %d« als Gruppe."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if g.Catalog.army_count(g.sim.reserve)>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
   if g.deploying=="hero":g.hud_widgets.deploy_hint.text="Held einsetzen: Tippe auf freies Gelände."
 static func format_number(value) -> String:
  var s=str(int(value));var parts=[]
