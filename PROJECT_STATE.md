@@ -1,3 +1,7 @@
+# Aktuell: Glutwacht 0.19
+
+Zuerst `docs/DEVELOPMENT_0_19.md` lesen. Bestehender Entwicklungsbranch `update/masterplan-online-20260925`; `main` bleibt historisch. Umsetzung: modernes HUD mit kleinen Safe-Area-Abständen, gemeinsame Dorfwege und aktive Jadeprüfung mit idempotenter Serverprüfung. Die folgenden älteren Einträge sind historisch. Veröffentlichungs- und TestFlightstatus stehen im aktuellen Entwicklungsdokument.
+
 # Current work: 0.14 continuation (27 September 2026)
 
 Read `docs/DEVELOPMENT_0_14.md` first. The current development branch is `update/masterplan-online-20260925`; `main` is historical. Verified TestFlight release: **0.14.0 (9.0.0)**, Apple VALID / IN_BETA_TESTING / Glutwacht test (run 36280416699). Latest continuation repairs automatic startup after an interrupted save acknowledgement; local regressions pass, browser gate and a native build with this follow-up still pending. Accounts, save schema 7, heroes, buildings, friends and clans are retained. No new backend migration or public website deployment in this continuation.

@@ -1,3 +1,7 @@
+# Aktuell: Glutwacht 0.19
+
+Zuerst `docs/DEVELOPMENT_0_19.md` lesen. Bestehender Entwicklungsbranch `update/masterplan-online-20260925`; `main` bleibt historisch. Umsetzung: modernes HUD mit kleinen Safe-Area-Abständen, gemeinsame Dorfwege und aktive Jadeprüfung mit idempotenter Serverprüfung. Die folgenden älteren Einträge sind historisch. Veröffentlichungs- und TestFlightstatus stehen im aktuellen Entwicklungsdokument.
+
 # Aktuell: 27.09.2026 — Glutwacht 0.14
 
 Zuerst `docs/DEVELOPMENT_0_14.md` und den obersten Eintrag in `PROJECT_STATE.md` lesen. Gleicher Entwicklungsbranch `update/masterplan-online-20260925`, kein Neustart. TestFlight **0.14.0 (9.0.0)** ist für „Glutwacht test“ verfügbar. Nachträgliche Korrektur: bei verloren gegangener Speicherbestätigung denselben Auftrag erneut prüfen, damit der automatische Einstieg nicht fälschlich einen Konflikt verlangt. Echte Konflikte und neuere lokale Änderungen bleiben geschützt. Browser-Abnahme und nativer Build dieser Korrektur sind noch ausstehend. Synthetischer Ton ist weiterhin keine realistische Foley-Aufnahme; iPhone-Gerätetest nicht behaupten.

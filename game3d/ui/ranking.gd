@@ -1,54 +1,56 @@
 extends Node
-# This trial is server-authoritative. Only player commands leave this client;
-# points, troops, HP and results are never accepted from a village snapshot.
+const LiveBattle=preload("res://game3d/live_battle.gd")
 var game
 var board:Dictionary={}
 var trial:Dictionary={}
 var page=0
-var lane=0
 var busy=false
-var retry_action=""
-var retry_args:Dictionary={}
-var stage
-var visual
-var frames:Array=[]
-var frame_clock=0.0
-var controls:Array=[]
-var status_label
-const ERRORS={"profile_required":"Aktiviere zuerst dein Spielerprofil bei Freunde.","trial_rate_limit":"20 Versuche pro Stunde erreicht. Bitte später erneut spielen.","stale_turn":"Ein anderer Auftrag wurde bereits bestätigt. Lade die Prüfung neu.","match_expired":"Diese Prüfung ist nach 20 Minuten abgelaufen. Starte einen neuen Versuch.","match_finished":"Diese Prüfung ist bereits beendet.","match_not_found":"Die Prüfung gehört nicht zu diesem Konto.","heal_unavailable":"Heilung ist gerade nicht verfügbar.","reserve_empty":"Diese Truppe ist bereits eingesetzt."}
+var active=false
+var pending:Dictionary={}
+var ack=0
+var sync_clock=0.0
+var retry_clock=0.0
+var status=""
+var saved_home
+var status_label:Label
+var troop_buttons={}
+var hero_button:Button
+var hp_label:Label
+var skill_button:Button
+var heal_button:Button
+var roll_button:Button
 func setup(g):game=g
-func clear():board={};trial={};frames=[];retry_args={};retry_action="";page=0
+func clear():
+ active=false;board={};trial={};pending={};saved_home=null
 func open():
+ if active:pause_menu();return
  if not game.account_active:game.open_account();return
  request("board",{"page":page})
 func request(action:String,args:Dictionary={}):
  if busy or not game.account_active:return
  if game.account.busy:game.toast("Die Cloud sichert gerade. Bitte gleich noch einmal tippen.");return
- busy=true;retry_action=action;retry_args=args.duplicate(true)
+ busy=true
  var uid=game.account.user_id
- var p=game.open_dialog("ranking_loading","Rangliste · Jadeprüfung I","")
- game.label(p,"Verbindung wird hergestellt …",Rect2(32,180,790,70),25,game.CREAM,true)
+ var p=game.open_dialog("ranking_loading","Jadeprüfung I","")
+ game.label(p,"Prüfung wird geladen …",Rect2(32,180,790,70),25,game.CREAM,true)
  var response=await game.account.ensure_session()
- if response.ok:response=await game.account.call_api("/rest/v1/rpc/glutwacht_ranking",HTTPClient.METHOD_POST,{"p_action":action,"p_args":args})
+ var endpoint="glutwacht_ranking" if action=="board" else "glutwacht_live_trial"
+ if response.ok:response=await game.account.call_api("/rest/v1/rpc/"+endpoint,HTTPClient.METHOD_POST,{"p_action":action,"p_args":args})
  busy=false
  if not game.account_active or game.account.user_id!=uid:return
  if game.dialog!="ranking_loading":return
  if not response.ok or not response.get("data") is Dictionary:
-  p=game.open_dialog("ranking_error","Verbindung zur Rangliste","")
-  var message=ERRORS.get(String(response.get("code","")),response.get("message","Die Anfrage konnte nicht bestätigt werden."))
+  p=game.open_dialog("ranking_error","Prüfung laden","")
+  var message="Aktiviere zuerst dein Spielerprofil bei Freunde." if response.get("code","")=="profile_required" else response.get("message","Verbindung fehlgeschlagen.")
   game.label(p,message,Rect2(35,130,790,150),25).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-  game.button(p,"Erneut versuchen",Rect2(35,330,380,66),func():request(retry_action,retry_args),true)
-  game.button(p,"Aktuellen Stand laden",Rect2(445,330,380,66),func():request("state") if action!="board" else open())
-  game.button(p,"Freunde / Spielerprofil",Rect2(235,420,390,66),game.open_social)
+  game.button(p,"Erneut versuchen",Rect2(35,330,380,66),func():request(action,args),true)
+  game.button(p,"Freunde / Spielerprofil",Rect2(445,330,380,66),game.open_social)
   return
- retry_action="";retry_args={}
  if action=="board":board=response.data;draw_board()
- elif response.data.get("state") is Dictionary:
-  trial=response.data;lane=int(trial.state.get("focus",0));frames=trial.get("frames",[]).duplicate(true);frame_clock=0;draw_trial()
- else:request("start")
+ else:start_trial(response.data)
 func draw_board():
  var p=game.open_dialog("ranking","Rangliste · Jadeprüfung I","")
- var info=game.label(p,"Dein bester Taktikangriff zählt. Gleiche Armee für alle · der Server berechnet jeden Zug. Gleiche Punkte = gleicher Rang.",Rect2(30,86,798,63),20)
+ var info=game.label(p,"Setze deine Truppen und deinen Helden ein. Steuere selbst und greife an. Dein bester bestätigter Versuch zählt.",Rect2(30,86,798,63),20)
  info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  info.name="RankingExplanation"
  var own=board.get("own")
@@ -66,81 +68,129 @@ func draw_board():
  var next=game.button(p,"›",Rect2(110,424,70,66),func():page+=1;open());next.disabled=(page+1)*20>=int(board.get("total",0))
  game.button(p,"Aktualisieren",Rect2(197,424,245,66),open)
  game.button(p,"Prüfung spielen",Rect2(462,424,365,66),func():request("start"),true)
-func order(kind:String,unit:String=""):
- if not frames.is_empty() or trial.is_empty() or bool(trial.state.get("done",false)):return
- var args={"match_id":trial.match_id,"round":int(trial.state.round),"request_id":game.account.uuid(),"kind":kind,"lane":lane}
- if unit!="":args.unit=unit
- request("turn",args)
-func draw_trial():
- var s=trial.state
- var p=game.open_dialog("ranked_trial","Jadeprüfung I · Runde %d / 18"%int(s.round),"")
- status_label=game.label(p,"",Rect2(30,81,1012,40),21,game.GOLD)
- var viewport=SubViewport.new();viewport.size=Vector2i(1012,190);viewport.own_world_3d=true;viewport.msaa_3d=Viewport.MSAA_2X
- var container=SubViewportContainer.new();container.position=Vector2(34,121);container.size=Vector2(1012,190);container.mouse_filter=Control.MOUSE_FILTER_IGNORE;p.add_child(container);container.add_child(viewport)
- var profile=game.Progress.new().fresh();profile.hero="warrior";profile.hero_id="warrior";profile.structures=[];profile.obstacles=[]
- visual=game.Battle.new(profile);visual.mode="raid";visual.manual_deployment=false;visual.hero_deployed=true;visual.buildings=[];visual.allies=[];visual.enemies=[];visual.hero={}
- apply_actors(frames[0] if not frames.is_empty() else s.actors)
- stage=game.World.new();viewport.add_child(stage);stage.setup(visual);stage.follow_hero=false;stage.zoom=38;stage.target_zoom=38
- stage.pan=Vector2(3,0);stage.focus=Vector3(3,0,0)
- controls=[]
- if bool(s.done):
-  status_label.text=("Geschafft! " if bool(s.won) else "Prüfung beendet. ")+"%d Punkte · dein Bestwert bleibt in der Rangliste."%int(s.score)
-  game.label(p,"Gebäudeschaden zählt. Ein vollständiger Sieg gibt 500 Bonuspunkte, dazu Tempo und verbleibende Truppenleben.",Rect2(35,408,1005,66),22).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
-  game.button(p,"Rangliste aktualisieren",Rect2(35,520,490,70),open,true)
-  game.button(p,"Neuer Versuch",Rect2(555,520,490,70),func():frames=[];request("start"))
-  return
- status_label.text="%d Punkte · 1 Befehl = 4 Kampfsekunden · Truppe wählen und einsetzen oder vorrücken."%int(s.score)
- for i in range(3):
-  var chosen=i-1
-  var b=game.button(p,["Nordflanke","Mitte","Südflanke"][i],Rect2(35+i*225,319,213,82),func():lane=chosen;draw_trial(),lane==chosen);controls.append(b)
- game.button(p,"Regeln",Rect2(728,319,150,82),rules)
- var stop=game.button(p,"Beenden",Rect2(890,319,155,82),func():order("finish"));controls.append(stop)
- for i in range(4):
-  var key=game.Catalog.TROOP_ORDER[i]
-  var b=game.button(p,"",Rect2(35+i*205,411,193,82),func():order("deploy",key))
-  b.tooltip_text=game.Catalog.TROOPS[key].name
-  game.icon(b,"face_"+key,Rect2(13,17,47,47))
-  var title=game.label(b,game.Catalog.TROOPS[key].name,Rect2(66,17,112,23),17,game.Storybook.INK)
-  game.fit_caption(title,Rect2(66,17,112,23),17)
-  game.label(b,"%d verfügbar"%int(s.reserve[key]),Rect2(66,43,112,22),17,game.Storybook.INK)
-  b.disabled=int(s.reserve[key])<=0;b.set_meta("rank_locked",b.disabled);controls.append(b)
- var advance=game.button(p,"Vorrücken",Rect2(855,411,190,82),func():order("advance"),true);controls.append(advance)
- var heal=game.button(p,"Held heilen · %d"%int(s.heal),Rect2(35,503,315,82),func():order("heal"));heal.disabled=int(s.heal)==0 or float(s.actors[0].hp)<=0 or float(s.actors[0].hp)>=420;heal.set_meta("rank_locked",heal.disabled);controls.append(heal)
- var rally=game.button(p,"Kampfruf · %d"%int(s.rally),Rect2(365,503,315,82),func():order("rally"));rally.disabled=int(s.rally)==0;rally.set_meta("rank_locked",rally.disabled);controls.append(rally)
- game.label(p,"Held: %d / 420 LP"%int(s.actors[0].hp),Rect2(707,503,338,82),23,game.GOLD,true)
- for b in controls:b.disabled=not frames.is_empty() or bool(b.get_meta("rank_locked",false))
-func rules():
- frames=[]
- var p=game.open_dialog("ranked_rules","Jadeprüfung · so funktioniert es","")
- var l=game.label(p,"18 Befehle, gleiche Truppe und Verteidigung für alle.\nWähle eine Flanke. Jeder Einsatz, Vormarsch oder Trank lässt 4 Sekunden Kampf ablaufen.\n\nHeilung: einmal +140 Heldenleben. Kampfruf: einmal +50 % Angriff für diesen Zug.\n\nMauern: je 50 Punkte · Türme: je 150 · Halle: 300. Auch Teilschaden zählt. Sieg: +500, +10 je übrigem Zug und bis +100 für Truppenleben. Nur dein bester Versuch zählt. Dein Dorf verbraucht keine Rohstoffe.",Rect2(35,92,790,347),22)
- l.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
- game.button(p,"Zurück zur Prüfung",Rect2(210,450,440,62),draw_trial,true)
-func apply_actors(entries:Array):
- for raw in entries:
-  var id=int(raw.id);var kind=String(raw.kind);var is_building=kind in ["wall","tower","hall"]
-  var list=visual.buildings if is_building else (visual.allies if raw.team=="ally" else visual.enemies)
-  var unit=visual.hero if id==1 else null
-  if unit==null:
-   for existing in list:
-    if existing.id==id:unit=existing;break
-  var pos=Vector2(raw.x,raw.z)
-  if unit==null or unit.is_empty():
-   if is_building:unit=visual.building(kind,pos,float(game.Catalog.BUILD[kind].radius),raw.max_hp,2,"rank_"+str(id),"enemy")
-   else:unit=visual.unit(kind,pos,raw.max_hp,raw.damage,String(raw.team))
-   unit.id=id
-   if id==1:visual.hero=unit;unit.class_key="warrior"
-   else:list.append(unit)
-  unit.facing=(pos-unit.pos).normalized() if pos.distance_to(unit.pos)>.01 else unit.get("facing",Vector2.LEFT)
-  unit.pos=pos;unit.hp=float(raw.hp);unit.anim=String(raw.anim);unit.attack_seq=int(raw.attack_seq);unit.attack_time=.4 if unit.anim=="attack" else 0.0
-  if is_building:unit.objective=true
+
+func cache_path() -> String:return "user://jade-inputs-"+game.account.user_id.sha256_text().substr(0,20)+".json"
+func store_commands():
+ if not active or game.account.user_id.is_empty() or not game.account.storage_enabled:return
+ var path=cache_path();var file=FileAccess.open(path+".tmp",FileAccess.WRITE)
+ if file:
+  file.store_string(JSON.stringify({"match_id":trial.match_id,"pending":pending,"commands":game.sim.commands_queue}));file.close();DirAccess.rename_absolute(path+".tmp",path)
+func start_trial(response:Dictionary):
+ trial=response;ack=int(trial.state.get("tick",0));pending={}
+ saved_home=game.sim;game.sim=LiveBattle.new(game.progress.data,trial.state);active=true
+ if game.account.storage_enabled and FileAccess.file_exists(cache_path()):
+  var cache=JSON.parse_string(FileAccess.get_file_as_string(cache_path()))
+  if cache is Dictionary and cache.get("match_id","")==trial.match_id:
+   var commands=cache.get("commands",[])
+   if commands is Array and commands.size()<=100:
+    for c in commands:
+     if c is Dictionary and int(c.get("tick",0))==int(game.sim.state.tick)+1 and c.get("input") is Dictionary:
+      LiveBattle.Rules.advance(game.sim.state,c.input);game.sim.commands_queue.append(c)
+   var old=cache.get("pending",{})
+   if old is Dictionary and int(old.get("tick",-1))==ack:pending=old
+   game.sim.apply_state()
+ game.close_dialog();game.cancel_gestures();game.result_shown=false;game.deploying="hero" if not game.sim.hero_deployed else "";game.deploy_group=false
+ game.world.setup(game.sim);game.world.follow_hero=false;game.world.pan=Vector2(1,0);game.world.target_zoom=55;game.build_hud();game.tone("battle_start")
+ if trial.state.done:show_result()
 func _process(dt):
- if not is_instance_valid(stage) or game.dialog!="ranked_trial":return
- if not frames.is_empty():
-  frame_clock+=dt
-  if frame_clock>=.24:
-   frame_clock=0;apply_actors(frames.pop_front())
-   if frames.is_empty():
-    apply_actors(trial.state.actors)
-    for b in controls:
-     if is_instance_valid(b):b.disabled=bool(b.get_meta("rank_locked",false))
- stage.sync(visual,minf(dt,.05))
+ if not active:return
+ sync_clock+=dt;retry_clock=maxf(0,retry_clock-dt)
+ game.sim.suspended=game.sim.commands_queue.size()>=40
+ if game.sim.suspended:status="Verbindung wird wiederhergestellt …"
+ if sync_clock>=.8 or game.sim.state.done:
+  if not busy and not game.account.busy and retry_clock<=0:
+   sync_clock=0;store_commands();flush()
+func flush():
+ if not active or busy or game.account.busy:return
+ if pending.is_empty():
+  var batch=game.sim.commands_queue.filter(func(c):return int(c.tick)>ack).slice(0,20)
+  if batch.is_empty():return
+  pending={"match_id":trial.match_id,"request_id":game.account.uuid(),"tick":ack,"inputs":batch.map(func(c):return c.input)}
+ store_commands();busy=true
+ var uid=game.account.user_id;var match_id=trial.match_id
+ var response=await game.account.ensure_session()
+ if response.ok:response=await game.account.call_api("/rest/v1/rpc/glutwacht_live_trial",HTTPClient.METHOD_POST,{"p_action":"input","p_args":pending})
+ busy=false
+ if not active or game.account.user_id!=uid or trial.match_id!=match_id:return
+ if not response.ok or not response.get("data") is Dictionary:
+  status="Verbindung unterbrochen · Eingaben bleiben erhalten";retry_clock=2.0
+  if response.get("code","") in ["stale_tick","match_not_found","match_finished","match_expired"]:
+   game.sim.suspended=true;game.paused=true
+   var p=game.open_dialog("trial_recover","Prüfung fortsetzen","")
+   game.label(p,"Ein neuerer bestätigter Stand liegt vor. Lade ihn, um sicher weiterzuspielen.",Rect2(35,145,790,110),25).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+   game.button(p,"Bestätigten Stand laden",Rect2(200,350,460,66),func():leave();request("start"),true)
+  return
+ trial=response.data;ack=int(trial.state.tick);pending={};status="Gesichert"
+ game.sim.reconcile(trial.state,ack);store_commands()
+ if trial.state.done:show_result()
+func finish():
+ if not active:return
+ game.close_dialog();game.sim.finish()
+func leave():
+ store_commands();active=false;game.close_dialog();game.sim=game.Battle.new(game.progress.data)
+ game.deploying="";game.result_shown=false;game.world.setup(game.sim);game.build_hud();saved_home=null
+func pause_menu():
+ var p=game.open_dialog("trial_pause","Jadeprüfung I","")
+ game.label(p,"Bewegen: Joystick · Ziel antippen · Angriff halten
+Truppen unten wählen und am freien Rand einsetzen.
+Haupthaus und Türme zerstören. Mauern nur bei Bedarf.
+Heilung und Kampfruf sind je einmal verfügbar.",Rect2(35,105,790,190),24).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ game.button(p,"Weiterspielen",Rect2(35,350,375,70),game.close_dialog,true)
+ game.button(p,"Prüfung beenden",Rect2(450,350,375,70),finish)
+ game.button(p,"Später fortsetzen",Rect2(245,445,370,60),leave)
+ store_commands()
+func show_result():
+ if not active:return
+ game.sim.suspended=true;game.result_shown=true;store_commands()
+ var p=game.open_dialog("trial_result","Jadeprüfung geschafft" if trial.state.won else "Jadeprüfung beendet","")
+ game.label(p,"%d Punkte"%int(trial.state.score),Rect2(35,135,790,90),48,game.GOLD,true)
+ game.label(p,"Ergebnis bestätigt. Dein bester Versuch bleibt gespeichert.
+Deine Dorftruppen und Rohstoffe bleiben erhalten.",Rect2(35,250,790,100),23,game.CREAM,true)
+ game.button(p,"Rangliste",Rect2(35,415,250,70),func():leave();open(),true)
+ game.button(p,"Neuer Versuch",Rect2(304,415,250,70),func():leave();request("start"))
+ game.button(p,"Mein Dorf",Rect2(573,415,250,70),leave)
+ var close=p.find_child("CloseDialog",true,false)
+ if close:
+  for c in close.pressed.get_connections():close.pressed.disconnect(c.callable)
+  close.pressed.connect(leave)
+func build_hud():
+ var g=game;troop_buttons={}
+ var card=g.Hud.plate(g,Rect2(20,18,300,103));card.set_meta("hud_edge","left")
+ g.label(card,"JADEPRÜFUNG I",Rect2(14,9,272,28),20,g.GOLD)
+ status_label=g.label(card,"",Rect2(14,43,272,26),18)
+ hp_label=g.label(card,"",Rect2(14,73,272,22),16)
+ g.Hud.dock(g.button(g.hud,"Pause",Rect2(1148,18,112,60),pause_menu))
+ g.create_stick()
+ for i in range(5):
+  var kind=(["hero"]+g.Catalog.TROOP_ORDER)[i]
+  var b=g.Hud.action(g,"face_"+("warrior" if kind=="hero" else kind),"Held" if kind=="hero" else "",Rect2(260+i*106,600,98,98),func():g.choose_deploy(kind))
+  b.name="TrialDeploy_"+kind;b.get_child(0).position=Vector2(19,8);b.get_child(0).size=Vector2(60,60)
+  var count=g.label(b,"",Rect2(6,70,86,22),17,g.Storybook.INK,true);b.set_meta("count",count)
+  troop_buttons[kind]=b
+ var group=g.button(g.hud,"Alle einsetzen",Rect2(366,542,218,48),func():g.choose_deploy_group(not g.deploy_group));group.name="TrialDeployGroup"
+ group.set_meta("trial_group",true)
+ var hit=g.Hud.dock(g.Hud.action(g,"attack","Angriff",Rect2(1114,578,146,124),func():g.sim.strike(),true));g.Hud.attack_skin(g,hit)
+ hit.button_down.connect(func():g.held=true);hit.button_up.connect(func():g.held=false)
+ skill_button=g.Hud.dock(g.Hud.action(g,"skill","Kampfruf",Rect2(1144,448,116,104),func():g.sim.skill(),true))
+ heal_button=g.Hud.action(g,"heal","Heilen",Rect2(898,600,96,98),func():g.sim.heal());heal_button.set_meta("hud_right_gap",266.0)
+ roll_button=g.Hud.action(g,"roll","Rolle",Rect2(1006,600,96,98),func():g.sim.roll(g.movement()));roll_button.set_meta("hud_right_gap",158.0)
+ g.Hud.dock(g.button(g.hud,"Zum Helden",Rect2(1100,366,160,58),func():g.world.follow_hero=true))
+ g.toast_label.position=Vector2(340,120);g.toast_label.size=Vector2(650,48)
+func update_hud():
+ if not is_instance_valid(status_label):return
+ var s=game.sim.state;var left=maxi(0,int(ceil(72.0-game.sim.time)))
+ status_label.text="%d Punkte · %d:%02d"%[int(s.score),left/60,left%60]
+ hp_label.text="Held: %d / 420 · %s"%[int(game.sim.hero.hp),status if status!="" else "Bereit"]
+ for key in troop_buttons:
+  var b=troop_buttons[key];var count=(0 if game.sim.hero_deployed else 1) if key=="hero" else int(s.reserve[key])-game.sim.pending_count(key)
+  b.visible=count>0;b.get_meta("count").text="Held" if key=="hero" else "%d übrig"%count
+  b.add_theme_stylebox_override("normal",game.skin("selected" if game.deploying==key else "blue"))
+  if count<=0 and game.deploying==key:game.deploying=""
+ var alive=game.sim.hero_deployed and game.sim.hero.hp>0
+ heal_button.disabled=not alive or int(s.heal)<=0 or game.sim.hero.hp>=420
+ skill_button.disabled=not alive or int(s.rally)<=0
+ roll_button.disabled=not alive or float(s.roll)>.0001
+ var group=game.hud.find_child("TrialDeployGroup",true,false)
+ if group:
+  group.visible=game.deploying!="hero" and int(s.reserve.get(game.deploying,0))>0
+  group.text="Alle ausgewählt" if game.deploy_group else "Alle einsetzen"

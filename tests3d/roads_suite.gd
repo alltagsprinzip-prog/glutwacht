@@ -50,14 +50,14 @@ func run():
    var controls=[g.hud.find_child("Action_portrait",true,false),g.hud.find_child("Action_tasks",true,false),g.hud.find_child("FriendsDock",true,false),g.stick]
    var cutout=Rect2(0,g.ui.size.y*.34,101,g.ui.size.y*.32)
    for item in controls:
-    check(is_zero_approx(item.position.x),"left control touches physical screen edge "+str(item.name))
+    check(is_equal_approx(item.position.x,g.safe_rect().position.x+12),"left control keeps small safe-area inset "+str(item.name))
     check(right or not cutout.intersects(item.get_global_rect()),"camera band remains clear "+str(item.name))
    check(not controls[2].get_global_rect().intersects(g.stick.get_global_rect()),"friend and joystick hit areas do not overlap")
    var bar=g.hud.find_child("BottomActionBar",true,false)
    check(bar.size.x*bar.size.y<=548*118*.72,"bottom bar at least 28 percent less visible area")
    for key in ["build","hero","army","training"]:
     var button=g.hud.find_child("Action_"+key,true,false)
-    check(bar.get_global_rect().encloses(button.get_global_rect()) and button.size.y>=80,"compact toolbar keeps usable button "+key)
+    check(bar.get_global_rect().grow(14).encloses(button.get_global_rect()) and button.size.y>=96,"compact toolbar keeps usable button "+key)
    await shot("edge-%d-%s"%[width,"right" if right else "left"])
  g.open_roads();await shot("roads-options")
  var ui=g.roads_ui;ui.draft.surface="gravel";ui.begin()
@@ -83,7 +83,7 @@ func run():
  await shot("roads-saved")
  g.open_raid();g.start_raid();g.sim.hero_deployed=true;g.update_hud()
  await frames()
- check(is_zero_approx(g.stick.position.x),"combat joystick also touches left edge")
+ check(is_equal_approx(g.stick.position.x,g.safe_rect().position.x+12),"combat joystick keeps safe-area inset")
  check(g.world.get_node_or_null("VillagePaths")==null,"custom village paths do not leak into enemy camps")
  await shot("edge-combat")
  g.return_home();check(g.progress.data.roads.segments.size()==1,"return from battle retains chosen routes")

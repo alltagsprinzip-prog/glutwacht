@@ -23,9 +23,13 @@ func draw_dialog():
  game.label(p,"Belag für neue Strecken",Rect2(28,221,804,36),22,game.GOLD)
  for i in range(3):
   var key=Roads.SURFACES[i]
-  game.button(p,Roads.NAMES[key],Rect2(28+i*272,269,260,64),func():draft.surface=key;draw_dialog(),draft.surface==key).name="RoadSurface_"+key
+  var card=game.button(p,"",Rect2(28+i*272,266,260,114),func():draft.surface=key;draw_dialog(),draft.surface==key)
+  card.name="RoadSurface_"+key;card.tooltip_text=Roads.NAMES[key]
+  material_preview(card,key)
+  var name_label=game.label(card,("✓ " if draft.surface==key else "")+Roads.NAMES[key],Rect2(10,78,240,28),22,game.Storybook.INK,true)
+  game.fit_caption(name_label,Rect2(10,78,240,28),22)
  var tip="Start und Ende antippen. Mehrere Stücke ergeben deinen Weg. Ziehen bewegt die Kamera, zwei Finger zoomen."
- var label=game.label(p,tip,Rect2(28,349,804,68),21);label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var label=game.label(p,tip,Rect2(28,390,804,48),19);label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  game.button(p,"Abbrechen",Rect2(28,446,216,66),abort)
  game.button(p,"Selbst zeichnen",Rect2(260,446,278,66),begin,true).name="RoadDraw"
  game.button(p,"Speichern",Rect2(554,446,278,66),apply,true).name="RoadSave"
@@ -73,3 +77,12 @@ func abort():
  game.world.render_paths(Roads.clean(game.progress.data.get("roads",{})),game.sim.buildings);game.build_hud()
 func reset():
  editing=false;start=null;draft={};history.clear()
+
+func material_preview(card:Control,surface:String):
+ var container=SubViewportContainer.new();container.position=Vector2(10,9);container.size=Vector2(240,62);container.stretch=true;container.mouse_filter=Control.MOUSE_FILTER_IGNORE;card.add_child(container)
+ var view=SubViewport.new();view.size=Vector2i(240,62);view.own_world_3d=true;view.render_target_update_mode=SubViewport.UPDATE_ONCE;container.add_child(view)
+ var root=Node3D.new();view.add_child(root)
+ var env=WorldEnvironment.new();var e=Environment.new();e.background_mode=Environment.BG_COLOR;e.background_color=Color("4b6336");e.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;e.ambient_light_color=Color.WHITE;e.ambient_light_energy=.85;env.environment=e;root.add_child(env)
+ var light=DirectionalLight3D.new();light.rotation_degrees=Vector3(-70,-30,0);light.light_energy=.6;root.add_child(light)
+ Roads.draw_segment(root,Vector2(-4,0),Vector2(4,0),surface)
+ var camera=Camera3D.new();camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.size=2.1;camera.position=Vector3(0,8,0);camera.rotation_degrees=Vector3(-90,0,0);root.add_child(camera)

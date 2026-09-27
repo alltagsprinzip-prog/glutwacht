@@ -32,6 +32,7 @@ static func build(g):
    top(g)
    if g.build_kind!="":g.build_placement_hud()
    else:home(g)
+ elif is_instance_valid(g.ranking_ui) and g.ranking_ui.active:g.ranking_ui.build_hud()
  elif g.sim.mode=="scout":scout(g)
  else:combat(g)
  g.hud_widgets.help=dock(g.button(g.hud,"?",Rect2(1148,124 if g.sim.active() else 288,112,76),func():g.open_help()))
@@ -51,7 +52,7 @@ static func top(g):
  var workers=dock(plate(g,Rect2(20,111,284,48)),"left")
  g.icon(workers,"worker",Rect2(13,11,26,26));g.builder_text=g.label(workers,"",Rect2(45,9,110,30),17,TEXT,true)
  g.hud_widgets.timer=g.label(workers,"",Rect2(158,9,108,30),15,GOLD,true)
- var gems=plate(g,Rect2(365,18,130,60));g.icon(gems,"gems",Rect2(12,14,30,30));g.resource_labels.gems=g.label(gems,"",Rect2(47,13,64,32),22,GOLD,true)
+ var gems=plate(g,Rect2(365,18,130,60));gems.name="Resource_gems";g.icon(gems,"gems",Rect2(12,14,30,30));g.resource_labels.gems=g.label(gems,"",Rect2(47,13,64,32),22,GOLD,true)
  for i in range(3):
   var key=["wood","stone","gold"][i];var x=520+i*210
   var resource=plate(g,Rect2(x,18,196,62));resource.name="Resource_"+key;resource.tooltip_text=key
@@ -75,14 +76,16 @@ static func home(g):
  var attack=dock(action(g,"attack","ANGRIFF",Rect2(1074,524,186,180),func():g.open_raid(),true));attack_skin(g,attack)
  attack.get_child(0).position=Vector2(38,15);attack.get_child(0).size=Vector2(110,110)
  attack.get_child(1).position=Vector2(5,130);attack.get_child(1).size=Vector2(176,36);attack.get_child(1).add_theme_font_size_override("font_size",26)
- var toolbar=plate(g,Rect2(402,612,476,96));toolbar.name="BottomActionBar";toolbar.add_theme_stylebox_override("panel",g.skin("wood"))
+ var toolbar=plate(g,Rect2(420,618,440,84));toolbar.name="BottomActionBar";toolbar.add_theme_stylebox_override("panel",g.skin("wood"))
  var keys=["build","hero","army","training"]
- var titles=["BAUEN","HELD","ARMEE","TRAINING"]
+ var titles=["Bauen","Held","Armee","Training"]
  var callbacks=[g.open_catalog,g.open_heroes,g.open_army,g.open_training]
  for i in range(4):
-  var tile=action(g,keys[i],titles[i],Rect2(412+i*116,618,108,84),callbacks[i])
-  tile.get_child(0).position=Vector2(33,8);tile.get_child(0).size=Vector2(42,42)
-  g.fit_caption(tile.get_child(1),Rect2(12,51,84,22),16)
+  var tile=action(g,keys[i],titles[i],Rect2(428+i*108,608,100,96),callbacks[i])
+  tile.get_child(0).position=Vector2(33,20);tile.get_child(0).size=Vector2(34,34)
+  for state in ["normal","hover","pressed","disabled"]:
+   var face=tile.get_theme_stylebox(state).duplicate();face.expand_margin_top=-10;face.expand_margin_bottom=-10;tile.add_theme_stylebox_override(state,face)
+  g.fit_caption(tile.get_child(1),Rect2(7,58,86,22),17)
  if g.selected_building!="":
   var b=g.progress.find_building(g.selected_building)
   if b.is_empty():return
@@ -157,6 +160,7 @@ static func scout(g):
  var b=action(g,"attack","ANGREIFEN",Rect2(991,597,269,107),func():g.start_raid(),true);b.disabled=g.Catalog.army_count(g.progress.data)==0
 static func update(g):
  if not g.stats:return
+ if is_instance_valid(g.ranking_ui) and g.ranking_ui.active:g.ranking_ui.update_hud();return
  if g.hud_widgets.has("sync"):g.hud_widgets.sync.text="GRAFIKPROBE · separates Testdorf · wird nicht gespeichert" if g.art_preview else (g.account.status if g.account.signed_in() else "Gastdorf · lokal gespeichert")
  for key in g.resource_bars:
   var b=g.resource_bars[key];b.size.x=b.get_parent().size.x*clampf(float(g.progress.data[key])/maxf(1,g.progress.storage()),0,1)
@@ -193,7 +197,7 @@ static func update(g):
  var slot=0
  for kind in g.deployment_buttons:
   var b=g.deployment_buttons[kind];b.get_meta("count").text=str(g.sim.reserve[kind]);b.disabled=g.sim.reserve[kind]<=0
-  b.visible=true
+  b.visible=int(g.sim.reserve[kind])>0
   if b.visible:
    var y=185+int(slot/2)*77
    b.set_meta("design_position",Vector2(20+(slot%2)*112,y));b.position=Vector2((slot%2)*112+g.edge_left_inset(y,b.size.y),y+g.safe_rect().position.y);slot+=1

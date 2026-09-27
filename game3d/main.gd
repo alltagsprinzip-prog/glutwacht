@@ -148,26 +148,15 @@ func reflow_hud():
   var horizontal=0.0 if base.x<240 else (1.0 if base.x>=1080 or (base.y<100 and base.x>=340 and sim.mode=="home") else .5)
   if node.name=="Action_attack":horizontal=1.0
   node.position=base+safe.position+Vector2(delta.x*horizontal,delta.y if base.y>=400 else 0.0)
-  if base.x<240 and node!=stick:node.position.x-=20
-  if node.get_meta("hud_edge","")=="right":node.position.x=safe.end.x-node.size.x
-  elif node.get_meta("hud_edge","")=="left":node.position.x=safe.position.x
-  elif node.has_meta("hud_right_gap"):node.position.x=safe.end.x-node.size.x-float(node.get_meta("hud_right_gap"))
-  if base.x<240 and node!=stick:node.position.x=base.x-20+edge_left_inset(node.position.y,node.size.y)
-  if sim.mode=="home" and node.get_meta("hud_edge","")=="left":
-   node.position.x=0
-   if safe.position.x>1:
-    if node.name=="Action_tasks":node.position.y=minf(base.y,ui.size.y*.34-node.size.y-4)
-    elif node.name=="FriendsDock":node.position.y=ui.size.y*.66+4
-    elif node.name=="TutorialNext":node.position=Vector2(144,ui.size.y*.66+4)
-  if node==stick:
-   node.position.x=0
-   if safe.position.x>1:
-    node.size=Vector2(136,136);node.position.y=safe.end.y-node.size.y
-func edge_left_inset(y:float,height:float) -> float:
- # iOS exposes a full-height safe rectangle, not the physical island outline.
- # Keep a conservative middle band clear; above/below it use the actual edge.
- var safe=safe_rect()
- return safe.position.x if y<ui.size.y*.66 and y+height>ui.size.y*.34 else 0.0
+  if base.x<240:node.position.x=maxf(12,base.x)+safe.position.x
+  if node.get_meta("hud_edge","")=="right":node.position.x=safe.end.x-node.size.x-12
+  elif node.get_meta("hud_edge","")=="left" or node==stick:node.position.x=safe.position.x+12
+  elif node.has_meta("hud_right_gap"):node.position.x=safe.end.x-node.size.x-float(node.get_meta("hud_right_gap"))-12
+  if sim.mode=="home" and node.name=="Resource_gems":node.position.x=safe.end.x-854
+  if sim.mode=="home" and node.name in ["Resource_wood","Resource_stone","Resource_gold"]:node.position.x=safe.end.x-712+["Resource_wood","Resource_stone","Resource_gold"].find(node.name)*208
+  if node==stick:node.position.y=safe.end.y-node.size.y-12
+func edge_left_inset(_y:float,_height:float) -> float:
+ return safe_rect().position.x+12
 func decorate(control:Control):
  var finish=load("res://game3d/ui/button_finish.gd").new();finish.show_behind_parent=false;finish.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);control.add_child(finish)
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
@@ -185,7 +174,7 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  p.add_theme_stylebox_override("panel",skin("panel"))
  parent.add_child(p);decorate(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
- var l=Label.new();l.clip_text=true;l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ var l=Label.new();l.clip_text=true;l.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
  l.add_theme_color_override("font_shadow_color",Color(0,.03,.07,.8));l.add_theme_constant_override("shadow_offset_y",1)
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);l.size=rect.size;return l
@@ -346,7 +335,7 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.18","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"roads_mode":progress.data.get("roads",{}).get("mode","auto"),"road_segments":progress.data.get("roads",{}).get("segments",[]).size(),"roads_editing":is_instance_valid(roads_ui) and roads_ui.editing,"road_points":road_draw_points(),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.19","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"roads_mode":progress.data.get("roads",{}).get("mode","auto"),"live_trial":is_instance_valid(ranking_ui) and ranking_ui.active,"trial_tick":sim.state.tick if sim.has_method("reconcile") else 0,"trial_ack":ranking_ui.ack if is_instance_valid(ranking_ui) and ranking_ui.active else 0,"road_segments":progress.data.get("roads",{}).get("segments",[]).size(),"roads_editing":is_instance_valid(roads_ui) and roads_ui.editing,"road_points":road_draw_points(),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
 func qa_controls() -> Array:
@@ -495,9 +484,16 @@ func world_tap(pos:Vector2):
   build_hud()
  elif sim.mode=="raid" and deploying!="":
   deploy_at_screen(pos)
+ elif is_instance_valid(ranking_ui) and ranking_ui.active:
+  var ground=world.ground_position(pos);var nearest=4.5;sim.target_id=-1
+  for unit in sim.buildings+sim.enemies:
+   var distance=ground.distance_to(unit.pos)
+   if unit.hp>0 and distance<nearest:nearest=distance;sim.target_id=int(unit.id)
+  if sim.target_id!=-1:sim.effects.append({"kind":"invalid","pos":ground,"life":.5,"max":.5,"color":GOLD})
 func _notification(what):
  if what==NOTIFICATION_APPLICATION_FOCUS_OUT and is_inside_tree() and sim:
   save()
+  if is_instance_valid(ranking_ui) and ranking_ui.active:ranking_ui.store_commands()
   if account_active and not account.busy and not cloud_sync_paused:sync_cloud()
   if not paused and build_kind=="":open_menu()
 func save(final_save:bool=false):
@@ -559,11 +555,12 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  rect.position=safe_rect().position+(safe_rect().size-rect.size)*.5
  var p=panel(modal,rect,Color("193943"))
  var trim=panel(p,Rect2(8,8,rect.size.x-16,67),Color("385962"));trim.mouse_filter=Control.MOUSE_FILTER_IGNORE
- label(p,heading,Rect2(25,12,rect.size.x-125,48),27,GOLD)
+ var title=label(p,heading,Rect2(28,20,rect.size.x-200,40),27,GOLD)
+ fit_caption(title,Rect2(28,20,rect.size.x-200,40),27)
  if sub!="":label(p,sub,Rect2(27,82,rect.size.x-60,31),16,CREAM)
  if not auth_locked() and name not in ["result","level_up"] and not (name=="heroes" and progress.data.hero==""):
-  if name!="help":button(p,"?",Rect2(rect.size.x-150,12,55,55),func():open_help())
-  var close=icon_button(p,"close","",Rect2(rect.size.x-87,6,77,67),func():close_dialog());close.name="CloseDialog";close.z_index=10
+  if name!="help":button(p,"?",Rect2(rect.size.x-142,18,52,52),func():open_help())
+  var close=icon_button(p,"close","",Rect2(rect.size.x-78,14,62,60),func():close_dialog());close.name="CloseDialog";close.z_index=10
  return p
 func close_dialog(force:bool=false):
  if auth_locked() and not force:return
@@ -826,6 +823,7 @@ func start_raid():
 func start_defense():
  close_dialog();build_kind="";world.build_focus=false;result_shown=false;sim.start_defense();world.setup(sim);build_hud()
 func end_raid():
+ if is_instance_valid(ranking_ui) and ranking_ui.active:ranking_ui.finish();return
  if sim.mode!="raid" or sim.result!="":return
  sim.result="complete"
  held=false;deploying=""
@@ -861,6 +859,7 @@ func open_result():
  icon(p,"xp",Rect2(342,396,34,34));label(p,"+%d EP"%reward.get("xp",0),Rect2(385,397,166,33),20,CREAM)
  button(p,"ZURÜCK INS DORF",Rect2(210,449,440,65),func():return_home(),true)
 func return_home():
+ if is_instance_valid(ranking_ui) and ranking_ui.active:ranking_ui.leave();return
  if is_instance_valid(roads_ui):roads_ui.reset()
  close_dialog();build_kind="";selected_building="";deploying="";world.build_focus=false;sim.home();result_shown=false;world.setup(sim);build_hud();save()
 func open_build_info(kind:String):
@@ -887,6 +886,7 @@ func change_setting(key:String,value):
   var timer=Timer.new();timer.name="SettingsSave";timer.one_shot=true;timer.wait_time=.4;add_child(timer);timer.timeout.connect(save)
  get_node("SettingsSave").start()
 func open_menu():
+ if is_instance_valid(ranking_ui) and ranking_ui.active:ranking_ui.pause_menu();return
  var p=open_dialog("menu","Am Lagerfeuer","")
  button(p,"Kampfberichte",Rect2(28,101,396,70),func():open_battle_reports(),true)
  button(p,"Grafik & Ton",Rect2(439,101,393,70),func():open_settings())
@@ -1291,6 +1291,7 @@ func profile_transaction(operation:Callable) -> bool:
 func open_land():load("res://game3d/ui/advancement.gd").land(self)
 func open_potions():load("res://game3d/ui/advancement.gd").potions(self)
 func use_active_potion():
+ if is_instance_valid(ranking_ui) and ranking_ui.active:sim.heal();return
  var hero_before=sim.hero.duplicate(true);var effects_before=sim.effects.duplicate(true);var texts_before=sim.combat_texts.duplicate(true)
  if profile_transaction(func():return sim.use_potion()):tone("skill");update_hud()
  else:

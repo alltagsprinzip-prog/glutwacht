@@ -44,19 +44,84 @@ static func remove_nearest(data:Dictionary,p:Vector2) -> bool:
   if d<distance:distance=d;nearest=i
  if nearest<0:return false
  data.segments.remove_at(nearest);return true
+static var materials={}
+static func material(surface:String,preview:bool=false) -> ShaderMaterial:
+ var key=surface+str(preview)
+ if not materials.has(key):
+  var m=ShaderMaterial.new();m.shader=load("res://game3d/path.gdshader")
+  m.set_shader_parameter("surface_kind",SURFACES.find(surface));m.set_shader_parameter("preview",preview);materials[key]=m
+ return materials[key]
+static func automatic_routes(buildings:Array) -> Array:
+ var doors:Array=[]
+ for b in buildings:
+  if b.kind!="wall":doors.append(b.pos+Vector2(0,float(b.radius)+.65))
+ var routes:Array=[]
+ if doors.size()<2:return routes
+ # Connect each door to the closest existing path, forming shared trunks.
+ var connected:Array=[doors.pop_front()]
+ while not doors.is_empty():
+  var best=INF;var door_index=0;var join:Vector2=connected[0]
+  for i in range(doors.size()):
+   for point in connected:
+    var distance=doors[i].distance_squared_to(point)
+    if distance<best:best=distance;door_index=i;join=point
+   for route in routes:
+    for j in range(route.size()-1):
+     var point=Geometry2D.get_closest_point_to_segment(doors[i],route[j],route[j+1])
+     var distance=doors[i].distance_squared_to(point)
+     if distance<best:best=distance;door_index=i;join=point
+  var door:Vector2=doors.pop_at(door_index)
+  var route:Array=[join,door]
+  # Bend around building footprints instead of paving through their centers.
+  for attempt in range(8):
+   var changed=false
+   for n in range(route.size()-1):
+    var a:Vector2=route[n];var b:Vector2=route[n+1]
+    for building in buildings:
+     if building.kind=="wall":continue
+     var radius=float(building.radius)+.45
+     var near=Geometry2D.get_closest_point_to_segment(building.pos,a,b)
+     if near.distance_to(building.pos)>=radius or near.distance_to(a)<.4 or near.distance_to(b)<.4:continue
+     var normal=(b-a).normalized().orthogonal();var left:Vector2=building.pos+normal*(radius+1.1);var right:Vector2=building.pos-normal*(radius+1.1)
+     route.insert(n+1,left if a.distance_to(left)+b.distance_to(left)<a.distance_to(right)+b.distance_to(right) else right)
+     changed=true;break
+    if changed:break
+   if not changed:break
+  routes.append(route);connected.append(door)
+ return routes
+static func rounded(route:Array) -> Array:
+ if route.size()<3:return route
+ var out:Array=[route[0]]
+ for i in range(1,route.size()-1):
+  var corner:Vector2=route[i];var a:Vector2=corner.move_toward(route[i-1],minf(1.5,corner.distance_to(route[i-1])*.3));var b:Vector2=corner.move_toward(route[i+1],minf(1.5,corner.distance_to(route[i+1])*.3))
+  out.append(a)
+  for n in range(1,7):
+   var t=float(n)/6.0;out.append(a.lerp(corner,t).lerp(corner.lerp(b,t),t))
+ out.append(route.back());return out
 static func draw(parent:Node3D,data:Dictionary,buildings:Array):
  if data.mode=="off":return
+ var buckets={}
  if data.mode=="auto":
-  for b in buildings:
-   if b.kind=="wall":continue
-   draw_segment(parent,Vector2(0,8),b.pos+Vector2(0,float(b.radius)*.72),data.surface)
+  buckets[data.surface]=automatic_routes(buildings).map(func(route):return rounded(route))
  else:
-  for s in data.segments:draw_segment(parent,vector(s.a),vector(s.b),s.surface)
+  for s in data.segments:
+   if not buckets.has(s.surface):buckets[s.surface]=[]
+   buckets[s.surface].append([vector(s.a),vector(s.b)])
+ # One draw call per material, independent of the number of path pieces.
+ for surface in buckets:
+  var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES)
+  for route in buckets[surface]:
+   for i in range(route.size()-1):append_strip(st,route[i],route[i+1])
+  if buckets[surface].is_empty():continue
+  var model=MeshInstance3D.new();model.mesh=st.commit();model.material_override=material(surface);model.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;parent.add_child(model)
+static func append_strip(st:SurfaceTool,a:Vector2,b:Vector2):
+ if a.distance_to(b)<.01:return
+ var side=(b-a).normalized().orthogonal()*.96;var along=(b-a).normalized()*.2;a-=along;b+=along
+ var points=[a-side,a+side,b+side,b-side]
+ var uvs=[Vector2(0,0),Vector2(1,0),Vector2(1,1),Vector2(0,1)]
+ for i in [0,2,1,0,3,2]:
+  st.set_normal(Vector3.UP);st.set_uv(uvs[i]);st.add_vertex(Vector3(points[i].x,.055,points[i].y))
 static func draw_segment(parent:Node3D,a:Vector2,b:Vector2,surface:String,preview:bool=false):
- var length=a.distance_to(b)
- if length<.1:return
- var model=MeshInstance3D.new();var path=PlaneMesh.new();path.size=Vector2(1.35,length+.04);model.mesh=path
- var material=ShaderMaterial.new();material.shader=load("res://game3d/path.gdshader")
- material.set_shader_parameter("length",length);material.set_shader_parameter("surface_kind",SURFACES.find(surface));material.set_shader_parameter("preview",preview)
- model.material_override=material;var middle=(a+b)*.5;model.position=Vector3(middle.x,.04,middle.y);model.rotation.y=atan2(b.x-a.x,b.y-a.y)
- model.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;parent.add_child(model)
+ if a.distance_to(b)<.1:return
+ var st=SurfaceTool.new();st.begin(Mesh.PRIMITIVE_TRIANGLES);append_strip(st,a,b)
+ var model=MeshInstance3D.new();model.mesh=st.commit();model.material_override=material(surface,preview);model.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF;parent.add_child(model)

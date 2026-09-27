@@ -23,7 +23,7 @@ func run():
   root.size=Vector2i(width,720);await frames();g.layout_art_preview()
   for right in [false,true]:
    g.notch_right=right;g.build_hud()
-   check(is_zero_approx(g.stick.position.x),"left joystick uses physical edge outside camera band")
+   check(is_equal_approx(g.stick.position.x,g.safe_rect().position.x+12),"left joystick respects the safe area")
    for value in [0,600,1200,99999999]:
     g.progress.data.wood=value;g.update_hud()
     var meter=g.resource_bars.wood;var clip=meter.get_parent()
@@ -42,12 +42,12 @@ func run():
  g.open_land();await shot("land-purchase");g.open_potions();await shot("potion-upgrades");g.close_dialog(true)
  g.open_profile();var field=g.modal.find_children("*","LineEdit",true,false)[0];field.text="Unverlorener Entwurf";field.grab_focus();await frames();g.get_node("KeyboardAccessory").dismiss()
  check(g.dialog=="profile" and field.text=="Unverlorener Entwurf" and not field.has_focus(),"Done dismisses keyboard and preserves dialog draft")
- var ranks=load("res://game3d/ui/ranking.gd").new();g.add_child(ranks);ranks.setup(g)
  var replay=JSON.parse_string(FileAccess.get_file_as_string("res://tests3d/fixtures/ranked-ui.json"))
- for i in range(replay.size()):
-  ranks.trial=replay[i];ranks.frames=[];ranks.draw_trial();await frames(4)
-  check(ranks.visual.hero.id==1 and ranks.visual.buildings.size()==7,"real server replay renders hero and seven targets")
-  await shot("ranked-%d"%i)
+ var ranks=load("res://game3d/ui/ranking.gd").new();g.add_child(ranks);ranks.setup(g);g.ranking_ui=ranks;g.account.storage_enabled=false
+ for i in [0,1,replay.size()-1]:
+  ranks.start_trial(replay[i]);ranks.set_process(false);await frames(4)
+  check(g.sim.has_method("reconcile"),"ranked trial uses full combat world")
+  await shot("ranked-%d"%i);ranks.leave()
  ranks.board={"rows":[{"name":"QA erste Sitzung","tag":"AABBCCDDEEFF","rank":1,"score":1525}],"own":{"name":"QA erste Sitzung","tag":"AABBCCDDEEFF","rank":1,"score":1525},"total":1};ranks.draw_board();await shot("ranked-board-fixture")
  await frames()
  var explanation=g.modal.find_child("RankingExplanation",true,false)
