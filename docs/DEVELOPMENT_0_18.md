@@ -31,4 +31,36 @@ bleibt zur erneuten Speicherung offen. Normale Offline-Produktion läuft weiter.
 Die mobile Prüfung nutzt Browseremulation und native Linux-Renderbilder mit
 simulierter Aussparung. Kein physischer iPhone-Test wird behauptet.
 
-Web-/iOS-Veröffentlichung und gerenderte Abnahme werden vor Auslieferung ergänzt.
+Gerenderte Abnahme: [Heroic review 36340694063](https://github.com/alltagsprinzip-prog/glutwacht/actions/runs/36340694063)
+bestanden. Vier Querformatansichten mit linker/rechter Aussparung, Wegeauswahl,
+eigener Kiesweg und Kampfrand wurden aus der tatsächlichen Spielszene erzeugt.
+Die beiden Aussparungsrichtungen sowie Wegeauswahl und Kiesentwurf wurden visuell
+kontrolliert. Die separate Browser-Art-Prüfung ist ebenfalls bestanden.
+
+iOS: **0.18.0 (18.0.0)** wurde aus Spiel-Commit
+`c41428fbae64978b224cd587d1174a5f8438a048` gebaut. Apple bestätigte am
+27. September 2026 um 18:35:54 UTC `VALID`, `IN_BETA_TESTING` und die Zuordnung
+zur bestehenden Gruppe **Glutwacht test**. Nachweis:
+[TestFlight-Lauf 36340694002](https://github.com/alltagsprinzip-prog/glutwacht/actions/runs/36340694002),
+Artefakt `apple-testflight-status-0.18`. Ein öffentlicher externer
+TestFlight-Einladungslink wurde nicht eingerichtet.
+
+Web-Abnahme: [Validierung 36340700058](https://github.com/alltagsprinzip-prog/glutwacht/actions/runs/36340700058)
+ist vollständig erfolgreich. Der Browserlauf prüfte Joystick, echten Kampf mit
+Rückkehr, getrennte Accounts, alte Lesezeichen sowie Ab- und Anmeldung. Der
+zusätzliche iPhone-Querformatlauf (750 × 342, Chromium-Emulation) lud den vorhandenen
+0.14-Magier-Spielstand, zeichnete einen Kiesweg über Touch, speicherte ihn und
+bestätigte nach dem Neuladen `roads_mode=custom`, ein Wegstück und denselben Helden.
+Anschließend bestanden Heldensetzung, schnelles Tippen und gehaltener Truppeneinsatz.
+Keine Browser-Laufzeitfehler. Die Bilder des gespeicherten Weges und des Angriffs
+wurden zusätzlich visuell geprüft. Der Cloudtransport dieser Browserläufe war
+isoliert simuliert; echte Nutzerkonten wurden nicht verändert.
+
+Veröffentlicht am 27. September 2026 um 18:45 UTC:
+[Glutwacht-Spieltest](https://glutwacht-spieltest.mg-automobile24.chatgpt.site/v08/),
+Version **0.18**, Spielpaket **535de38a08f2**. Das unveränderte geprüfte Exportpaket
+wurde als Site-Version **14** veröffentlicht, Source-Commit
+`7a8a1139299e3ece7dee62fea0bed03732d841c7`.
+Die Veröffentlichung meldete `succeeded`; bestehende Adresse, Sichtbarkeit und
+Account-Speicherbereiche bleiben erhalten. Das endgültige Archiv wurde vor der
+Veröffentlichung vollständig gelesen und auf gzip-Integrität geprüft.
