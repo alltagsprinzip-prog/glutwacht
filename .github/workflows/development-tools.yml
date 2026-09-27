@@ -26,6 +26,11 @@ jobs:
           cp "$(command -v supabase)" /tmp/development-tools/supabase
           tar -czf /tmp/development-tools/pglite.tar.gz -C backend/tests node_modules
           supabase --version > /tmp/development-tools/SUPABASE_VERSION.txt
+          supabase --help
+          supabase migration --help
+          supabase migration new --help
+          supabase migration new verified_tactics_and_clan_search
+          cp supabase/migrations/*_verified_tactics_and_clan_search.sql /tmp/development-tools/
       - uses: actions/upload-artifact@v4
         with:
           name: development-tools
