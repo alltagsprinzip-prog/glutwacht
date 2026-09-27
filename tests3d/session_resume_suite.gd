@@ -100,6 +100,16 @@ func run():
  var bad_meta=durable.duplicate(true);bad_meta.pending_json='{}';a.sent={}
  var mismatch=await a.resume_pending_save(bad_meta)
  check(not mismatch.ok and a.sent.is_empty(),"mismatched serialized body cannot be sent")
+ var latest_meta=JSON.parse_string(FileAccess.get_file_as_string(a.metadata_path()))
+ var latest_raw=JSON.stringify(latest_meta)
+ var journal=JSON.stringify({"user_id":a.user_id,"snapshot":original,"metadata":latest_raw})
+ check(Account.recoverable_journal(journal,a.user_id,"{}").get("snapshot","")==original,"reload journal preserves newer village bytes before IndexedDB catches up")
+ check(Account.recoverable_journal(journal,a.user_id,latest_raw).get("metadata","")==latest_raw,"village and immutable receipt recover as one record")
+ check(Account.recoverable_journal(journal,Account.uuid(),"{}").is_empty(),"journal cannot cross account boundaries")
+ latest_meta.local_sequence+=1
+ check(Account.recoverable_journal(journal,a.user_id,JSON.stringify(latest_meta)).is_empty(),"stale journal cannot replace a newer IndexedDB save")
+ var corrupt=JSON.parse_string(journal);corrupt.snapshot='{"invalid":true}'
+ check(Account.recoverable_journal(JSON.stringify(corrupt),a.user_id,"{}").is_empty(),"corrupt journal leaves existing village untouched")
  g.queue_free();await process_frame
  for file in [path,path.trim_suffix(".json")+".sync.json"]:
   for suffix in ["",".tmp",".before-hud"]:DirAccess.remove_absolute(file+suffix)

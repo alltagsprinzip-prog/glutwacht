@@ -16,6 +16,7 @@ var pending:Dictionary={}
 var pending_json=""
 var pending_restore:Dictionary={}
 var dirty=false
+var local_sequence=0
 var storage_enabled=true
 var native_store=preload("res://game3d/online/native_session_store.gd").new()
 var email_history_path="user://login-emails.json"
@@ -68,13 +69,49 @@ func save_metadata() -> bool:
  if not storage_enabled:return true
  if not signed_in():return false
  var path=metadata_path();var temp=path+".tmp"
+ var previous=JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else {}
+ if previous is Dictionary:local_sequence=maxi(local_sequence,int(previous.get("local_sequence",0)))
+ local_sequence+=1
+ var raw=JSON.stringify({"revision":revision,"dirty":dirty,"pending":pending,"pending_json":pending_json,"pending_restore":pending_restore,"local_sequence":local_sequence})
  var f=FileAccess.open(temp,FileAccess.WRITE)
  if not f:return false
- f.store_string(JSON.stringify({"revision":revision,"dirty":dirty,"pending":pending,"pending_json":pending_json,"pending_restore":pending_restore}))
+ f.store_string(raw)
  f.flush();var error=f.get_error();f.close()
  if error!=OK:return false
- return DirAccess.rename_absolute(temp,path)==OK
+ if DirAccess.rename_absolute(temp,path)!=OK:return false
+ if OS.has_feature("web"):
+  var village="user://account-"+user_id+".json"
+  if FileAccess.file_exists(village):
+   # One synchronous record covers actions made while IndexedDB or an older
+   # cloud request is still pending. Reload cannot separate village and receipt.
+   var journal=JSON.stringify({"user_id":user_id,"snapshot":FileAccess.get_file_as_string(village),"metadata":raw})
+   return bool(JavaScriptBridge.eval("(()=>{try{localStorage.setItem("+JSON.stringify("glutwacht.save-journal.v1."+user_id)+","+JSON.stringify(journal)+");return true}catch(e){return false}})()",true))
+ return true
+static func recoverable_journal(raw:String,user:String,current_meta:String) -> Dictionary:
+ var journal=JSON.parse_string(raw)
+ if not journal is Dictionary or journal.get("user_id")!=user:return {}
+ if not journal.get("snapshot") is String or not journal.get("metadata") is String:return {}
+ var snapshot=JSON.parse_string(journal.snapshot);var meta=JSON.parse_string(journal.metadata)
+ if not snapshot is Dictionary or not preload("res://game3d/progress.gd").validate_save(snapshot).is_empty():return {}
+ if not meta is Dictionary or not meta.get("dirty") is bool or not meta.get("pending") is Dictionary or not meta.get("pending_restore",{}) is Dictionary:return {}
+ if not (meta.get("revision") is float or meta.get("revision") is int) or int(meta.revision)<0:return {}
+ var sequence=int(meta.get("local_sequence",0))
+ if sequence<=0:return {}
+ var current=JSON.parse_string(current_meta) if not current_meta.is_empty() else {}
+ if current is Dictionary and sequence<int(current.get("local_sequence",0)):return {}
+ return journal
+func recover_web_journal():
+ if not OS.has_feature("web") or not storage_enabled or not signed_in():return
+ var raw=JavaScriptBridge.eval("(()=>{try{return localStorage.getItem("+JSON.stringify("glutwacht.save-journal.v1."+user_id)+")||''}catch(e){return ''}})()",true)
+ if not raw is String or raw.is_empty():return
+ var current=FileAccess.get_file_as_string(metadata_path()) if FileAccess.file_exists(metadata_path()) else ""
+ var journal=recoverable_journal(raw,user_id,current)
+ if journal.is_empty():return
+ for entry in [["user://account-"+user_id+".json",journal.snapshot],[metadata_path(),journal.metadata]]:
+  var file=FileAccess.open(entry[0],FileAccess.WRITE)
+  if file:file.store_string(entry[1]);file.close()
 func read_metadata() -> Dictionary:
+ recover_web_journal()
  if not FileAccess.file_exists(metadata_path()):return {}
  var raw=FileAccess.get_file_as_string(metadata_path())
  var value=JSON.parse_string(raw)
