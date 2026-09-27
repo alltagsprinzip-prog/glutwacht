@@ -1,5 +1,6 @@
 extends Node
 # Optional social identity; independent of account saves and their revisions.
+const Invitations=preload("res://game3d/online/invitations.gd")
 var game
 var state:Dictionary={}
 var section=0
@@ -29,8 +30,11 @@ func request(action:String,args:Dictionary={}):
   if game.dialog=="social_loading":draw()
   game.toast("Die Serverantwort konnte nicht gelesen werden.");return
  if action=="chat":pending_chat={}
+ if action=="request" and Invitations.tag(String(args.get("tag","")))==Invitations.pending():Invitations.clear()
  if action=="search":
   if game.dialog=="social_loading":player_card(response.data.player)
+ elif action=="find_clans":
+  if game.dialog=="social_loading":clan_results(response.data.get("clans",[]))
  elif action=="visit":
   if game.dialog=="social_loading":visit(response.data)
  else:
@@ -58,7 +62,7 @@ func draw():
   action(column,"Spielerprofil aktivieren",func():request("enroll",{"name":name_field.text}),true)
   return
  game.label(p,"Deine Kennung: #"+String(state.me.tag),Rect2(30,80,580,35),23,game.GOLD)
- game.button(p,"Kopieren",Rect2(644,79,181,42),func():DisplayServer.clipboard_set(String(state.me.tag));game.toast("Spielerkennung kopiert."))
+ game.button(p,"Freunde einladen",Rect2(564,77,263,44),invitation_dialog)
  for i in range(4):
   var selected=i
   game.button(p,["Freunde","Clan","Chat","Blockiert"][i],Rect2(28+i*203,123,194,46),func():section=selected;draw(),section==i)
@@ -69,8 +73,13 @@ func draw():
   2:chat(column)
   3:blocked(column)
 func friends(column):
- var input=field(column,"Spielerkennung, z. B. #A1B2C3D4E5F6",13)
- action(column,"Spieler suchen",func():request("search",{"tag":input.text}),true)
+ var invited=Invitations.pending()
+ if invited!="":
+  text(column,"Spieleinladung von #"+invited,game.GOLD)
+  action(column,"Einladung ansehen",func():search_player(invited),true)
+  action(column,"Einladung verwerfen",func():Invitations.clear();draw())
+ var input=field(column,"Spielerkennung oder Einladungslink",240)
+ action(column,"Spieler suchen",func():search_player(input.text),true)
  action(column,"Aktualisieren",func():request("state"))
  for kind in ["incoming","friends","outgoing"]:
   text(column,{"incoming":"Anfragen an dich","friends":"Deine Freunde","outgoing":"Gesendete Anfragen"}[kind],game.GOLD)
@@ -102,7 +111,9 @@ func confirm(title:String,callback:Callable):
  game.button(p,"Bestätigen",Rect2(445,330,375,70),callback,true)
 func clan(column):
  if not state.get("clan") is Dictionary:
-  text(column,"Gründe einen Clan oder lass dich mit deiner Kennung einladen.")
+  text(column,"Finde einen Clan, bitte dessen Leitung um eine Einladung oder gründe selbst einen.")
+  var search=field(column,"Clan suchen",24)
+  action(column,"Clans finden",func():request("find_clans",{"query":search.text}),true)
   var name_field=field(column,"Clanname (3–24 Zeichen)",24)
   var description=field(column,"Clanbeschreibung",180)
   action(column,"Clan kostenlos gründen",func():request("create_clan",{"name":name_field.text,"description":description.text}),true)
@@ -180,3 +191,29 @@ func _process(_dt):
  var transform=get_viewport().get_screen_transform()*scroll.get_global_transform_with_canvas()
  var keyboard=DisplayServer.virtual_keyboard_get_height()
  scroll.size.y=332 if keyboard<=0 else clampf((DisplayServer.window_get_size().y-keyboard-transform.origin.y-12)/maxf(transform.get_scale().y,.01),70,332)
+
+func search_player(value:String):
+ var target=Invitations.tag(value)
+ if target=="":game.toast("Ungültiger Link. Bitte eine Glutwacht-Einladung oder die 12-stellige Kennung eingeben.");return
+ if state.get("me",{}).get("tag","")==target:
+  Invitations.clear();game.toast("Das ist dein eigener Einladungslink.");draw();return
+ request("search",{"tag":target})
+func invitation_dialog():
+ var p=game.open_dialog("friend_invite","Freunde einladen","")
+ var column=list_area(p);var link=Invitations.url(String(state.me.tag))
+ text(column,"Spieleinladung: Link teilen, anmelden und dann die Freundschaft bestätigen. Jeder behält seinen eigenen Account.")
+ var link_field=field(column,"Einladungslink",240,link);link_field.editable=false
+ action(column,"Link kopieren",func():DisplayServer.clipboard_set(link);game.toast("Einladungslink kopiert."),true)
+ if OS.has_feature("web"):
+  action(column,"Teilen …",func():JavaScriptBridge.eval("window.GlutwachtInvite?.share("+JSON.stringify(String(state.me.tag))+")"))
+ text(column,"Browser-Spieltest · auch auf einem anderen Gerät. In der App kannst du den Link bei Freunde einfügen. Die TestFlight-Installation läuft separat über Apples Testereinladung.")
+ action(column,"Zurück",draw)
+func clan_results(entries:Array):
+ var p=game.open_dialog("clan_search","Clans finden","")
+ var column=list_area(p)
+ if entries.is_empty():text(column,"Kein passender Clan gefunden.")
+ for entry in entries:
+  text(column,String(entry.name)+" · %d / 30"%int(entry.members),game.GOLD)
+  text(column,String(entry.description))
+  action(column,"Leitung kontaktieren",func():player_card({"name":entry.owner_name,"tag":entry.owner_tag}))
+ action(column,"Zurück",draw)

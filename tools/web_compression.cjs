@@ -17,7 +17,7 @@ const cloud=require('./mock_cloud.cjs');
    await page.goto('http://127.0.0.1:8766/v08/?qa=1');
    await page.locator('#gw-email').waitFor({timeout:120000});
    await page.locator('#gw-email').fill('gzip-player@example.test');
-   await page.locator('#gw-password').fill('Test-only-password-123');
+   await page.locator('#gw-password').fill('Test-only-password-123');await page.keyboard.press('Enter');
    await page.locator('#gw-account button[type=submit]').click();
    await page.waitForFunction(()=>window.__glutwacht?.dialog==='tutorial',null,{timeout:60000}).catch(async e=>{
     console.log('Gzip test diagnostic',JSON.stringify({pass,state:await page.evaluate(()=>window.__glutwacht),notice:await page.locator('#gw-notice').textContent(),errors}));throw e;

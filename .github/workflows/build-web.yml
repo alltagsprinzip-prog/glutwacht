@@ -87,6 +87,8 @@ jobs:
         run: python3 tools/check_godot.py logs/friendly-combat.log godot --headless --path . --script tests3d/friendly_combat_suite.gd
       - name: Gameplay and save regression tests
         run: python3 tools/check_godot.py logs/rules.log godot --headless --path . --script tests3d/release_suite.gd
+      - name: Land, potions, dodge, rare camps and saved progression
+        run: python3 tools/check_godot.py logs/jade-rules.log godot --headless --path . --script tests3d/jade_suite.gd
       - name: HUD ability rules
         run: python3 tools/check_godot.py logs/hud_rules.log godot --headless --path . --script tests3d/hud_rules.gd
       - name: Account and save regression tests

@@ -16,7 +16,7 @@ concurrency:
 jobs:
   native-preflight:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
       - uses: solarlabyrinth/action-setup-godot@v3
@@ -40,9 +40,11 @@ jobs:
           python3 tools/check_godot.py logs/release-gate.log godot --headless --path . --script tests3d/release_gate.gd
       - name: Cloud recovery, retry safety and restoration freeze
         run: python3 tools/check_godot.py logs/cloud-recovery.log godot --headless --path . --script tests3d/cloud_recovery_suite.gd
+      - name: Land, potion effects, level gates and varied camps
+        run: python3 tools/check_godot.py logs/jade.log godot --headless --path . --script tests3d/jade_suite.gd
       - name: Quest progression and battle reports
         run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd
-      - name: 0.16 saved village, complete edge labels and direct menu logout
+      - name: 0.17 saved village, complete edge labels and direct menu logout
         run: |
           python3 tools/check_godot.py logs/session-resume.log godot --headless --path . --script tests3d/session_resume_suite.gd
           python3 tools/check_godot.py logs/frontier.log godot --headless --path . --script tests3d/frontier_suite.gd
@@ -115,19 +117,19 @@ jobs:
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           GLUTWACHT: ${{ secrets.GLUTWACHT }}
         run: python3 tools/publish_testflight.py
-      - name: Confirm 0.16 processing and availability in the existing TestFlight group
+      - name: Confirm 0.17 processing and availability in the existing TestFlight group
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           GLUTWACHT: ${{ secrets.GLUTWACHT }}
-          TARGET_VERSION: '0.16.0'
+          TARGET_VERSION: '0.17.0'
           TARGET_BUILD: '${{ github.run_number }}.0.0'
           REQUIRE_READY: '1'
         run: python3 tools/check_testflight.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: apple-testflight-status-0.16
+          name: apple-testflight-status-0.17
           path: apple-status.json
           retention-days: 14
   windows-build:
@@ -147,6 +149,6 @@ jobs:
           python3 tools/check_godot.py logs/windows-export.log godot --headless --path . --export-release Windows builds/windows/Glutwacht.exe
       - uses: actions/upload-artifact@v4
         with:
-          name: Glutwacht-Windows-0.16.0
+          name: Glutwacht-Windows-0.17.0
           path: builds/windows
           retention-days: 30

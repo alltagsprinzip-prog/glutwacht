@@ -52,7 +52,7 @@ var raid_loot:Dictionary:
  get:return looted
 func training(attribute:String) -> int:return int(profile.get("training",{}).get("heroes",{}).get(hero_key(),{}).get(attribute,0))
 func entry_position() -> Vector2:
- return {"south":Vector2(0,27),"west":Vector2(-27,0),"east":Vector2(27,0),"north":Vector2(0,-27)}.get(attack_side,Vector2(0,27))
+ return {"south":Vector2(0,41),"west":Vector2(-41,0),"east":Vector2(41,0),"north":Vector2(0,-41)}.get(attack_side,Vector2(0,41))
 func _init(p:Dictionary):
  profile=p
  if not profile.has("frontier"):profile.frontier=Advancement.fresh()

@@ -21,7 +21,7 @@ func _initialize():
  for kind in ["melee","archers"]:
   for i in range(10):
    var before=b.reserve[kind];var n=b.allies.size()
-   check(b.deploy(kind,Vector2(-27,-18+i*3)) and b.reserve[kind]==before-1 and b.allies.size()==n+1,kind+" single deployment "+str(i+1))
+   check(b.deploy(kind,Vector2(-41,-18+i*3)) and b.reserve[kind]==before-1 and b.allies.size()==n+1,kind+" single deployment "+str(i+1))
   var before=b.reserve[kind]
   check(not b.deploy(kind,Vector2.ZERO) and b.reserve[kind]==before,"invalid placement retains "+kind)
  b.deploy_all();var count=b.allies.size();b.deploy_all();check(count==24 and b.allies.size()==24,"reserve exhausted without duplication")
@@ -62,7 +62,7 @@ func _initialize():
  var names={}
  for i in range(100):
   var v=C.matched_village(i,p.data);var ratio=float(C.village_strength(v))/C.strength(p.data)
-  check(ratio>=.84 and ratio<=1.16,"match rating within 15 percent "+str(i));names[v.seed]=true
+  check((ratio>=1.38 and ratio<=1.75) if v.get("rich",false) else (ratio>=.84 and ratio<=1.16),"advertised normal or rare stronger match rating "+str(i));names[v.seed]=true
  check(names.size()==100,"next opponent varies layouts")
  p=rich();b=B.new(p.data);var anchors=b.allies.map(func(u):return u.pos)
  for i in range(600):b.step(.05,Vector2(1,0))

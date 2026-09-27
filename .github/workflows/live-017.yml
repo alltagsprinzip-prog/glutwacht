@@ -1,0 +1,48 @@
+name: Live two-account acceptance 0.17
+on:
+  push:
+    branches: [update/masterplan-online-20260925]
+    paths: [.github/workflows/live-017.yml]
+permissions:
+  contents: read
+jobs:
+  live-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python3 tools/prepare_live_qa.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: disposable-qa-provision
+          path: ${{ runner.temp }}/glutwacht-qa/provision.json
+          retention-days: 1
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current game and browser runtime
+        run: |
+          python3 tools/check_godot.py logs/live-import.log godot --headless --editor --path . --import
+          mkdir -p dist/v08
+          python3 tools/check_godot.py logs/live-export.log godot --headless --path . --export-release Web dist/v08/index.html
+          python3 tools/web_bootstrap.py dist/v08
+          npm install --prefix "$RUNNER_TEMP/live-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/live-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Real sessions, invitation, friends, clan and verified ranking
+        run: NODE_PATH="$RUNNER_TEMP/live-browser/node_modules" node tools/live_acceptance.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-017-acceptance
+          path: logs/live
+          retention-days: 7
+      - name: Remove runner-only credentials
+        if: always()
+        run: rm -f "$RUNNER_TEMP/glutwacht-qa/credentials.json"

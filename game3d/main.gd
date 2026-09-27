@@ -70,6 +70,7 @@ var browser_qa=false
 var hud_widgets:Dictionary={}
 var save_import_callback
 var account
+var ranking_ui
 var social_ui
 var account_active=false
 var cloud_clock=0.0
@@ -334,9 +335,9 @@ func _process(dt):
 func qa_controls() -> Array:
  var out=[]
  for node in ui.find_children("*","Control",true,false):
-  if not node.is_visible_in_tree() or not (node is BaseButton or node is HSlider):continue
+  if not node.is_visible_in_tree() or not (node is BaseButton or node is HSlider or node is LineEdit):continue
   var r=node.get_global_rect()
-  out.append({"id":String(node.name),"text":node.text if node is Button else "","rect":[r.position.x,r.position.y,r.size.x,r.size.y],"disabled":node.disabled if node is BaseButton else false})
+  out.append({"id":String(node.name),"text":node.text if node is Button else (node.placeholder_text if node is LineEdit else ""),"rect":[r.position.x,r.position.y,r.size.x,r.size.y],"disabled":node.disabled if node is BaseButton else false})
  return out
 func deployment_preview_points() -> Array:
  var points=[]
@@ -519,7 +520,7 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  modal=Control.new();modal.size=ui.size;modal.z_index=100;ui.add_child(modal)
  var veil=ColorRect.new();veil.color=Color(.025,.065,.09,.58);veil.size=ui.size;modal.add_child(veil)
  var rect=Rect2(210,92,860,536)
- if name=="building":rect=Rect2(100,48,1080,624)
+ if name in ["building","ranked_trial"]:rect=Rect2(100,48,1080,624)
  if name in ["catalog","heroes"]:rect=Rect2(130,70,1020,580)
  rect.position=safe_rect().position+(safe_rect().size-rect.size)*.5
  var p=panel(modal,rect,Color("193943"))
@@ -854,7 +855,8 @@ func open_menu():
  var backup=button(p,"Spielstand sichern / laden",Rect2(28,273,396,70),func():open_save_tools());backup.add_theme_font_size_override("font_size",23)
  var logout=button(p,"Abmelden",Rect2(439,273,393,70),func():logout_from_menu());logout.name="MenuLogout";logout.disabled=not account.signed_in()
  if sim.active():logout.text="Angriff beenden & abmelden";logout.add_theme_font_size_override("font_size",21)
- label(p,account.status if account.signed_in() else "Gastdorf · lokal gespeichert",Rect2(29,365,801,37),20,CREAM,true)
+ button(p,"Rangliste · Jadeprüfung",Rect2(28,355,396,62),open_ranking,true)
+ label(p,account.status if account.signed_in() else "Gastdorf · lokal gespeichert",Rect2(448,355,374,54),18,CREAM,true).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
  label(p,"Stick: Bewegen · Ziehen: Kamera · Zwei Finger: Zoom",Rect2(29,409,801,30),18,CREAM,true)
  if sim.active():button(p,"Angriff beenden",Rect2(28,459,396,59),func():close_dialog();end_raid())
  elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(28,459,396,59),func():return_home())
@@ -1069,6 +1071,7 @@ func activate_cloud(result:Dictionary):
  account.revision=int(result.revision);account.loaded=true;account.pending.clear();account.pending_json="";account.pending_restore.clear();account.dirty=false;account.save_metadata();cloud_sync_paused=false
  progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
  if progress.data.hero=="":open_tutorial()
+ elif load("res://game3d/online/invitations.gd").pending()!="":call_deferred("open_social")
  sync_cloud()
 func sync_cloud(final_save:bool=false):
  if not account_active or cloud_sync_running or account.busy or progress.write_blocked or (account_leaving and not final_save):return
@@ -1114,6 +1117,7 @@ func leave_account():
    account_leaving=false;toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
  await account.sign_out()
  if social_ui!=null:social_ui.clear()
+ if ranking_ui!=null:ranking_ui.clear()
  account_active=false;account_leaving=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
  if auth_locked():update_access();open_account()
  elif progress.write_blocked:open_save_tools()
@@ -1126,6 +1130,7 @@ func activate_local_account(meta:Dictionary):
  account.revision=int(meta.revision);account.loaded=true;account.pending=meta.get("pending",{});account.pending_json=String(meta.get("pending_json",""));account.dirty=true;cloud_sync_paused=false
  progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
  if progress.data.hero=="":open_tutorial()
+ elif load("res://game3d/online/invitations.gd").pending()!="":call_deferred("open_social")
  await sync_cloud()
 func restore_account_start():
  if art_preview:return
@@ -1250,3 +1255,8 @@ func use_active_potion():
  if profile_transaction(func():return sim.use_potion()):tone("skill");update_hud()
  else:
   sim.hero.clear();sim.hero.merge(hero_before,true);sim.effects=effects_before;sim.combat_texts=texts_before;sim.refresh_potion()
+
+func open_ranking():
+ if ranking_ui==null:
+  ranking_ui=load("res://game3d/ui/ranking.gd").new();add_child(ranking_ui);ranking_ui.setup(self)
+ ranking_ui.open()

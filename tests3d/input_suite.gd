@@ -23,7 +23,7 @@ func edge_point() -> Vector2:
  for x in range(280,int(game.ui.size.x)-280,35):
   for y in range(185,int(game.ui.size.y)-205,25):
    var screen=Vector2(x,y);var point=game.world.ground_position(screen)
-   if game.sim.deployment_valid(point) and point.distance_to(game.sim.hero.pos)>2 and not game.blocks_world_at(screen):return screen
+   if game.sim.deployment_valid(point) and game.sim.deployment_valid(game.world.ground_position(screen+Vector2(20,0))) and point.distance_to(game.sim.hero.pos)>2 and not game.blocks_world_at(screen):return screen
  return Vector2.ZERO
 func run():
  game=load("res://game3d/main.tscn").instantiate();game.save_path="user://qa-input-v08.json";root.add_child(game);await frames()

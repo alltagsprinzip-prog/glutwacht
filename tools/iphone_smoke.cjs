@@ -15,7 +15,7 @@ const fs=require('node:fs');const assert=require('node:assert/strict');const clo
   await page.goto('http://127.0.0.1:8766/v08/?qa=1');
   const wait=(fn,timeout=120000)=>page.waitForFunction(fn,null,{timeout});const state=()=>page.evaluate(()=>window.__glutwacht);
   await wait(()=>window.__glutwacht?.mode==='login');
-  await page.locator('#gw-email').fill(email);await page.locator('#gw-password').fill('Test-only-password-123');await page.locator('#gw-account button[type=submit]').click();
+  await page.locator('#gw-email').fill(email);await page.locator('#gw-password').fill('Test-only-password-123');await page.keyboard.press('Enter');await page.locator('#gw-account button[type=submit]').click();
   await wait(()=>window.__glutwacht?.mode==='home'&&window.__glutwacht.dialog==='');
   assert.equal((await state()).hero,'mage');assert.equal((await state()).gold,321);
   const control=async(test)=>{const until=Date.now()+45000;while(Date.now()<until){const s=await state();const b=s.controls?.find(test);if(b){const [x,y,w,h]=b.rect;const v=page.viewportSize();return [(x+w/2)*v.width/s.ui_size[0],(y+h/2)*v.height/s.ui_size[1]]}await page.waitForTimeout(250)}throw Error('Visible control not found: '+test.toString())};

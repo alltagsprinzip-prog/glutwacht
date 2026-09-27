@@ -25,7 +25,7 @@ func _process(_dt):
  if not done.visible:return
  var safe=game.safe_rect();var scale=get_viewport().get_screen_transform().get_scale().y
  var bottom=safe.end.y-12
- var height=DisplayServer.virtual_keyboard_get_height()
+ var height=DisplayServer.virtual_keyboard_get_height() if DisplayServer.has_feature(DisplayServer.FEATURE_VIRTUAL_KEYBOARD) else 0
  if height>0:bottom=minf(bottom,(DisplayServer.window_get_size().y-height)/maxf(scale,.01)-8)
  done.position=Vector2(safe.end.x-done.size.x-8,maxf(safe.position.y+8,bottom-done.size.y))
 func _input(event):

@@ -76,6 +76,8 @@ def summarize(response, target):
         state = included.get(('buildBetaDetails',detail.get('id')),{}).get('internalBuildState','unknown')
         return {'version':marketing,'build':attrs['version'],'processing':attrs.get('processingState'),
                 'expired':attrs.get('expired'), 'internal_state':state,'groups':groups,
+                'public_testflight_links':[a['publicLink'] for (kind,_),a in included.items() if kind=='betaGroups' and a.get('publicLinkEnabled') and a.get('publicLink')],
+                'external_state':included.get(('buildBetaDetails',detail.get('id')),{}).get('externalBuildState','unknown'),
                 'assigned_to_glutwacht_test':any(x.casefold()=='glutwacht test' for x in groups)}
     return {'version':target,'processing':'NOT_VISIBLE_YET','groups':[],'assigned_to_glutwacht_test':False}
 

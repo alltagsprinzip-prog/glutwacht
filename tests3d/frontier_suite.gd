@@ -74,7 +74,9 @@ func run():
  check(not game.sim.deployment_valid(Vector2(47,0)),"outside battle map rejected")
  check(game.sim.deploy_hero(Vector2(0,40)),"hero shares expanded legal area")
  game.sim.reserve.melee=18;game.choose_deploy("melee");game.modal_guard_until=0
- var pos=game.world.camera.unproject_position(Vector3(-27,0,0))
+ var candidates=game.deployment_preview_points()
+ check(not candidates.is_empty(),"free visible deployment ground exists for generated village")
+ var pos=Vector2(candidates[0][0],candidates[0][1]) if not candidates.is_empty() else Vector2.ZERO
  check(not game.blocks_world_at(pos),"hold test is on playable ground")
  var n=game.sim.reserve.melee;game.pointer_begin(0,pos);game.update_gestures(.181)
  check(game.sim.reserve.melee==n-1,"hold starts within 181 ms; short multi-touch grace")
@@ -84,7 +86,7 @@ func run():
  check(game.sim.reserve.melee==n-11,"five rapid taps deploy five more soldiers")
  game.update_hud();game.world.sync(game.sim,.016)
  check(game.deployment_buttons.melee.get_child(0).texture is AtlasTexture,"deployment uses original face atlas")
- check(game.world.actors[game.sim.hero.id].node.get_meta("asset")!=game.world.actors[game.sim.allies[0].id].node.get_meta("asset"),"hero and soldier have distinct animated models")
+ check(not game.sim.allies.is_empty() and game.world.actors[game.sim.hero.id].node.get_meta("asset")!=game.world.actors[game.sim.allies[0].id].node.get_meta("asset"),"hero and soldier have distinct animated models")
  check(game.sound.sounds.hit[0] is AudioStreamOggVorbis and game.sound.sounds.shield[0] is AudioStreamOggVorbis,"recorded combat Foley loaded")
  await shot("iphone-attack")
  # Wall-only destruction must be limited to the needed breach.
