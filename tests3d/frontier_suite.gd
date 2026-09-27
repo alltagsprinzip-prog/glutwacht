@@ -37,10 +37,22 @@ func run():
  await process_frame;await process_frame;game.set_process(false);game.close_dialog(true);game.build_hud()
  check(absf(game.stick.position.x-game.safe_rect().position.x)<.1,"joystick at usable left edge with iPhone notch inset")
  check(game.safe_rect().encloses(game.hud_widgets.help.get_global_rect()),"help remains inside safe area")
+ check(game.stick.position.x+game.stick.visible_circle().position.x-game.safe_rect().position.x<=2.1,"visible joystick rim has no hidden left gutter")
+ for item in [game.collect_button,game.hud_widgets.help,game.hud.find_child("Action_menu",true,false),game.hud.find_child("Action_shop",true,false)]:
+  check(absf(item.get_global_rect().end.x-game.safe_rect().end.x)<.1,"utility button on usable right edge: "+str(item.name))
+ var mountain=game.world.landscape.find_child("MountainRange",true,false)
+ check(mountain!=null and mountain.mesh is ArrayMesh and mountain.get_aabb().end.z<-75,"continuous rock ridge stays outside maximum village area")
+ game.open_menu()
+ check(game.modal.find_child("MenuLogout",true,false)!=null and game.modal.find_child("MenuAccount",true,false)!=null,"account and logout directly available from menu")
+ game.close_dialog(true)
  var balances=game.progress.data.wood+game.progress.data.stone+game.progress.data.gold
  game.collect_resources();var after=game.progress.data.wood+game.progress.data.stone+game.progress.data.gold
  game.collect_resources();check(after>balances and after==game.progress.data.wood+game.progress.data.stone+game.progress.data.gold,"collect all pays available stock exactly once")
  await shot("iphone-village")
+ var zoom=game.world.target_zoom;game.world.target_zoom=66;game.world.focus=Vector3(0,0,-30);game.world.pan=Vector2(0,-30);game.world.follow_hero=false
+ for i in range(120):game.world.update_camera(game.sim,.016)
+ await shot("iphone-mountains");game.world.target_zoom=zoom;game.world.pan=Vector2.ZERO;game.world.follow_hero=true
+ for i in range(120):game.world.update_camera(game.sim,.016)
  game.open_catalog();check(game.modal.find_children("BuildInfo_*","Button",true,false).size()==7,"every catalog tile has an info button")
  await shot("iphone-build-menu")
  game.open_build_info("camp");check(game.dialog=="build_info","unlocked building info opens")

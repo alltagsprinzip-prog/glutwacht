@@ -21,7 +21,7 @@ const fs=require('node:fs');const assert=require('node:assert/strict');const clo
   const control=async(test)=>{const until=Date.now()+45000;while(Date.now()<until){const s=await state();const b=s.controls?.find(test);if(b){const [x,y,w,h]=b.rect;const v=page.viewportSize();return [(x+w/2)*v.width/s.ui_size[0],(y+h/2)*v.height/s.ui_size[1]]}await page.waitForTimeout(250)}throw Error('Visible control not found: '+test.toString())};
   const tap=async(test)=>{await page.touchscreen.tap(...await control(test));await page.waitForTimeout(450)};
   await page.screenshot({path:'logs/iphone/existing-village.png'});
-  await tap(b=>b.text==='ALLES SAMMELN');await tap(b=>b.text==='?');await wait(()=>window.__glutwacht.dialog==='help');await page.screenshot({path:'logs/iphone/help.png'});await tap(b=>b.id==='CloseDialog');
+  await tap(b=>b.id==='CollectAll');await tap(b=>b.id==='HelpDock');await wait(()=>window.__glutwacht.dialog==='help');await page.screenshot({path:'logs/iphone/help.png'});await tap(b=>b.id==='CloseDialog');
   await tap(b=>b.id==='Action_build');await wait(()=>window.__glutwacht.dialog==='catalog');await tap(b=>b.id==='BuildInfo_hero_hall');await wait(()=>window.__glutwacht.dialog==='build_info');await page.screenshot({path:'logs/iphone/build-info.png'});await tap(b=>b.id==='CloseDialog');
   await tap(b=>b.id==='Action_menu');await tap(b=>b.text==='Grafik & Ton');await wait(()=>window.__glutwacht.dialog==='settings');
   await tap(b=>b.text==='Sparsam');await tap(b=>b.id==='Setting_brightness');await tap(b=>b.id==='Setting_music');await tap(b=>b.id==='Setting_effects');
@@ -34,7 +34,7 @@ const fs=require('node:fs');const assert=require('node:assert/strict');const clo
   for(let i=0;i<3;i++)await page.touchscreen.tap(...await ground());
   await wait(new Function(`return window.__glutwacht.reserve.melee===${n-3}`));
   const cdp=await context.newCDPSession(page);const [x,y]=await ground();await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x,y,id:0}]});await page.waitForTimeout(1300);await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-  await wait(()=>window.__glutwacht.reserve.melee===0);await tap(b=>b.text==='?');await wait(()=>window.__glutwacht.dialog==='help');await tap(b=>b.id==='CloseDialog');
+  await wait(()=>window.__glutwacht.reserve.melee===0);await tap(b=>b.id==='HelpDock');await wait(()=>window.__glutwacht.dialog==='help');await tap(b=>b.id==='CloseDialog');
   await page.screenshot({path:'logs/iphone/attack.png'});assert.deepEqual(errors,[]);fs.writeFileSync('logs/iphone/result.json',JSON.stringify({viewport:page.viewportSize(),engine:'Chromium with iPhone landscape emulation; not a physical device',state:await state(),errors},null,2));
   console.log('IPHONE_SMOKE_OK: existing 0.14 account save, collection, building info, help, settings reload, hero and rapid/held troop deployment');
  }catch(e){if(browser){const p=browser.contexts()[0]?.pages()[0];if(p){await p.screenshot({path:'logs/iphone/failure.png'}).catch(()=>{});console.error('IPHONE_STATE',await p.evaluate(()=>window.__glutwacht).catch(()=>null))}}throw e}

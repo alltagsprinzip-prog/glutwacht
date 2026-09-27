@@ -33,19 +33,23 @@ func _notification(what):
  if what==NOTIFICATION_APPLICATION_FOCUS_OUT:release()
 func release():
  value=Vector2.ZERO;finger=-1;mouse=false;queue_redraw()
+func visible_circle() -> Rect2:
+ var radius=minf(size.x,size.y)*.5-2
+ return Rect2(size*.5-Vector2.ONE*radius,Vector2.ONE*radius*2)
 func _draw():
  var c=size/2
- var radius=minf(size.x,size.y)*.43
+ var radius=minf(size.x,size.y)*.5-2
  var knob=radius*.34
- draw_circle(c+Vector2(0,5),radius+3,Color(.015,.035,.045,.6))
- draw_circle(c,radius,Color(.06,.14,.23,.48))
- draw_arc(c,radius,0,TAU,64,Color("a9c9e1a0"),3,true)
+ draw_circle(c,radius+1,Color(.08,.12,.1,.28))
+ draw_circle(c,radius,Color(.12,.20,.17,.48))
+ draw_arc(c,radius,0,TAU,64,Color("d4d1bda0"),3,true)
  draw_arc(c,radius*.72,0,TAU,64,Color(.65,.80,.80,.28),2,true)
  for i in range(4):
   var d=Vector2.RIGHT.rotated(i*PI/2)
-  draw_line(c+d*radius*.78,c+d*radius*.9,Color("a9c9e1a0"),3,true)
+  var tip=c+d*radius*.91;var base=c+d*radius*.72;var side=d.orthogonal()*radius*.1
+  draw_colored_polygon(PackedVector2Array([tip,base+side,base-side]),Color("d4d1bda0"))
  var center=c+value*radius*.62
  draw_circle(center+Vector2(0,4),knob+2,Color(.015,.035,.045,.8))
- draw_circle(center,knob,Color("92aac1"))
- draw_circle(center-Vector2(0,4),knob*.78,Color("d1e3f4"))
- draw_arc(center,knob,0,TAU,32,Color("f3f7ff"),2,true)
+ draw_circle(center,knob,Color("abae9f"))
+ draw_circle(center-Vector2(0,4),knob*.78,Color("d0d1c3"))
+ draw_arc(center,knob,0,TAU,32,Color("e9e5d4"),2,true)

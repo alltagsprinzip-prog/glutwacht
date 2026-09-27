@@ -33,7 +33,7 @@ func run():
  for viewport in [Vector2i(1280,720),Vector2i(1560,720),Vector2i(1710,720),Vector2i(1440,900)]:
   root.size=viewport;await frames();g.layout_art_preview();g.build_hud()
   var attack=g.hud.find_child("Action_attack",true,false)
-  check(absf(attack.get_global_rect().end.x-g.safe_rect().end.x+20)<2,"attack anchored to usable right edge "+str(viewport))
+  check(absf(attack.get_global_rect().end.x-g.safe_rect().end.x)<2,"attack anchored to usable right edge "+str(viewport))
   check(absf(g.stick.get_global_rect().end.y-g.safe_rect().end.y+20)<2,"joystick anchored to lower edge "+str(viewport))
   check(g.ui.position==Vector2.ZERO and g.ui.size==root.get_visible_rect().size,"full viewport "+str(viewport))
   g.open_building("hall");await frames()
@@ -46,6 +46,12 @@ func run():
   for i in range(60):g.world.sync(g.sim,1.0/60);await process_frame
   var metrics={"renderer":RenderingServer.get_video_adapter_name(),"viewport":str(root.get_visible_rect().size),"frames":60,"elapsed_ms":(Time.get_ticks_usec()-started)/1000.0,"draw_calls":Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),"conditions":"Linux CI software rendering, village fixture, 60 animation replay frames; not iPhone performance"}
   var file=FileAccess.open(out+"/render-metrics.json",FileAccess.WRITE);file.store_string(JSON.stringify(metrics,"  "));file.close()
+ g.world.target_zoom=66;g.world.pan=Vector2(0,-30);g.world.follow_hero=false
+ for i in range(120):g.world.update_camera(g.sim,.016)
+ await shot("mountain-range")
+ g.world.target_zoom=46;g.world.pan=Vector2.ZERO;g.world.follow_hero=true
+ for i in range(120):g.world.update_camera(g.sim,.016)
+ g.open_menu();await shot("direct-account-menu");g.close_dialog(true)
  g.open_building("hall");await shot("building-upgrade");g.close_dialog(true)
  var site=g.progress.data.structures[0];site.stock=37;var key=g.Catalog.RESOURCES[site.kind];var balance=g.progress.data[key]
  g.world.sync(g.sim,.016);g.collect_building_resource(site.uid);await shot("resource-collection")

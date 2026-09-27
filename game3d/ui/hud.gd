@@ -10,10 +10,17 @@ static func plate(g,rect:Rect2,color:Color=Color("263e46")):
 static func action(g,key:String,title:String,rect:Rect2,callback:Callable,primary:bool=false):
  var b=g.icon_button(g.hud,key,title,rect,func():g.tone("click");callback.call(),primary)
  b.set_meta("hud_action",title)
+ if key=="menu":
+  for state in ["normal","hover","pressed"]:b.add_theme_stylebox_override(state,g.skin("panel"))
  if b.get_child_count()>1 and b.get_child(1) is Label:
   var caption=b.get_child(1);caption.add_theme_font_size_override("font_size",21)
-  caption.position=Vector2(4,rect.size.y-36);caption.size=Vector2(rect.size.x-8,34)
+  caption.position=Vector2(4,rect.size.y-43);caption.size=Vector2(rect.size.x-8,29)
  return b
+static func dock(button:Control,edge:String="right"):
+ button.set_meta("hud_edge",edge);return button
+static func attack_skin(g,b):
+ for state in ["normal","hover","pressed"]:b.add_theme_stylebox_override(state,g.skin("attack"))
+ if b.get_child_count()>1 and b.get_child(1) is Label:g.Storybook.heading(b.get_child(1),TEXT)
 static func build(g):
  g.clear_hud();g.hud_widgets={}
  g.stats=text(g,"",Rect2(0,0,1,1),1);g.stats.hide()
@@ -25,15 +32,17 @@ static func build(g):
   else:home(g)
  elif g.sim.mode=="scout":scout(g)
  else:combat(g)
- g.hud_widgets.help=g.button(g.hud,"?",Rect2(1198,239 if g.sim.active() else 265,62,58),func():g.open_help())
+ g.hud_widgets.help=dock(g.button(g.hud,"?",Rect2(1174,124 if g.sim.active() else 288,86,76),func():g.open_help()))
+ g.hud_widgets.help.name="HelpDock";g.hud_widgets.help.add_theme_font_size_override("font_size",39)
  g.hud_widgets.help.tooltip_text="Hilfe & nächstes Upgrade"
  update(g)
  if is_instance_valid(g.modal):g.ui.move_child(g.modal,-1)
 static func top(g):
  var name=g.progress.data.get("player_name","Mein Dorf")
- var profile=action(g,"portrait","",Rect2(20,18,306,88),func():g.open_profile())
+ var profile=dock(action(g,"portrait","",Rect2(20,18,306,88),func():g.open_profile()),"left")
+ for state in ["normal","hover","pressed"]:profile.add_theme_stylebox_override(state,g.skin("panel"))
  profile.get_child(0).position=Vector2(0,0);profile.get_child(0).size=Vector2(88,88)
- var village_name=g.label(profile,name,Rect2(93,9,200,35),25,TEXT);village_name.clip_text=true;village_name.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+ var village_name=g.label(profile,name,Rect2(93,9,200,35),25,TEXT);village_name.clip_text=true;village_name.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;g.Storybook.heading(village_name,TEXT)
  g.label(profile,"LV. %d · Dorf %d"%[g.Catalog.level(g.progress.data,g.sim.hero_key()),g.progress.data.hall],Rect2(95,39,199,26),21,GOLD)
  plate(g,Rect2(20,115,306,41))
  g.icon(g.hud,"worker",Rect2(30,118,33,33));g.builder_text=text(g,"",Rect2(68,117,110,34),19,TEXT,true)
@@ -46,25 +55,24 @@ static func top(g):
   g.resource_labels[key]=text(g,"",Rect2(x+66,23,129,33),25,TEXT,true)
   var track=ColorRect.new();track.position=Vector2(x+68,61);track.size=Vector2(125,5);track.color=Color("0c1d30");track.mouse_filter=Control.MOUSE_FILTER_IGNORE;g.hud.add_child(track)
   var meter=ColorRect.new();meter.size=Vector2(0,5);meter.color=[Color("d8a163"),Color("adcede"),GOLD][i];meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;track.add_child(meter);g.resource_bars[key]=meter
- action(g,"menu","",Rect2(1180,18,80,62),func():g.open_menu())
- action(g,"tasks","ZIELE",Rect2(20,173,86,82),func():g.open_tasks())
- action(g,"shop","SHOP",Rect2(1174,100,86,82),func():g.open_shop())
+ dock(action(g,"menu","",Rect2(1174,18,86,62),func():g.open_menu()))
+ dock(action(g,"tasks","ZIELE",Rect2(20,173,96,82),func():g.open_tasks()),"left")
+ dock(action(g,"shop","SHOP",Rect2(1174,100,86,82),func():g.open_shop()))
  g.hud_widgets.sync=text(g,"",Rect2(114,82,205,22),15,TEXT)
  g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 static func home(g):
- g.button(g.hud,"FREUNDE",Rect2(20,286,138,54),func():g.open_social())
+ var friends=dock(g.button(g.hud,"FREUNDE",Rect2(20,270,96,66),func():g.open_social()),"left");friends.add_theme_font_size_override("font_size",16)
  g.create_stick()
- g.collect_button=g.button(g.hud,"ALLES SAMMELN",Rect2(1020,199,240,60),func():g.collect_resources(),true)
- g.collect_button.add_theme_font_size_override("font_size",22)
+ g.collect_button=dock(action(g,"collect","SAMMELN",Rect2(1174,194,86,82),func():g.collect_resources(),true));g.collect_button.name="CollectAll";g.collect_button.tooltip_text="Alle verfügbaren Ressourcen einsammeln"
+ g.collect_button.get_child(1).add_theme_font_size_override("font_size",14)
  if g.progress.tutorial_step()!="done":
   var next=g.progress.tutorial_step()
   var captions={"hero":"Helden wählen","build":"Sägewerk bauen","upgrade":"Haupthaus ausbauen","train":"Helden trainieren","battle":"Erstes Lager angreifen"}
-  g.button(g.hud,"Einführung: "+captions[next],Rect2(340,144,550,46),func():g.open_tutorial(),true)
- var attack=action(g,"attack","ANGRIFF",Rect2(1074,524,186,180),func():g.open_raid(),true)
- for state in ["normal","hover","pressed"]:
-  var box=g.skin("pressed" if state=="pressed" else "gold");box.set_corner_radius_all(90);box.set_border_width_all(4);attack.add_theme_stylebox_override(state,box)
+  var tutorial=dock(g.button(g.hud,"WEITER: "+captions[next],Rect2(20,355,232,62),func():g.open_tutorial(),true),"left");tutorial.name="TutorialNext";tutorial.add_theme_font_size_override("font_size",16)
+ var attack=dock(action(g,"attack","ANGRIFF",Rect2(1074,524,186,180),func():g.open_raid(),true));attack_skin(g,attack)
  attack.get_child(0).position=Vector2(38,15);attack.get_child(0).size=Vector2(110,110)
  attack.get_child(1).position=Vector2(5,130);attack.get_child(1).size=Vector2(176,36);attack.get_child(1).add_theme_font_size_override("font_size",26)
+ var toolbar=plate(g,Rect2(352,574,622,139));toolbar.name="BottomActionBar";toolbar.add_theme_stylebox_override("panel",g.skin("wood"))
  var keys=["build","hero","army","training"]
  var titles=["BAUEN","HELD","ARMEE","TRAINING"]
  var callbacks=[g.open_catalog,g.open_heroes,g.open_army,g.open_training]
@@ -96,22 +104,22 @@ static func combat(g):
  plate(g,Rect2(385,18,470,86))
  for i in range(3):g.stars_view.append(g.icon(g.hud,"star",Rect2(399+i*48,36,43,43)))
  g.objective=text(g,"",Rect2(558,31,280,57),34,TEXT,true)
- action(g,"menu","",Rect2(1158,18,102,91),func():g.open_menu())
+ dock(action(g,"menu","",Rect2(1174,18,86,91),func():g.open_menu()))
  for i in range(4):
   var key=g.Catalog.TROOP_ORDER[i];var b=action(g,"face_"+key,"",Rect2(20+(i%2)*112,185+int(i/2)*77,104,70),func():g.choose_deploy(key))
   b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,4);b.get_child(0).size=Vector2(62,62);b.tooltip_text=g.Catalog.TROOPS[key].name
-  b.set_meta("count",g.label(b,"",Rect2(65,18,35,42),30,TEXT,true))
+  b.set_meta("count",g.label(b,"",Rect2(65,18,35,42),30,g.Storybook.INK,true))
  g.hud_widgets.deploy_single=g.button(g.hud,"Einzeln",Rect2(20,338,102,66),func():g.choose_deploy_group(false))
  g.hud_widgets.deploy_group=g.button(g.hud,"Alle",Rect2(128,338,108,66),func():g.choose_deploy_group(true),true)
  for key in ["deploy_single","deploy_group"]:g.hud_widgets[key].add_theme_font_size_override("font_size",24)
  g.hud_widgets.deploy_hint=text(g,"",Rect2(275,110,735,45),22,TEXT,true)
  g.hud_widgets.deploy_hero=action(g,"face_"+g.sim.hero_key(),"",Rect2(20,413,104,78),func():g.choose_deploy("hero"),true)
  g.hud_widgets.deploy_hero.get_child(0).position=Vector2(4,4);g.hud_widgets.deploy_hero.get_child(0).size=Vector2(66,66)
- g.label(g.hud_widgets.deploy_hero,"1",Rect2(68,20,32,40),30,TEXT,true)
+ g.label(g.hud_widgets.deploy_hero,"1",Rect2(68,20,32,40),30,g.Storybook.INK,true)
  g.hud_widgets.deploy_hero.tooltip_text=g.sim.stats().name+" einsetzen"
  g.hud_widgets.auto_attack=g.button(g.hud,"Autoangriff: AUS",Rect2(20,413,216,64),func():g.sim.hero_auto_attack=not g.sim.hero_auto_attack;update(g))
  g.hud_widgets.auto_attack.add_theme_font_size_override("font_size",21)
- g.hud_widgets.follow=g.button(g.hud,"Zum Helden",Rect2(1088,316,172,66),func():g.world.follow_hero=true)
+ g.hud_widgets.follow=dock(g.button(g.hud,"Zum Helden",Rect2(1088,316,172,66),func():g.world.follow_hero=true))
  g.hud_widgets.follow.add_theme_font_size_override("font_size",22)
  g.create_stick()
  plate(g,Rect2(265,617,460,85));g.icon(g.hud,g.sim.hero_key(),Rect2(274,626,67,67))
@@ -119,15 +127,16 @@ static func combat(g):
  g.health_text=text(g,"",Rect2(548,620,160,35),24,TEXT,true)
  g.health=ProgressBar.new();g.health.position=Vector2(352,666);g.health.size=Vector2(355,17);g.health.show_percentage=false;g.health.max_value=g.sim.hero.max_hp;g.health.mouse_filter=Control.MOUSE_FILTER_IGNORE
  g.health.add_theme_stylebox_override("background",g.style(Color("14262b"),Color.TRANSPARENT,0,5));g.health.add_theme_stylebox_override("fill",g.style(Color("80c56c"),Color.TRANSPARENT,0,5));g.hud.add_child(g.health)
- var attack=action(g,"attack","ANGRIFF",Rect2(1106,561,154,143),func():pass,true)
+ var attack=dock(action(g,"attack","ANGRIFF",Rect2(1106,561,154,143),func():pass,true));attack_skin(g,attack)
  attack.get_child(0).position=Vector2(41,12);attack.get_child(0).size=Vector2(72,72)
  attack.button_down.connect(func():g.held=true);attack.button_up.connect(func():g.held=false)
- g.cooldowns.skill=action(g,"super_"+g.sim.hero_key(),"FÄHIGKEIT",Rect2(1088,406,172,139),func():g.sim.skill(),true)
+ g.cooldowns.skill=dock(action(g,"super_"+g.sim.hero_key(),"FÄHIGKEIT",Rect2(1088,406,172,139),func():g.sim.skill(),true))
  g.cooldowns.skill.get_child(0).position=Vector2(50,12);g.cooldowns.skill.get_child(0).size=Vector2(72,72)
  g.cooldowns.roll=action(g,"roll","ROLLE",Rect2(758,608,148,96),func():g.sim.roll(g.movement()))
  g.cooldowns.heal=action(g,"heal","TRANK",Rect2(920,608,148,96),func():g.sim.heal())
+ g.cooldowns.roll.set_meta("hud_right_gap",374.0);g.cooldowns.heal.set_meta("hud_right_gap",212.0)
  for key in g.cooldowns:
-  var b=g.cooldowns[key];var l=g.label(b,"",Rect2(4,8,b.size.x-8,53),34,TEXT,true);b.set_meta("cooldown",l)
+  var b=g.cooldowns[key];var l=g.label(b,"",Rect2(4,8,b.size.x-8,53),34,g.Storybook.INK,true);b.set_meta("cooldown",l)
 static func scout(g):
  var v=g.sim.village;plate(g,Rect2(20,18,390,184))
  text(g,v.name,Rect2(35,26,359,39),31,GOLD);text(g,("Kampagne %d/10"%(g.sim.campaign_index+1) if g.sim.campaign_index>=0 else "KI-Lager")+" · Stärke %d"%g.Catalog.village_strength(v),Rect2(36,68,357,32),24)

@@ -1,4 +1,5 @@
 extends Node3D
+const Storybook=preload("res://game3d/ui/storybook.gd")
 const Hud=preload("res://game3d/ui/hud.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 const Progress=preload("res://game3d/progress.gd")
@@ -145,6 +146,9 @@ func reflow_hud():
   if node.name=="Action_attack":horizontal=1.0
   node.position=base+safe.position+Vector2(delta.x*horizontal,delta.y if base.y>=400 else 0.0)
   if base.x<240 and node!=stick:node.position.x-=20
+  if node.get_meta("hud_edge","")=="right":node.position.x=safe.end.x-node.size.x
+  elif node.get_meta("hud_edge","")=="left":node.position.x=safe.position.x
+  elif node.has_meta("hud_right_gap"):node.position.x=safe.end.x-node.size.x-float(node.get_meta("hud_right_gap"))
 func decorate(control:Control):
  var finish=load("res://game3d/ui/button_finish.gd").new();finish.show_behind_parent=false;finish.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);control.add_child(finish)
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
@@ -153,13 +157,8 @@ func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> S
  s.content_margin_left=0;s.content_margin_right=0;s.content_margin_top=0;s.content_margin_bottom=0
  s.shadow_color=Color(0,0,0,.22);s.shadow_size=6 if width>0 else 0;s.shadow_offset=Vector2(0,5) if width>0 else Vector2.ZERO
  return s
-func skin(key:String) -> StyleBoxFlat:
- var palette={"panel":["142b46","d8ae61"],"blue":["163858","e8c477"],"gold":["e97708","ffe4a0"],"pressed":["214e60","fff0b6"],"disabled":["506a70","a7b7b5"],"selected":["357b55","fff0b6"]}
- var colors=palette.get(key,palette.panel)
- var box=style(Color(colors[0]),Color(colors[1]),2,16)
- box.border_width_bottom=4;box.border_width_top=2
- box.shadow_color=Color("163a4260");box.shadow_size=5;box.shadow_offset=Vector2(0,4)
- return box
+func skin(key:String) -> StyleBox:
+ return Storybook.surface(key)
 func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Panel:
  if color.v>.65:color=Color("294953")
  elif color.a>.9:color=Color("193943")
@@ -173,8 +172,9 @@ func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CR
  parent.add_child(l);return l
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",27)
- b.add_theme_color_override("font_color",CREAM)
- b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("c3cecf"))
+ b.add_theme_font_override("font",Storybook.FONT)
+ b.add_theme_color_override("font_color",Storybook.INK)
+ b.add_theme_color_override("font_hover_color",Storybook.INK);b.add_theme_color_override("font_pressed_color",Storybook.INK);b.add_theme_color_override("font_disabled_color",Color("6a685d"))
  b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
@@ -185,6 +185,7 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
  var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
 func icon_texture(key:String) -> Texture2D:
+ if key in ["build","hero","army","training"]:return load("res://assets3d/ui/"+key+".svg")
  if key.begins_with("face_") or key=="portrait":
   var faces=["warrior","ninja","shaman","mage","melee","archers","shield","siege"]
   var face_key=key.trim_prefix("face_") if key!="portrait" else sim.hero_key()
@@ -205,7 +206,7 @@ func icon_button(parent:Control,key:String,title:String,rect:Rect2,callback:Call
  icon(b,key,Rect2((rect.size.x-h)/2,5,h,h))
  b.button_down.connect(func():var art=b.get_child(0);art.pivot_offset=art.size*.5;art.scale=Vector2.ONE*.92)
  b.button_up.connect(func():b.get_child(0).create_tween().tween_property(b.get_child(0),"scale",Vector2.ONE,.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT))
- if title!="":label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,CREAM,true)
+ if title!="":Storybook.heading(label(b,title,Rect2(4,rect.size.y-31,rect.size.x-8,27),19,Storybook.INK,true))
  var finish=load("res://game3d/ui/button_finish.gd").new();finish.size=rect.size;finish.round_button=key=="attack" and sim.mode=="home";b.add_child(finish)
  return b
 func costs(parent:Control,values:Dictionary,pos:Vector2,width:float=390,font_size:int=18):
@@ -245,7 +246,7 @@ func build_placement_hud():
 func create_stick():
  stick=Stick.new();stick.name="VillageJoystick" if sim.mode=="home" else "CombatJoystick"
  stick.position=Vector2(0,528) if sim.mode=="home" else Vector2(0,509)
- stick.size=Vector2(172,172) if sim.mode=="home" else Vector2(220,195);hud.add_child(stick)
+ stick.size=Vector2(172,172) if sim.mode=="home" else Vector2(195,195);hud.add_child(stick)
 func update_hud():
  Hud.update(self)
 func movement() -> Vector2:
@@ -311,7 +312,7 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.15","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.16","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
 func qa_controls() -> Array:
@@ -818,15 +819,24 @@ func change_setting(key:String,value):
  get_node("SettingsSave").start()
 func open_menu():
  var p=open_dialog("menu","Am Lagerfeuer","")
- button(p,"Kampfberichte",Rect2(28,94,396,69),func():open_battle_reports(),true)
- button(p,"Grafik & Ton",Rect2(439,94,393,69),func():open_settings())
- var rows=[["hero","WASD / Stick","Held bewegen"],["move","Ziehen / zwei Finger","Kamera / Zoom"],["attack","J / Angriff halten","Schlagen"],["skill","K · Leertaste · H","Fähigkeit · Rolle · Trank"]]
- for i in range(rows.size()):
-  var y=191+i*53;icon(p,rows[i][0],Rect2(34,y,38,38));label(p,rows[i][1],Rect2(88,y,336,40),19,GOLD);label(p,rows[i][2],Rect2(450,y,356,40),18)
- label(p,(account.status if account_active else "Lokaler Spielstand")+" · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
- button(p,"Spielstand sichern / laden",Rect2(28,459,441,59),func():open_save_tools())
- if sim.active():button(p,"Angriff beenden",Rect2(500,459,328,59),func():close_dialog();end_raid())
- elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(500,459,328,59),func():return_home())
+ button(p,"Kampfberichte",Rect2(28,101,396,70),func():open_battle_reports(),true)
+ button(p,"Grafik & Ton",Rect2(439,101,393,70),func():open_settings())
+ var help=button(p,"Hilfe & Empfehlungen",Rect2(28,187,396,70),func():open_help());help.name="MenuHelp";help.add_theme_font_size_override("font_size",24)
+ var profile=button(p,"Konto & Cloud",Rect2(439,187,393,70),func():open_account());profile.name="MenuAccount"
+ var backup=button(p,"Spielstand sichern / laden",Rect2(28,273,396,70),func():open_save_tools());backup.add_theme_font_size_override("font_size",23)
+ var logout=button(p,"Abmelden",Rect2(439,273,393,70),func():logout_from_menu());logout.name="MenuLogout";logout.disabled=not account.signed_in()
+ if sim.active():logout.text="Angriff beenden & abmelden";logout.add_theme_font_size_override("font_size",21)
+ label(p,account.status if account.signed_in() else "Gastdorf · lokal gespeichert",Rect2(29,365,801,37),20,CREAM,true)
+ label(p,"Stick: Bewegen · Ziehen: Kamera · Zwei Finger: Zoom",Rect2(29,409,801,30),18,CREAM,true)
+ if sim.active():button(p,"Angriff beenden",Rect2(28,459,396,59),func():close_dialog();end_raid())
+ elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(28,459,396,59),func():return_home())
+ button(p,"Weiterspielen",Rect2(439,459,393,59),func():close_dialog(),true)
+func logout_from_menu():
+ # Settle an explicitly ended raid once before the existing durable sign-out.
+ if sim.active() and not result_shown:
+  sim.result="complete";result_shown=true;held=false;deploying=""
+  reward=sim.settle();progress.tutorial_event("battle");save()
+ await leave_account()
 
 func open_local_overview(status:bool=false):
  var p=open_dialog("local_status" if status else "tasks","Dorfstatus" if status else "Nächste Schritte","")

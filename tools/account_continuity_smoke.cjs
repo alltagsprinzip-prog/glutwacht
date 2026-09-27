@@ -26,10 +26,10 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),cloud=require('
   await page.goto(url);await wait(()=>window.__glutwacht?.mode==='home'&&window.__glutwacht.dialog==='');
   console.log('Returned to original account');
   const tap=async(test)=>{const p=await page.evaluate(src=>{const s=window.__glutwacht,b=s.controls.find(new Function('b','return '+src));if(!b)throw Error(src);return [(b.rect[0]+b.rect[2]/2)*innerWidth/s.ui_size[0],(b.rect[1]+b.rect[3]/2)*innerHeight/s.ui_size[1]]},test);await page.touchscreen.tap(...p);await page.waitForTimeout(400)};
-  await tap("b.id==='Action_portrait'");await wait(()=>window.__glutwacht.dialog==='profile');await tap("b.text==='Konto / Cloud'");await wait(()=>window.__glutwacht.dialog==='account');
-  console.log('Account dialog opened');
+  await tap("b.id==='Action_menu'");await wait(()=>window.__glutwacht.dialog==='menu');
+  console.log('Direct menu logout available');
   await page.waitForFunction(id=>{const j=JSON.parse(localStorage.getItem('glutwacht.save-journal.v1.'+id)||'{}'),m=JSON.parse(j.metadata||'{}');return m.dirty===false&&Object.keys(m.pending||{}).length===0},id,{timeout:120000});
-  console.log("Cloud is clean");await tap("b.text==='Abmelden'");await wait(()=>window.__glutwacht?.mode==='login');await page.reload();await wait(()=>window.__glutwacht?.mode==='login');
+  console.log("Cloud is clean");await tap("b.id==='MenuLogout'");await wait(()=>window.__glutwacht?.mode==='login');await page.reload();await wait(()=>window.__glutwacht?.mode==='login');
   await page.locator('#gw-email').fill('legacy@example.test');await page.locator('#gw-password').fill('Test-only-password-123');await page.locator('button[type=submit]').click();
   await wait(()=>window.__glutwacht?.mode==='home'&&window.__glutwacht.dialog==='');
   assert.equal(await page.evaluate(()=>window.__glutwacht.gold),321);assert.equal(await page.evaluate(()=>window.__glutwacht.hero),'mage');assert.deepEqual(errors,[]);

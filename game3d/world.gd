@@ -240,9 +240,7 @@ func terrain():
    var rock=mesh_node(stone,Vector3(bank,.02,z),material(Color("7b8071")),landscape);rock.scale=Vector3(1.4,.8,1);rock.rotation.y=rng.randf()*TAU
  if mode=="home":
   create_boat(-1,Color("eee5bd"));create_boat(1,Color("f2a14b"))
- for i in range(10):
-  var m=CylinderMesh.new();m.top_radius=0;m.bottom_radius=rng.randf_range(9,17);m.height=rng.randf_range(13,26);m.radial_segments=7
-  mesh_node(m,Vector3(-60+i*14,m.height/2-2,-65),material(Color("637d89")),landscape)
+ load("res://game3d/mountains.gd").build(landscape)
 # Paths follow the actual building positions, including relocated legacy buildings.
 func village_paths(sim):
  if mode!="home":return
