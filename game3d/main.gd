@@ -74,6 +74,8 @@ var account_active=false
 var cloud_clock=0.0
 var cloud_sync_paused=false
 var save_generation=0
+var cloud_sync_running=false
+var account_leaving=false
 var pending_import
 var art_preview=false
 var require_login=OS.has_feature("web") or OS.has_feature("ios")
@@ -309,7 +311,7 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.15","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.15","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
 func qa_controls() -> Array:
@@ -446,7 +448,8 @@ func _notification(what):
   save()
   if account_active and not account.busy and not cloud_sync_paused:sync_cloud()
   if not paused and build_kind=="":open_menu()
-func save():
+func save(final_save:bool=false):
+ if account_leaving and not final_save:return
  if art_preview or auth_locked():return
  if not progress.store_file(save_path):toast(progress.warning);return
  save_generation+=1
@@ -454,7 +457,7 @@ func save():
   account.dirty=true;account.save_metadata()
   if not account.busy:
    account.status="Lokal gesichert · Cloud ausstehend"
-   if not cloud_sync_paused and cloud_clock>=0:call_deferred("sync_cloud")
+   if not account_leaving and not cloud_sync_paused and cloud_clock>=0:call_deferred("sync_cloud")
 func tone(kind):
  if sound and progress.data.sound:sound.play("click" if kind=="click" else kind)
 func toast(text:String):
@@ -1027,9 +1030,11 @@ func activate_cloud(result:Dictionary):
  progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
  if progress.data.hero=="":open_tutorial()
  sync_cloud()
-func sync_cloud():
- if not account_active or account.busy or progress.write_blocked:return
- if not progress.store_file(save_path):toast(progress.warning);return
+func sync_cloud(final_save:bool=false):
+ if not account_active or cloud_sync_running or account.busy or progress.write_blocked or (account_leaving and not final_save):return
+ cloud_sync_running=true
+ if not progress.store_file(save_path):
+  cloud_sync_running=false;toast(progress.warning);return
  account.status="Wird mit Cloud synchronisiert …"
  var generation=save_generation
  var replaying=not account.pending.is_empty()
@@ -1048,17 +1053,28 @@ func sync_cloud():
   account.dirty=save_generation!=generation or (replaying and JSON.stringify(result.get("saved_snapshot",{}))!=JSON.stringify(requested_snapshot))
   account.status="Lokal gesichert · Cloud ausstehend" if account.dirty else "Cloud gesichert"
  account.save_metadata()
+ cloud_sync_running=false
 func leave_account():
+ if account_leaving:return
  if not account.pending_restore.is_empty():toast("Bitte zuerst die Wiederherstellung fortsetzen.");return
- if account.busy:toast("Bitte die laufende Sicherung abwarten.");return
- save()
+ account_leaving=true
+ var started=Time.get_ticks_msec()
+ while cloud_sync_running or account.busy:
+  if Time.get_ticks_msec()-started>20000:
+   account_leaving=false;toast("Die Sicherung läuft noch. Bitte erneut abmelden, sobald sie abgeschlossen ist.");return
+  await get_tree().process_frame
+ if account_active:account.dirty=true
+ save(true)
  if account_active:
-  await sync_cloud()
+  # An immutable retry can confirm an older request first; then save the latest village.
+  for attempt in range(2):
+   await sync_cloud(true)
+   if not account.dirty:break
   if account.dirty:
-   toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
- await account.sign_out();
+   account_leaving=false;toast("Noch nicht in der Cloud. Bitte Verbindung prüfen und erneut sichern; Abmelden wurde angehalten.");return
+ await account.sign_out()
  if social_ui!=null:social_ui.clear()
- account_active=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
+ account_active=false;account_leaving=false;save_path=Progress.SAVE;progress=Progress.new();progress.load_file(save_path);sim=Battle.new(progress.data);return_home()
  if auth_locked():update_access();open_account()
  elif progress.write_blocked:open_save_tools()
  elif progress.data.hero=="":open_tutorial()

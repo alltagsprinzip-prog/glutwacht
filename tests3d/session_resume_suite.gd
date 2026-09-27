@@ -35,8 +35,10 @@ class ResumeGame extends Main:
  func open_dialog(kind:String,_title:String,_subtitle:String) -> Panel:
   dialog=kind;var p=Panel.new();add_child(p);return p
 class SyncAccount extends Account:
+ var uploads=0
  var during_upload:Callable
  func upload(snapshot:Dictionary) -> Dictionary:
+  uploads+=1
   var saved=pending.get("p_snapshot",snapshot).duplicate(true)
   busy=true
   if during_upload.is_valid():during_upload.call()
@@ -112,6 +114,9 @@ func run():
  var latest_raw=JSON.stringify(latest_meta)
  var journal=JSON.stringify({"user_id":a.user_id,"snapshot":original,"metadata":latest_raw})
  check(Account.recoverable_journal(journal,a.user_id,"{}").get("snapshot","")==original,"reload journal preserves newer village bytes before IndexedDB catches up")
+ check(Account.journal_covers_save(journal,a.user_id,original,latest_raw),"durable browser journal confirms exact village and receipt")
+ check(not Account.journal_covers_save(journal,a.user_id,original+" ",latest_raw),"older browser journal cannot confirm newer village")
+ check(not Account.journal_covers_save(journal,a.user_id,original,latest_raw+" "),"older browser journal cannot confirm newer receipt")
  check(Account.recoverable_journal(journal,a.user_id,latest_raw).get("metadata","")==latest_raw,"village and immutable receipt recover as one record")
  check(Account.recoverable_journal(journal,Account.uuid(),"{}").is_empty(),"journal cannot cross account boundaries")
  latest_meta.local_sequence+=1
@@ -133,6 +138,19 @@ func run():
  check(sync_account.dirty,"replayed older receipt still leaves the newer local village dirty")
  await sync_game.sync_cloud()
  check(not sync_account.dirty,"newer village becomes clean after its own confirmation")
+ var before_uploads=sync_account.uploads
+ sync_account.during_upload=func():
+  sync_account.busy=false
+  sync_game.sync_cloud()
+ await sync_game.sync_cloud()
+ check(sync_account.uploads==before_uploads+1,"sync mutex covers gaps between account operations")
+ sync_game.account_leaving=true
+ var before_generation=sync_game.save_generation
+ sync_game.save();await sync_game.sync_cloud()
+ check(sync_account.uploads==before_uploads+1 and sync_game.save_generation==before_generation,"logout suppresses background saves and deferred uploads")
+ sync_account.during_upload=Callable()
+ await sync_game.sync_cloud(true)
+ check(sync_account.uploads==before_uploads+2 and not sync_account.dirty,"logout can explicitly complete its final save")
  sync_game.queue_free();await process_frame
  for suffix in ["",".tmp",".before-hud"]:DirAccess.remove_absolute("user://sync-generation-test.json"+suffix)
  g.queue_free();await process_frame

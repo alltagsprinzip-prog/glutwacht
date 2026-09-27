@@ -231,28 +231,18 @@ func resume_pending_save(meta:Dictionary) -> Dictionary:
  # Never mark the local village clean: it may contain actions after the request.
  if not save_metadata():return {"ok":false,"message":"Sicherungsbestätigung konnte lokal nicht gespeichert werden."}
  return result
+static func journal_covers_save(raw:String,user:String,snapshot:String,metadata:String) -> bool:
+ var journal=recoverable_journal(raw,user,metadata)
+ return not journal.is_empty() and journal.snapshot==snapshot and journal.metadata==metadata
 func flush_pending_save() -> bool:
  if not OS.has_feature("web") or not storage_enabled:return true
- # FileAccess writes to Emscripten memory first. The immutable receipt and the
- # village must reach IndexedDB BEFORE the server can accept another revision.
- # A lost acknowledgement can then always be recovered with this exact request.
- busy=true
- JavaScriptBridge.eval("""
- (()=>{
-  const state={done:false,ok:false};window.__glutwachtSaveFlush=state;
-  const flush=()=>{
-   if(typeof GodotFS==='undefined'||!GodotFS.is_persistent()){state.done=true;return;}
-   if(GodotFS._syncing){setTimeout(flush,10);return;}
-   GodotFS.sync().then(error=>{state.ok=!error;state.done=true;}).catch(()=>{state.done=true;});
-  };flush();
- })()
- """,false)
- var start=Time.get_ticks_msec()
- while not bool(JavaScriptBridge.eval("!!window.__glutwachtSaveFlush?.done",true)):
-  if Time.get_ticks_msec()-start>15000:busy=false;return false
-  await get_tree().process_frame
- var ok=bool(JavaScriptBridge.eval("!!window.__glutwachtSaveFlush?.ok",true))
- busy=false;return ok
+ # save_metadata atomically persists village + immutable receipt in localStorage.
+ # Read back both exact strings before uploading. Do not compete with Godot's
+ # own IndexedDB sync: its private _syncing flag can remain busy indefinitely.
+ var village="user://account-"+user_id+".json"
+ if not FileAccess.file_exists(village) or not FileAccess.file_exists(metadata_path()):return false
+ var raw=JavaScriptBridge.eval("(()=>{try{return localStorage.getItem("+JSON.stringify("glutwacht.save-journal.v1."+user_id)+")||''}catch(e){return ''}})()",true)
+ return raw is String and journal_covers_save(raw,user_id,FileAccess.get_file_as_string(village),FileAccess.get_file_as_string(metadata_path()))
 func upload(snapshot:Dictionary) -> Dictionary:
  if not pending_restore.is_empty():return {"ok":false,"message":"Wiederherstellung zuerst abschließen.","code":"restore_pending"}
  if not signed_in() or not loaded:return {"ok":false,"message":"Zuerst den Cloud-Stand prüfen."}

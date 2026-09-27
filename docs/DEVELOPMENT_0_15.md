@@ -23,3 +23,18 @@ Local: release rules187/187, accounts37/37, session resume30/30, HUD222/222, her
 ## Art
 unit-faces.webp: original generated portrait atlas; 1024×512 (optimized from original 2048×1024); warrior/ninja/shaman/mage, melee/archer/shield/engineer.
 Recorded Foley source and license: assets3d/audio/LICENSE.txt. Background music: original generated synthesis in scripts/audio.gd.
+
+### Logout durability fix (2026-09-27)
+The browser logout gate reproduced a permanently busy GodotFS IndexedDB sync flag.
+Cloud uploads now read back and validate the atomic account-specific localStorage
+journal (exact village and metadata/receipt strings) instead of starting a competing
+engine filesystem sync. Missing, stale or unwritable journal data still blocks upload.
+A full-operation sync mutex and logout guard prevent background/deferred uploads
+from racing the final save. Logout waits for an active operation and can confirm an
+older immutable receipt followed by the latest village before clearing the session.
+
+Verified locally: session-resume suite 36/36; exported-browser account continuity
+passes with the existing 0.14 fixture, two isolated accounts, logout, reload, login,
+and unchanged hero/resources. `tools/account_continuity_smoke.cjs` reproduces this
+regression independently of the longer battle gate. Release CI and deployment are
+still required for this source revision.
