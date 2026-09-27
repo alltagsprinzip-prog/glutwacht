@@ -73,6 +73,7 @@ var social_ui
 var account_active=false
 var cloud_clock=0.0
 var cloud_sync_paused=false
+var save_generation=0
 var pending_import
 var art_preview=false
 var require_login=OS.has_feature("web") or OS.has_feature("ios")
@@ -448,6 +449,7 @@ func _notification(what):
 func save():
  if art_preview or auth_locked():return
  if not progress.store_file(save_path):toast(progress.warning);return
+ save_generation+=1
  if account_active:
   account.dirty=true;account.save_metadata()
   if not account.busy:
@@ -1029,6 +1031,9 @@ func sync_cloud():
  if not account_active or account.busy or progress.write_blocked:return
  if not progress.store_file(save_path):toast(progress.warning);return
  account.status="Wird mit Cloud synchronisiert …"
+ var generation=save_generation
+ var replaying=not account.pending.is_empty()
+ var requested_snapshot=progress.data.duplicate(true)
  var result=await account.upload(progress.data)
  if not result.ok:
   cloud_sync_paused=result.get("code","")=="revision_conflict"
@@ -1037,7 +1042,10 @@ func sync_cloud():
   if cloud_sync_paused:toast(account.status)
  else:
   cloud_sync_paused=false
-  account.dirty=JSON.stringify(result.get("saved_snapshot",{}))!=JSON.stringify(progress.data)
+  # Production advances its timestamp continuously and is reconstructed on load.
+  # Only subsequent saves need another upload. A replay of an older immutable
+  # receipt must still be followed by the newer village, even after a restart.
+  account.dirty=save_generation!=generation or (replaying and JSON.stringify(result.get("saved_snapshot",{}))!=JSON.stringify(requested_snapshot))
   account.status="Lokal gesichert · Cloud ausstehend" if account.dirty else "Cloud gesichert"
  account.save_metadata()
 func leave_account():

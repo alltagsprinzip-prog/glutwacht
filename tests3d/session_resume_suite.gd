@@ -34,6 +34,14 @@ class ResumeGame extends Main:
  func activate_cloud(_result:Dictionary):activated="cloud"
  func open_dialog(kind:String,_title:String,_subtitle:String) -> Panel:
   dialog=kind;var p=Panel.new();add_child(p);return p
+class SyncAccount extends Account:
+ var during_upload:Callable
+ func upload(snapshot:Dictionary) -> Dictionary:
+  var saved=pending.get("p_snapshot",snapshot).duplicate(true)
+  busy=true
+  if during_upload.is_valid():during_upload.call()
+  busy=false;pending.clear()
+  return {"ok":true,"saved_snapshot":saved}
 func check(ok:bool,title:String):
  checks+=1
  if not ok:failures+=1;push_error(title)
@@ -110,6 +118,23 @@ func run():
  check(Account.recoverable_journal(journal,a.user_id,JSON.stringify(latest_meta)).is_empty(),"stale journal cannot replace a newer IndexedDB save")
  var corrupt=JSON.parse_string(journal);corrupt.snapshot='{"invalid":true}'
  check(Account.recoverable_journal(JSON.stringify(corrupt),a.user_id,"{}").is_empty(),"corrupt journal leaves existing village untouched")
+ var sync_game=ResumeGame.new();root.add_child(sync_game)
+ var sync_account=SyncAccount.new();sync_game.add_child(sync_account);sync_game.account=sync_account;sync_account.storage_enabled=false
+ sync_game.progress=Progress.new();sync_game.progress.choose_hero("mage");sync_game.account_active=true;sync_game.cloud_clock=-1
+ sync_game.save_path="user://sync-generation-test.json"
+ sync_account.during_upload=func():sync_game.progress.production(float(sync_game.progress.data.last_production)+2)
+ await sync_game.sync_cloud()
+ check(not sync_account.dirty,"regenerable production tick does not prevent a confirmed save becoming clean")
+ sync_account.during_upload=func():sync_game.progress.data.gold+=1;sync_game.save()
+ await sync_game.sync_cloud()
+ check(sync_account.dirty,"a player action during upload still requires another save")
+ sync_account.during_upload=Callable();sync_account.pending={"p_snapshot":sync_game.progress.data.duplicate(true)};sync_game.progress.data.gold+=3
+ await sync_game.sync_cloud()
+ check(sync_account.dirty,"replayed older receipt still leaves the newer local village dirty")
+ await sync_game.sync_cloud()
+ check(not sync_account.dirty,"newer village becomes clean after its own confirmation")
+ sync_game.queue_free();await process_frame
+ for suffix in ["",".tmp",".before-hud"]:DirAccess.remove_absolute("user://sync-generation-test.json"+suffix)
  g.queue_free();await process_frame
  for file in [path,path.trim_suffix(".json")+".sync.json"]:
   for suffix in ["",".tmp",".before-hud"]:DirAccess.remove_absolute(file+suffix)
