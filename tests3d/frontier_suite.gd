@@ -42,6 +42,7 @@ func run():
   check(absf(item.get_global_rect().end.x-game.safe_rect().end.x)<.1,"utility button on usable right edge: "+str(item.name))
  var collect_caption=game.collect_button.get_child(1)
  check(collect_caption.position.x+collect_caption.size.x<=game.collect_button.size.x,"collect caption remains inside its button at the screen edge")
+ check(collect_caption.get_theme_font("font").get_string_size(collect_caption.text,HORIZONTAL_ALIGNMENT_LEFT,-1,collect_caption.get_theme_font_size("font_size")).x<=game.collect_button.size.x-24,"collect label fits within the visible cream area")
  var mountain=game.world.landscape.find_child("MountainRange",true,false)
  check(mountain!=null and mountain.mesh is ArrayMesh and mountain.get_aabb().end.z<-75,"continuous rock ridge stays outside maximum village area")
  game.open_menu()

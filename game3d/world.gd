@@ -214,9 +214,9 @@ func batch_static_landscape():
    for surface in range(remainder.get_surface_count()):node.set_surface_override_material(surface,null)
 func terrain():
  var surf=SurfaceTool.new();surf.begin(Mesh.PRIMITIVE_TRIANGLES)
- for x in range(-82,82,2):
-  for z in range(-82,82,2):
-   for v in [Vector2(x,z),Vector2(x+2,z),Vector2(x,z+2),Vector2(x+2,z),Vector2(x+2,z+2),Vector2(x,z+2)]:
+ for x in range(-144,144,4):
+  for z in range(-164,132,4):
+   for v in [Vector2(x,z),Vector2(x+4,z),Vector2(x,z+4),Vector2(x+4,z),Vector2(x+4,z+4),Vector2(x,z+4)]:
     var meadow=clampf((sin(v.x*.08)+cos(v.y*.09)+2.0)/4.0,0,1)
     var c=Color("548d38").lerp(Color("98b957"),meadow*.65)
     var noise=sin(v.x*.4+v.y*.25)*.017+rng.randf_range(-.012,.012)
@@ -227,9 +227,9 @@ func terrain():
  if mode=="home":
   mat.set_shader_parameter("grass_dark",Color("30442c"));mat.set_shader_parameter("grass_light",Color("718454"))
  var water=SurfaceTool.new();water.begin(Mesh.PRIMITIVE_TRIANGLES)
- for i in range(132):
+ for i in range(288):
   for point in [Vector2(0,i),Vector2(1,i),Vector2(0,i+1),Vector2(1,i),Vector2(1,i+1),Vector2(0,i+1)]:
-   var z=point.y-66;var x=Nature.river_x(z)+(point.x-.5)*Nature.river_width(z)
+   var z=point.y-156;var x=Nature.river_x(z)+(point.x-.5)*Nature.river_width(z)
    water.set_uv(Vector2(point.x,z*.15));water.set_normal(Vector3.UP);water.add_vertex(Vector3(x,.09,z))
  mesh_node(water.commit(),Vector3.ZERO,water_material(),landscape)
  asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),10.2,"width",PI/2)
@@ -240,7 +240,12 @@ func terrain():
    var rock=mesh_node(stone,Vector3(bank,.02,z),material(Color("7b8071")),landscape);rock.scale=Vector3(1.4,.8,1);rock.rotation.y=rng.randf()*TAU
  if mode=="home":
   create_boat(-1,Color("eee5bd"));create_boat(1,Color("f2a14b"))
- load("res://game3d/mountains.gd").build(landscape)
+ var mountains=load("res://game3d/mountains.gd");mountains.build(landscape)
+ for i in range(33):
+  var x=-105.0+i*7.0;var z=-80.0-sin(i*2.37)*2.0
+  if absf(x-Nature.river_x(z))<Nature.river_width(z):continue
+  var h=mountains.elevation(x,z,mountains.terrain_noise)
+  Nature.tree(landscape,Vector3(x,h-.2,z),5.0+sin(i*1.3)*1.7,i+812)
 # Paths follow the actual building positions, including relocated legacy buildings.
 func village_paths(sim):
  if mode!="home":return

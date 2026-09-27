@@ -2,7 +2,8 @@ extends RefCounted
 # A continuous limestone ridge beyond the largest village boundary. Deterministic
 # geometry is shared across home/scout rebuilds; there are no conical primitives.
 static var cached: ArrayMesh
-static var rock: StandardMaterial3D
+static var rock: ShaderMaterial
+static var terrain_noise:FastNoiseLite
 static func build(parent:Node3D):
  if cached==null:make_mesh()
  var ridge=MeshInstance3D.new();ridge.name="MountainRange";ridge.mesh=cached;ridge.material_override=rock
@@ -19,7 +20,7 @@ static func elevation(x:float,z:float,noise:FastNoiseLite) -> float:
  var detail=noise.get_noise_2d(x*9.0,z*9.0)*1.7
  return maxf(0.0,(profile*peaks*(.68+ridge*.65)+erosion+detail)*edge*side)
 static func make_mesh():
- var noise=FastNoiseLite.new();noise.seed=49182;noise.frequency=.032;noise.noise_type=FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+ var noise=FastNoiseLite.new();noise.seed=49182;noise.frequency=.032;noise.noise_type=FastNoiseLite.TYPE_SIMPLEX_SMOOTH;terrain_noise=noise
  noise.fractal_octaves=4;noise.fractal_gain=.48
  var vertices=PackedVector3Array();var normals=PackedVector3Array();var colors=PackedColorArray();var indices=PackedInt32Array()
  const NX=145
@@ -44,4 +45,6 @@ static func make_mesh():
    indices.append_array(PackedInt32Array([a,b,c,b,d,c]))
  var arrays=[];arrays.resize(Mesh.ARRAY_MAX);arrays[Mesh.ARRAY_VERTEX]=vertices;arrays[Mesh.ARRAY_NORMAL]=normals;arrays[Mesh.ARRAY_COLOR]=colors;arrays[Mesh.ARRAY_INDEX]=indices
  cached=ArrayMesh.new();cached.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
- rock=StandardMaterial3D.new();rock.vertex_color_use_as_albedo=true;rock.roughness=.96
+ var grain=FastNoiseLite.new();grain.seed=8947;grain.frequency=.018;grain.fractal_octaves=4;grain.fractal_gain=.57
+ var texture=NoiseTexture2D.new();texture.width=512;texture.height=512;texture.seamless=true;texture.generate_mipmaps=true;texture.noise=grain
+ rock=ShaderMaterial.new();rock.shader=load("res://game3d/mountain_rock.gdshader");rock.set_shader_parameter("rock_noise",texture)

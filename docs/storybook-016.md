@@ -16,7 +16,8 @@ Speicherpfade, Save-Schema 7, Konten und Cloud-Protokoll bleiben erhalten.
   unsichtbare Polster und die rechteckige Kampffläche sind entfernt.
 - Die zehn regelmäßigen Bergkegel sind durch einen zusammenhängenden,
   unregelmäßigen Felszug mit Erosionsrinnen, Schichten und bewachsenen
-  unteren Flächen ersetzt. Er liegt außerhalb der maximalen Dorfgrenze.
+  unteren Flächen, eigener Felsoberfläche und Bäumen am Bergfuß ersetzt.
+  Wiese und Fluss reichen über den sichtbaren Kamerabereich hinaus. Er liegt außerhalb der maximalen Dorfgrenze.
 - Konto, Hilfe und Abmelden stehen direkt im Hauptmenü. Der ausdrücklich
   beschriftete Kampfabmeldeknopf rechnet den Angriff einmal ab und nutzt
   anschließend die vorhandene dauerhafte Sicherung vor dem Abmelden.
@@ -25,7 +26,7 @@ Speicherpfade, Save-Schema 7, Konten und Cloud-Protokoll bleiben erhalten.
 
 - HUD-Geometrie: 222/222 Prüfungen.
 - Vorhandenes 0.14-Dorf, Safe-Area, Ressourcen, Gebäudeinformationen,
-  Einstellungen, weite Einsatzfläche und Tippen/Halten: 65/65 Prüfungen.
+  Einstellungen, weite Einsatzfläche und Tippen/Halten: 66/66 Prüfungen.
 - Unterbrochene Cloud-Sicherung und Wiedereinstieg: 36/36 Prüfungen.
 - iPhone-13-Querformat im Chromium-Test: alter Kontospielstand, Hilfe,
   Sammeln, Einstellungen über Neuladen und Helden-/Truppeneinsatz bestanden.

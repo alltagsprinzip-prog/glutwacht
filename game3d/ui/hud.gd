@@ -32,7 +32,7 @@ static func build(g):
   else:home(g)
  elif g.sim.mode=="scout":scout(g)
  else:combat(g)
- g.hud_widgets.help=dock(g.button(g.hud,"?",Rect2(1174,124 if g.sim.active() else 288,86,76),func():g.open_help()))
+ g.hud_widgets.help=dock(g.button(g.hud,"?",Rect2(1148,124 if g.sim.active() else 288,112,76),func():g.open_help()))
  g.hud_widgets.help.name="HelpDock";g.hud_widgets.help.add_theme_font_size_override("font_size",39)
  g.hud_widgets.help.tooltip_text="Hilfe & nächstes Upgrade"
  update(g)
@@ -56,19 +56,19 @@ static func top(g):
   var track=ColorRect.new();track.position=Vector2(x+68,61);track.size=Vector2(125,5);track.color=Color("0c1d30");track.mouse_filter=Control.MOUSE_FILTER_IGNORE;g.hud.add_child(track)
   var meter=ColorRect.new();meter.size=Vector2(0,5);meter.color=[Color("d8a163"),Color("adcede"),GOLD][i];meter.mouse_filter=Control.MOUSE_FILTER_IGNORE;track.add_child(meter);g.resource_bars[key]=meter
  dock(action(g,"menu","",Rect2(1174,18,86,62),func():g.open_menu()))
- dock(action(g,"tasks","ZIELE",Rect2(20,173,96,82),func():g.open_tasks()),"left")
- dock(action(g,"shop","SHOP",Rect2(1174,100,86,82),func():g.open_shop()))
+ dock(action(g,"tasks","ZIELE",Rect2(20,173,112,82),func():g.open_tasks()),"left")
+ dock(action(g,"shop","SHOP",Rect2(1148,100,112,82),func():g.open_shop()))
  g.hud_widgets.sync=text(g,"",Rect2(114,82,205,22),15,TEXT)
  g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 static func home(g):
- var friends=dock(g.button(g.hud,"FREUNDE",Rect2(20,270,96,66),func():g.open_social()),"left");friends.add_theme_font_size_override("font_size",16);friends.size=Vector2(96,66)
+ var friends=dock(g.button(g.hud,"FREUNDE",Rect2(20,270,112,66),func():g.open_social()),"left");friends.add_theme_font_size_override("font_size",14);friends.size=Vector2(112,66)
  g.create_stick()
- g.collect_button=dock(action(g,"collect","SAMMELN",Rect2(1174,194,86,82),func():g.collect_resources(),true));g.collect_button.name="CollectAll";g.collect_button.tooltip_text="Alle verfügbaren Ressourcen einsammeln"
- g.collect_button.get_child(1).add_theme_font_size_override("font_size",14);g.collect_button.get_child(1).size=Vector2(78,29)
+ g.collect_button=dock(action(g,"collect","SAMMELN",Rect2(1148,194,112,82),func():g.collect_resources(),true));g.collect_button.name="CollectAll";g.collect_button.tooltip_text="Alle verfügbaren Ressourcen einsammeln"
+ g.collect_button.get_child(1).add_theme_font_size_override("font_size",14);g.collect_button.get_child(1).size=Vector2(104,29)
  if g.progress.tutorial_step()!="done":
   var next=g.progress.tutorial_step()
   var captions={"hero":"Helden wählen","build":"Sägewerk bauen","upgrade":"Haupthaus ausbauen","train":"Helden trainieren","battle":"Erstes Lager angreifen"}
-  var tutorial=dock(g.button(g.hud,"WEITER: "+captions[next],Rect2(20,355,232,62),func():g.open_tutorial(),true),"left");tutorial.name="TutorialNext";tutorial.add_theme_font_size_override("font_size",16)
+  var tutorial=dock(g.button(g.hud,"Einführung",Rect2(20,355,196,62),func():g.open_tutorial(),true),"left");tutorial.name="TutorialNext";tutorial.add_theme_font_size_override("font_size",19);tutorial.tooltip_text=captions[next];tutorial.size=Vector2(196,62)
  var attack=dock(action(g,"attack","ANGRIFF",Rect2(1074,524,186,180),func():g.open_raid(),true));attack_skin(g,attack)
  attack.get_child(0).position=Vector2(38,15);attack.get_child(0).size=Vector2(110,110)
  attack.get_child(1).position=Vector2(5,130);attack.get_child(1).size=Vector2(176,36);attack.get_child(1).add_theme_font_size_override("font_size",26)
@@ -79,7 +79,7 @@ static func home(g):
  for i in range(4):
   var tile=action(g,keys[i],titles[i],Rect2(370+i*146,586,132,118),callbacks[i])
   tile.get_child(0).position=Vector2(29,6);tile.get_child(0).size=Vector2(74,74)
-  tile.get_child(1).add_theme_font_size_override("font_size",19);tile.get_child(1).size=Vector2(124,29)
+  tile.get_child(1).add_theme_font_size_override("font_size",18);tile.get_child(1).size=Vector2(124,29)
  if g.selected_building!="":
   var b=g.progress.find_building(g.selected_building)
   if b.is_empty():return
