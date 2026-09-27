@@ -1,0 +1,28 @@
+name: Verify published Glutwacht 0.17
+on:
+  push:
+    branches: [release/testflight-017-20260927]
+    paths: [.github/workflows/public-site-017.yml, tools/public_site_smoke.cjs]
+permissions:
+  contents: read
+jobs:
+  public-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Set up software WebGL browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/public-browser" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/public-browser/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Check deployed bytes and play the published site
+        run: NODE_PATH="$RUNNER_TEMP/public-browser/node_modules" node tools/public_site_smoke.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: public-site-017
+          path: logs/public-site
+          retention-days: 7

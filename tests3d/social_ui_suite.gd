@@ -17,7 +17,15 @@ func run():
  for i in range(5):await process_frame
  g.progress.choose_hero("warrior");g.sim.home();g.cloud_sync_paused=true
  g.open_tasks();check(g.dialog=="tasks","quest panel opens");await shot("quests")
- g.task_page=4;g.open_tasks();check(g.task_page==4,"last quest page reachable")
+ var last_page=maxi(0,ceili(g.progress.active_tasks().size()/4.0)-1)
+ for i in range(last_page):
+  var next=null
+  for control in g.modal.find_children("*","Button",true,false):
+   if control.text=="→":next=control;break
+  check(next!=null and not next.disabled,"next dynamic quest page is available")
+  if next!=null and not next.disabled:next.pressed.emit()
+  await process_frame
+ check(g.task_page==last_page,"last active quest page reachable through navigation")
  g.reward={"level_before":1,"level_after":2};g.show_battle_completion();check(g.dialog=="level_up","level-up celebration opens");await shot("hero-level")
  g.open_result();check(g.dialog=="result","celebration can be skipped immediately")
  var social=load("res://game3d/ui/social.gd").new();g.add_child(social);social.setup(g)
