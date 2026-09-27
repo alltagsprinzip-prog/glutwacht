@@ -87,7 +87,8 @@ def main():
         report = summarize(get('/v1/builds?'+query, token()),target)
         print(json.dumps(report),flush=True)
         Path('apple-status.json').write_text(json.dumps(report,indent=2)+'\n')
-        if report['processing'] in ('VALID','FAILED','INVALID'):
+        ready = report.get('processing') == 'VALID' and not report.get('expired') and report.get('internal_state') == 'IN_BETA_TESTING' and report.get('assigned_to_glutwacht_test')
+        if report['processing'] in ('FAILED','INVALID') or (report['processing'] == 'VALID' and (os.environ.get('REQUIRE_READY') != '1' or ready)):
             break
         if attempt < 14:
             time.sleep(30)
@@ -97,6 +98,8 @@ def main():
             out.write('Apple read-only verification\n\n```json\n'+json.dumps(report,indent=2)+'\n```\n')
     if report['processing'] in ('FAILED','INVALID'):
         raise SystemExit('Apple rejected build processing')
+    if os.environ.get('REQUIRE_READY') == '1' and not ready:
+        raise SystemExit('Upload is not yet confirmed available in the existing Glutwacht test group; check Apple processing/group status before announcing an update.')
 
 if __name__=='__main__':
     try:

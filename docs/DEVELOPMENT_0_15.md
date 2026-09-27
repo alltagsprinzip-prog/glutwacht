@@ -38,3 +38,13 @@ passes with the existing 0.14 fixture, two isolated accounts, logout, reload, lo
 and unchanged hero/resources. `tools/account_continuity_smoke.cjs` reproduces this
 regression independently of the longer battle gate. Release CI and deployment are
 still required for this source revision.
+
+### TestFlight follow-up (2026-09-27)
+Browser 0.15 is live (Site version 11); the previous installed TestFlight release
+remains 0.14.0 (9.0.0). Publish the same game source as native 0.15.0 through the
+existing signing/upload workflow and unchanged bundle ID. The release pipeline
+now checks this exact workflow build against Apple's processing state and the
+existing `Glutwacht test` group before reporting availability. No new testers
+or invitations are created. Device update acceptance is still a user/device test.
+The additional referenced design image was not attached in this conversation;
+navy/gold Heroic Pop styling is implemented, but exact 1:1 fidelity is unconfirmed.
