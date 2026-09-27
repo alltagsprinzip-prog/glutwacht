@@ -1,0 +1,16 @@
+# Glutwacht 0.19 – 27.09.2026
+
+Weiterarbeit auf dem bestätigten 0.18-Stand e15d43c. Kein Neustart; Schema 7, Accounts, Held, Gebäude, Jobs, soziale Daten, native Bundle-ID und Webpfad /v08/ bleiben bestehen.
+
+- Modernes grünes HUD mit dünnen goldenen Kanten, gut lesbarer Sans-Schrift, tatsächlichen Innenabständen und kleinerer sichtbarer unterer Leiste bei 96 Pixel hohen Spielkoordinaten-Touchflächen.
+- Linke und rechte Bedienelemente halten 12 Spielkoordinaten-Pixel Abstand innerhalb der Safe Area. Aktueller Auftrag ersetzt die alten Nullabstands-Tests.
+- Weltkoordinaten-Materialien für Pflaster, Kies und Erde; gemeinsame automatische Strecken statt Sternnetz, abgerundete Umwege um Gebäude. Maximal drei Meshes/Materialien pro Dorfwegnetz. Materialkarten zeigen echte 3D-Vorschauen desselben Shaders. Save-Vertrag unverändert.
+- Jadeprüfung I läuft im vorhandenen 3D-Weltfenster mit Truppenleiste unten, Heldenplatzierung, Joystick, Zielwahl, manueller Angriffstaste, Heilung, Kampfruf und Rolle. Eine Prüfung dauert bis zu 72 fortlaufende Kampfsekunden. Sieg benötigt Halle und Türme, keine vollständige Mauerzerstörung.
+- Neues versioniertes Eingabeprotokoll auf der bestehenden privaten Match-Tabelle. Server berechnet jeden 100-ms-Schritt aus Eingaben; keine Clientpunkte oder HP werden übernommen. Client sagt Eingaben voraus und gleicht bestätigte Zustände ab. Batches und lokale Eingabewarteschlange sind wiederholbar. Alte laufende Runden werden einschließlich Einheiten, HP, Reserven und vergangener Kampfzeit übernommen. Bestwerte werden weiterhin nur erhöht; keinerlei Dorfinventar-Belohnung hinzugefügt.
+- Neue SQL-Migration ist additiv; alte Clients können einen bereits umgestellten Echtzeitversuch nicht durch alte Rundenbefehle verändern. Bestehende normale Spiel- und Accountfunktionen bleiben verfügbar.
+
+Gezielt lokal bestanden: PostgreSQL/PGlite 19/19 (synthetische Identitäten), vollständiger server/client-Replay über 720 Eingaben, HUD/Alt-Spielstand/Wege 150/150 und 92/92, allgemeines HUD 197/197. Die additive Migration `20260927193048_live_jade_trial.sql` ist live angewendet. Anonyme Aufrufe und direkter Clientzugriff auf private Simulationsfunktionen sind gesperrt; nur die authentifizierte RPC-Fassade ist zugänglich. Kein realer Nutzerstand wurde für die SQL-Prüfung verändert. Render-, iPhone-Browser- und Veröffentlichungsstatus wird nach erfolgreicher Prüfung ergänzt. Kein physischer iPhone-Test behauptet.
+
+Native Vorprüfung auf Commit `ebf3a3b620c9fb4c025ed21192512114d2c69c5b` erfolgreich (Workflow 36345629108): 65/65 echte synthetische Touch-Eingaben einschließlich Jade-Held einsetzen, gleichzeitig bewegen und angreifen, Zielwahl, Soldat einsetzen, Kampfruf, Rolle und kontinuierlicher Zeit. Account-/Sitzungs-/Recovery-, Alt-Spielstand-, Kampagnen- und Wegeregressionen bestanden. Browser-/Gerätegrenzen: automatisierte Maus-/Touch-Injektion ist kein Test auf einem physischen iPhone.
+
+Nachtrag aus dem laufenden Auftrag: Schalter 1× / 2× rechts im normalen Angriff und in der Jadeprüfung. Beschleunigt Kämpfer, Angriffe, Fähigkeiten und Kampfzeit gemeinsam; Dorfproduktion und Eingabegesten bleiben in Echtzeit. Server erlaubt höchstens doppeltes Kampftempo; Wertung bleibt in Simulationszeit. Separate additive Migration `battle_double_speed`, kein Save-Formatwechsel.

@@ -1,0 +1,161 @@
+name: Publish Glutwacht to TestFlight
+on:
+  workflow_dispatch:
+  push:
+    branches: [update/masterplan-online-20260925]
+    paths:
+      - '.github/workflows/publish-testflight.yml'
+      - 'tools/publish_testflight.py'
+permissions:
+  contents: read
+concurrency:
+  group: glutwacht-testflight
+  # This development branch publishes its newest complete state. Superseded
+  # visual-review builds must not block the current requested update.
+  cancel-in-progress: true
+jobs:
+  native-preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify account isolation, recovery and social authorization
+        run: npm ci --ignore-scripts --no-audit --no-fund && npm test
+        working-directory: backend/tests
+      - run: |
+          python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/native-account.log godot --headless --path . --script tests3d/native_account_suite.gd
+          python3 tools/check_godot.py logs/account-save.log godot --headless --path . --script tests3d/account_save_suite.gd
+      - name: Persistent native sessions, remembered emails and hero movement
+        run: |
+          python3 tools/check_godot.py logs/native-session.log godot --headless --path . --script tests3d/native_session_suite.gd
+          python3 tools/check_godot.py logs/comfort.log godot --headless --path . --script tests3d/comfort_suite.gd
+          python3 tools/check_godot.py logs/hud-rules.log godot --headless --path . --script tests3d/hud_rules.gd
+          python3 tools/check_godot.py logs/release-gate.log godot --headless --path . --script tests3d/release_gate.gd
+      - name: Cloud recovery, retry safety and restoration freeze
+        run: python3 tools/check_godot.py logs/cloud-recovery.log godot --headless --path . --script tests3d/cloud_recovery_suite.gd
+      - name: Land, potion effects, level gates and varied camps
+        run: python3 tools/check_godot.py logs/jade.log godot --headless --path . --script tests3d/jade_suite.gd
+      - name: Safe-area controls and saved village path editor
+        run: python3 tools/check_godot.py logs/roads.log godot --headless --path . --script tests3d/roads_suite.gd
+      - name: Quest progression and battle reports
+        run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd
+      - name: Live trial authority, client prediction and 1x/2x attack speed
+        run: |
+          node backend/tests/live_trial.mjs
+          python3 tools/check_godot.py logs/live-trial.log godot --headless --path . --script tests3d/live_trial_suite.gd
+          python3 tools/check_godot.py logs/interface019.log godot --headless --path . --script tests3d/interface019_suite.gd
+      - name: 0.19 saved village, wrapped labels, batched architecture and direct menu logout
+        run: |
+          python3 tools/check_godot.py logs/session-resume.log godot --headless --path . --script tests3d/session_resume_suite.gd
+          python3 tools/check_godot.py logs/frontier.log godot --headless --path . --script tests3d/frontier_suite.gd
+      - name: Campaign and tutorial migration
+        run: |
+          python3 tools/check_godot.py logs/campaign.log godot --headless --path . --script tests3d/campaign_suite.gd
+          python3 tools/check_godot.py logs/onboarding.log godot --headless --path . --script tests3d/onboarding_sync_suite.gd
+      - name: Preserve saves and verify village expansion
+        run: |
+          python3 tools/check_godot.py logs/release.log godot --headless --path . --script tests3d/release_suite.gd
+          python3 tools/check_godot.py logs/hud-layout.log godot --headless --path . --script tests3d/hud_layout_suite.gd
+      - name: Render Heroic gameplay and verify manual hero deployment
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/heroic
+        run: |
+          mkdir -p logs/heroic
+          python3 tools/check_godot.py logs/heroic.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/heroic_suite.gd
+      - name: Render social and recovery screens and verify touch controls
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/social
+        run: |
+          mkdir -p logs/social
+          python3 tools/check_godot.py logs/social-ui.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/social_ui_suite.gd
+          python3 tools/check_godot.py logs/input.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/input_suite.gd
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: testflight-preflight
+          path: logs
+  xcode-project:
+    needs: native-preflight
+    runs-on: macos-15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install official Godot macOS editor and iOS templates
+        shell: bash
+        run: |
+          set -euo pipefail
+          godot_root="$RUNNER_TEMP/glutwacht-godot"
+          mkdir -p "$godot_root/bin"
+          release="https://github.com/godotengine/godot-builds/releases/download/4.7.2-stable"
+          curl --fail --location --retry 3 "$release/Godot_v4.7.2-stable_macos.universal.zip" -o "$godot_root/editor.zip"
+          unzip -q "$godot_root/editor.zip" -d "$godot_root"
+          ln -s "$godot_root/Godot.app/Contents/MacOS/Godot" "$godot_root/bin/godot"
+          echo "$godot_root/bin" >> "$GITHUB_PATH"
+          curl --fail --location --retry 3 "$release/Godot_v4.7.2-stable_export_templates.tpz" -o "$godot_root/templates.tpz"
+          templates_root="$HOME/Library/Application Support/Godot/export_templates/4.7.2.stable"
+          mkdir -p "$templates_root"
+          unzip -j -q "$godot_root/templates.tpz" templates/ios.zip templates/version.txt -d "$templates_root"
+      - name: Configure real Apple team and unique build number
+        env:
+          APPLE_TEAM_ID: ZYCVLZJMPG
+          GLUTWACHT_BUILD_NUMBER: ${{ github.run_number }}
+        run: godot --headless --path . --script tools/prepare_ios.gd
+      - name: Export Xcode project
+        run: |
+          godot --headless --editor --path . --import
+          godot --headless --path . --export-release iOS builds/ios/Glutwacht.zip
+      - name: Sign and upload to TestFlight
+        env:
+          IOS_DISTRIBUTION_P12_BASE64: ${{ secrets.IOS_DISTRIBUTION_P12_BASE64 }}
+          IOS_DISTRIBUTION_P12_PASSWORD: ${{ secrets.IOS_DISTRIBUTION_P12_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          GLUTWACHT: ${{ secrets.GLUTWACHT }}
+        run: python3 tools/publish_testflight.py
+      - name: Confirm 0.19 processing and availability in the existing TestFlight group
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          GLUTWACHT: ${{ secrets.GLUTWACHT }}
+          TARGET_VERSION: '0.19.0'
+          TARGET_BUILD: '${{ github.run_number }}.0.0'
+          REQUIRE_READY: '1'
+        run: python3 tools/check_testflight.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: apple-testflight-status-0.19
+          path: apple-status.json
+          retention-days: 14
+  windows-build:
+    needs: native-preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: true
+      - name: Export Windows game
+        run: |
+          mkdir -p builds/windows
+          python3 tools/check_godot.py logs/windows-import.log godot --headless --editor --path . --import
+          python3 tools/check_godot.py logs/windows-export.log godot --headless --path . --export-release Windows builds/windows/Glutwacht.exe
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Glutwacht-Windows-0.19.0
+          path: builds/windows
+          retention-days: 30

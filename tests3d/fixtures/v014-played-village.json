@@ -1,0 +1,167 @@
+{
+  "archers": 3,
+  "barracks": 3,
+  "battle_history": [],
+  "builder_bonus": 0,
+  "campaign_stars": {
+    "0": 3,
+    "1": 2
+  },
+  "claimed_tasks": [],
+  "core_positions": {
+    "hall": {
+      "x": 0,
+      "z": -12
+    }
+  },
+  "gems": 42,
+  "gold": 321,
+  "hall": 4,
+  "hero": "mage",
+  "hero_id": "mage",
+  "jobs": [
+    {
+      "finish": 4102444805.0,
+      "new": false,
+      "start": 4102444780.0,
+      "target": 3,
+      "uid": "smithy"
+    }
+  ],
+  "last_production": 4102444800.0,
+  "melee": 7,
+  "next_uid": 4,
+  "obstacle_jobs": [],
+  "obstacles": [
+    {
+      "kind": "tree",
+      "uid": "o1",
+      "x": -27.0,
+      "z": -24.0
+    },
+    {
+      "kind": "tree",
+      "uid": "o2",
+      "x": 27.0,
+      "z": 20.0
+    },
+    {
+      "kind": "bush",
+      "uid": "o3",
+      "x": -25.0,
+      "z": 27.0
+    },
+    {
+      "kind": "rock",
+      "uid": "o4",
+      "x": 26.0,
+      "z": -26.0
+    },
+    {
+      "kind": "tree",
+      "uid": "o5",
+      "x": 5.0,
+      "z": 28.0
+    },
+    {
+      "kind": "bush",
+      "uid": "o6",
+      "x": -28.0,
+      "z": 4.0
+    },
+    {
+      "kind": "rock",
+      "uid": "o7",
+      "x": 28.0,
+      "z": -4.0
+    },
+    {
+      "kind": "bush",
+      "uid": "o8",
+      "x": -6.0,
+      "z": -28.0
+    }
+  ],
+  "player_name": "Bestehendes Testdorf",
+  "shield": 2,
+  "siege": 0,
+  "smithy": 2,
+  "sound": true,
+  "stone": 654,
+  "structures": [
+    {
+      "kind": "lumber",
+      "level": 1,
+      "rotation": 0,
+      "stock": 77,
+      "uid": "s1",
+      "x": -35,
+      "z": 30
+    },
+    {
+      "kind": "quarry",
+      "level": 1,
+      "rotation": 0,
+      "stock": 20.0,
+      "uid": "s2",
+      "x": 22.5,
+      "z": -15.0
+    },
+    {
+      "kind": "camp",
+      "level": 2,
+      "rotation": 0,
+      "stock": 0,
+      "uid": "s3",
+      "x": -13,
+      "z": 20
+    }
+  ],
+  "sword": false,
+  "training": {
+    "heroes": {
+      "mage": {
+        "power": 3,
+        "skill": 0,
+        "vitality": 0
+      },
+      "ninja": {
+        "power": 0,
+        "skill": 0,
+        "vitality": 0
+      },
+      "shaman": {
+        "power": 0,
+        "skill": 0,
+        "vitality": 0
+      },
+      "warrior": {
+        "power": 0,
+        "skill": 0,
+        "vitality": 0
+      }
+    },
+    "troops": {
+      "archers": 0,
+      "melee": 0,
+      "shield": 0,
+      "siege": 0
+    }
+  },
+  "tutorial_done": [
+    "hero",
+    "build",
+    "upgrade",
+    "train",
+    "battle"
+  ],
+  "version": 7,
+  "wins": 8,
+  "wood": 987,
+  "xp": {
+    "mage": 900,
+    "ninja": 0,
+    "shaman": 0,
+    "warrior": 0
+  }
+}

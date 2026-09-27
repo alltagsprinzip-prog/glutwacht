@@ -9,8 +9,10 @@ func check(ok:bool,title:String):
 func _initialize():call_deferred("run")
 func frames(n:int=2):
  for i in range(n):await process_frame
+func emit_touch(pos:Vector2,down:bool,id:int=0):
+ var e=InputEventScreenTouch.new();e.index=id;e.position=pos;e.pressed=down;Input.parse_input_event(e)
 func touch(pos:Vector2,down:bool,id:int=0):
- var e=InputEventScreenTouch.new();e.index=id;e.position=pos;e.pressed=down;Input.parse_input_event(e);await frames()
+ emit_touch(pos,down,id);await frames()
 func tap(pos:Vector2):
  await touch(pos,true);await touch(pos,false)
 func drag(pos:Vector2,relative:Vector2,id:int=0):
@@ -18,11 +20,10 @@ func drag(pos:Vector2,relative:Vector2,id:int=0):
 func click_button(b:Button):
  var pos=b.get_global_rect().get_center();await tap(pos)
 func edge_point() -> Vector2:
- for axis in range(4):
-  for z in range(-21,22,3):
-   var point=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
-   var screen=game.world.camera.unproject_position(Vector3(point.x,0,point.y))
-   if Rect2(280,160,690,355).has_point(screen) and game.sim.deployment_valid(point) and point.distance_to(game.sim.hero.pos)>2 and not game.blocks_world_at(screen):return screen
+ for x in range(280,int(game.ui.size.x)-280,35):
+  for y in range(185,int(game.ui.size.y)-205,25):
+   var screen=Vector2(x,y);var point=game.world.ground_position(screen)
+   if game.sim.deployment_valid(point) and game.sim.deployment_valid(game.world.ground_position(screen+Vector2(20,0))) and point.distance_to(game.sim.hero.pos)>2 and not game.blocks_world_at(screen):return screen
  return Vector2.ZERO
 func run():
  game=load("res://game3d/main.tscn").instantiate();game.save_path="user://qa-input-v08.json";root.add_child(game);await frames()
@@ -50,6 +51,10 @@ func run():
   check(game.modal==null and not game.paused,name+" closes through real touch")
   game.modal_guard_until=0
  game.open_raid();game.start_raid();await frames(10);game.modal_guard_until=0
+ game.set_process(false);await click_button(game.hud_widgets.battle_speed)
+ var speed_time=game.sim.time;game.step_simulation(.05,.05)
+ check(game.battle_speed==2 and absf(game.sim.time-speed_time-.1)<.0001,"normal attack touch enables double simulation time")
+ await click_button(game.hud_widgets.battle_speed);check(game.battle_speed==1,"speed returns to normal through touch");game.set_process(true)
  var point=edge_point();check(point!=Vector2.ZERO,"legal visible deployment area found")
  for kind in ["melee","archers"]:
   await click_button(game.deployment_buttons[kind]);check(game.deploying==kind,"touch selects "+kind)
@@ -65,8 +70,10 @@ func run():
  check(game.sim.reserve.melee+game.sim.reserve.archers==remain,"ability controls never deploy")
  var center=game.world.camera.unproject_position(Vector3.ZERO);await tap(center)
  check(game.sim.reserve.melee+game.sim.reserve.archers==remain,"invalid ground tap consumes nothing")
- await click_button(game.deployment_buttons.melee);await touch(point,true,0)
- var second=point+Vector2(90,0);await touch(second,true,1);await drag(second+Vector2(30,0),Vector2(30,0),1);await touch(point,false,0);await touch(second+Vector2(30,0),false,1)
+ await click_button(game.deployment_buttons.melee)
+ # Both fingers land in one input frame. Waiting two rendered software-GPU
+ # frames between them can exceed the deliberate 180 ms hold threshold.
+ var second=point+Vector2(90,0);emit_touch(point,true,0);emit_touch(second,true,1);await frames();await drag(second+Vector2(30,0),Vector2(30,0),1);await touch(point,false,0);await touch(second+Vector2(30,0),false,1)
  check(game.sim.reserve.melee+game.sim.reserve.archers==remain,"pinch never deploys")
  check(game.world.target_zoom<48,"pinch changes zoom")
  await frames(30);game.set_process(false);game.world.target_zoom=48;game.world.zoom=48;game.world.sync(game.sim,.05)
@@ -77,6 +84,46 @@ func run():
  await click_button(game.deployment_buttons.archers);before=game.sim.reserve.archers;await touch(point,true);await drag(point+Vector2(12,0),Vector2(12,0));await touch(point+Vector2(12,0),false)
  
  check(game.sim.reserve.archers==before-1,"edge drag emits one before repeat delay")
+ game.sim.reserve.melee=5;game.sim.reserve.archers=0;game.update_hud()
+ check(not game.deployment_buttons.archers.visible and game.deployment_buttons.archers.disabled,"empty archer portrait is hidden and disabled")
+ await click_button(game.deployment_buttons.melee);await click_button(game.hud_widgets.deploy_group)
+ check(game.deploy_group,"touch selects squad mode")
+ var allies_before=game.sim.allies.size();point=edge_point();await tap(point)
+ check(game.sim.reserve.melee==0 and game.sim.allies.size()==allies_before+5,"one ground tap deploys all five warriors")
  game.end_raid();game._process(.01);await frames();check(game.dialog=="result","abort opens result screen")
  game.return_home();game.modal_guard_until=0;await frames();game.open_building("hall");await frames();var close=game.modal.find_child("CloseDialog",true,false);await click_button(close);check(game.modal==null,"upgrade closes reliably")
+ if FileAccess.file_exists("res://logs/live-trial/replay.json"):await live_touch()
  game.queue_free();await frames();DirAccess.remove_absolute("user://qa-input-v08.json");print("INPUT_TESTS ",checks-failures,"/",checks);quit(1 if failures else 0)
+func live_touch():
+ var fixture=JSON.parse_string(FileAccess.get_file_as_string("res://logs/live-trial/replay.json"))
+ if not is_instance_valid(game.ranking_ui):
+  game.ranking_ui=load("res://game3d/ui/ranking.gd").new();game.add_child(game.ranking_ui);game.ranking_ui.setup(game)
+ game.account.storage_enabled=false;game.ranking_ui.start_trial({"match_id":"isolated-touch","state":fixture.initial});game.ranking_ui.set_process(false);game.modal_guard_until=0;await frames()
+ check(not game.world.actors[1].node.visible,"trial hero is hidden before deployment")
+ var point=edge_point();check(point!=Vector2.ZERO,"trial has visible deployment ground")
+ await tap(point);game._process(.1)
+ check(game.sim.hero_deployed,"touch deploys trial hero")
+ var start=game.sim.hero.pos;var stickpos=game.stick.get_global_rect().get_center()+Vector2(50,0)
+ await touch(stickpos,true,4)
+ var hit=game.hud.find_child("Action_attack",true,false)
+ await touch(hit.get_global_rect().get_center(),true,0)
+ for i in range(12):game._process(.1)
+ await touch(hit.get_global_rect().get_center(),false,0);await touch(stickpos,false,4)
+ check(game.sim.hero.pos.distance_to(start)>1,"trial joystick moves hero during attack touch")
+ check(game.sim.commands_queue.any(func(c):return c.input.get("attack",false)),"trial attack touch queues authoritative attack input")
+ check(game.gestures.is_empty() and game.stick.value==Vector2.ZERO,"trial multitouch releases cleanly")
+ await click_button(game.ranking_ui.skill_button);game._process(.1)
+ check(game.sim.state.rally==0 and game.sim.state.buff>0,"trial skill touch activates rally")
+ await click_button(game.ranking_ui.roll_button);game._process(.1)
+ check(game.sim.state.roll>0,"trial roll touch activates dodge")
+ await click_button(game.ranking_ui.troop_buttons.melee);point=edge_point();await tap(point);game._process(.1)
+ check(game.sim.reserve.melee==1,"trial troop card and ground tap deploy one soldier")
+ var target=game.sim.buildings[0];await tap(game.world.camera.unproject_position(Vector3(target.pos.x,0,target.pos.y)));game._process(.1)
+ check(game.sim.target_id==target.id and game.deploying=="","enemy target touch leaves troop placement without consuming troops")
+ var tick=int(game.sim.state.tick);game._process(.2)
+ check(game.sim.state.tick>=tick+1,"trial time continues without command buttons")
+ await click_button(game.hud_widgets.battle_speed);tick=int(game.sim.state.tick);game.step_simulation(.1,.1)
+ check(game.battle_speed==2 and int(game.sim.state.tick)==tick+2,"trial speed touch advances two input ticks per real timestep")
+ await click_button(game.hud_widgets.battle_speed);tick=int(game.sim.state.tick);game.step_simulation(.1,.1)
+ check(game.battle_speed==1 and int(game.sim.state.tick)==tick+1,"trial speed can return to one times")
+ game.ranking_ui.leave()

@@ -1,4 +1,5 @@
 extends RefCounted
+const Advancement=preload("res://game3d/advancement.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 const Progress=preload("res://game3d/progress.gd")
 var profile:Dictionary
@@ -22,6 +23,7 @@ var facing=Vector2(0,-1)
 var serial=0
 var notices=""
 var selected_village=0
+var campaign_index=-1
 var village:Dictionary
 var wave=0
 var next_wave=0.0
@@ -30,20 +32,31 @@ var raid_building_total=0
 var attack_side="south"
 var priority="nearest"
 var first_target=""
-var reserve={"melee":0,"archers":0}
+var reserve={"melee":0,"archers":0,"shield":0,"siege":0}
+var deployment_polygon=PackedVector2Array()
 var manual_deployment=false
+var hero_deployed=true
+var hero_auto_attack=false
+func friendly_units() -> Array:return ([hero] if hero_deployed else [])+living(allies)
+func deploy_hero(pos:Vector2) -> bool:
+ if mode!="raid" or result!="" or hero_deployed or not deployment_valid(pos):return false
+ hero.pos=pos;hero_deployed=true;return true
 var alarm=false
 var traps:Array=[]
 var combat_texts:Array=[]
 var pending_hits:Array=[]
+var pending_skills:Array=[]
 var audio_events:Array=[]
 var looted={"wood":0,"stone":0,"gold":0}
 var raid_loot:Dictionary:
  get:return looted
 func training(attribute:String) -> int:return int(profile.get("training",{}).get("heroes",{}).get(hero_key(),{}).get(attribute,0))
 func entry_position() -> Vector2:
- return {"south":Vector2(0,27),"west":Vector2(-27,0),"east":Vector2(27,0),"north":Vector2(0,-27)}.get(attack_side,Vector2(0,27))
-func _init(p:Dictionary):profile=p;village=Catalog.matched_village(0,profile);home()
+ return {"south":Vector2(0,41),"west":Vector2(-41,0),"east":Vector2(41,0),"north":Vector2(0,-41)}.get(attack_side,Vector2(0,41))
+func _init(p:Dictionary):
+ profile=p
+ if not profile.has("frontier"):profile.frontier=Advancement.fresh()
+ village=Catalog.matched_village(0,profile);home()
 func hero_key() -> String:return String(profile.hero) if Catalog.HEROES.has(profile.get("hero","")) else "warrior"
 func stats() -> Dictionary:return Catalog.hero(hero_key())
 func unit(kind:String,pos:Vector2,hp:float,damage:float,team:String) -> Dictionary:
@@ -52,17 +65,26 @@ func unit(kind:String,pos:Vector2,hp:float,damage:float,team:String) -> Dictiona
 func make_hero(pos:Vector2):
  var c=stats();var level=Catalog.level(profile,hero_key())
  hero=unit("hero",pos,c.hp+35*(int(profile.hall)-1)+20*(level-1)+25*training("vitality"),c.damage+8*(int(profile.smithy)-1)+4*(level-1)+6*training("power")+(12 if profile.sword else 0),"ally")
+ for site in profile.get("structures",[]):
+  if site.kind=="hero_hall":hero.hp+=15*int(site.level);hero.max_hp=hero.hp
  hero.class_key=hero_key()
 func home():
- mode="home";time=0;pending_hits.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
+ hero_deployed=true;hero_auto_attack=false
+ campaign_index=-1
+ mode="home";time=0;pending_hits.clear();pending_skills.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0,"shield":0,"siege":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
 func soldier(kind:String,pos:Vector2) -> Dictionary:
- var rank=int(profile.get("training",{}).get("troops",{}).get("archers" if kind=="archer" else "melee",0))
- return unit(kind,pos,(205 if kind=="melee" else 135)+int(profile.barracks)*30+20*rank,18+int(profile.barracks)*5+4*rank,"ally")
+ var key="archers" if kind=="archer" else kind
+ var rank=int(profile.get("training",{}).get("troops",{}).get(key,0))
+ var spec=Catalog.TROOPS[key]
+ return unit(kind,pos,int(spec.hp)+int(profile.barracks)*30+20*rank,int(spec.damage)+int(profile.barracks)*5+4*rank,"ally")
 func form_army():
  allies.clear()
- var total=int(profile.melee)+int(profile.archers)
+ var roster=[]
+ for key in Catalog.TROOP_ORDER:
+  for n in range(int(profile.get(key,0))):roster.append("archer" if key=="archers" else key)
+ var total=roster.size()
  for i in range(total):
-  var kind="melee" if i<int(profile.melee) else "archer"
+  var kind=roster[i]
   var barracks_pos:Vector2=Vector2(profile.get("core_positions",{}).get("barracks",{}).get("x",-12),profile.get("core_positions",{}).get("barracks",{}).get("z",2))
   for site in profile.get("structures",[]):
    if site.kind=="camp":barracks_pos=Vector2(site.x,site.z);break
@@ -72,21 +94,31 @@ func form_army():
   var troop=soldier(kind,pos.clamp(Vector2(-29,-29),Vector2(29,29)))
   troop.anchor=troop.pos;troop.idle_phase=i*1.37;allies.append(troop)
 func deployment_valid(pos:Vector2) -> bool:
- if maxf(absf(pos.x),absf(pos.y))<24 or maxf(absf(pos.x),absf(pos.y))>30:return false
+ if not Rect2(-46,-46,92,92).has_point(pos):return false
+ if deployment_polygon.size()>2 and Geometry2D.is_point_in_polygon(pos,deployment_polygon):return false
  for b in buildings:
-  if b.hp>0 and pos.distance_to(b.pos)<float(b.radius)+1:return false
+  if b.hp>0 and pos.distance_to(b.pos)<float(b.radius)+4.0:return false
  return true
 func deploy(kind:String,pos:Vector2) -> bool:
  if mode!="raid" or result!="" or not reserve.has(kind) or int(reserve[kind])<=0 or not deployment_valid(pos):return false
- reserve[kind]-=1;allies.append(soldier("archer" if kind=="archers" else "melee",pos));return true
+ reserve[kind]-=1;allies.append(soldier("archer" if kind=="archers" else kind,pos));return true
 func deploy_all():
  var center=entry_position();var along=Vector2(1,0) if attack_side in ["south","north"] else Vector2(0,1)
  var n=0
- for kind in ["melee","archers"]:
+ for kind in Catalog.TROOP_ORDER:
   while int(reserve[kind])>0:
    var pos=center+along*((n%7)-3)*1.25
    if not deploy(kind,pos):break
    n+=1
+func deploy_squad(kind:String,pos:Vector2) -> int:
+ if mode!="raid" or result!="" or not deployment_valid(pos):return 0
+ var count=int(reserve.get(kind,0));var placed=0
+ for i in range(count):
+  var offset=Vector2(cos(i*2.4),sin(i*2.4))*sqrt(float(i))*.65
+  var target=pos+offset
+  if not deployment_valid(target):target=pos
+  if deploy(kind,target):placed+=1
+ return placed
 func building(kind:String,pos:Vector2,radius:float,hp:float,level:int=1,uid:String="",team:String="enemy",rotation:int=0) -> Dictionary:
  serial+=1
  return {"id":serial,"uid":uid,"kind":kind,"pos":pos,"radius":radius,"hp":hp,"max_hp":hp,"cd":.8,"level":level,"team":team,"rotation":rotation,"objective":false,"flash":0.0,"destroyed":false}
@@ -98,38 +130,36 @@ func home_buildings():
   var item=building(b.kind,Vector2(b.x,b.z),Catalog.BUILD[b.kind].radius,hp,b.level,b.uid,"ally",b.rotation)
   item.construction=b.construction;item.stock=float(b.get("stock",0.0));buildings.append(item)
 func reset_battle():
- pending_hits.clear();audio_events.clear();looted={"wood":0,"stone":0,"gold":0}
- time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0}
+ hero_deployed=true;hero_auto_attack=false
+ pending_hits.clear();pending_skills.clear();audio_events.clear();looted={"wood":0,"stone":0,"gold":0}
+ time=0;result="";settled=false;kills=0;command="Angriff";refresh_potion();notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0,"shield":0,"siege":0}
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
 func layout(index:int):
- selected_village=maxi(0,index);village=Catalog.matched_village(selected_village,profile)
+ selected_village=maxi(0,index);village=Catalog.campaign(campaign_index) if campaign_index>=0 else Catalog.matched_village(selected_village,profile)
  buildings.clear();enemies.clear();var level=int(village.level)
  var layout_rng=RandomNumberGenerator.new();layout_rng.seed=int(village.seed)
- var shift=layout_rng.randf_range(-4.0,4.0)
- var hall=building("hall",Vector2(shift,-12),4.3,480+level*210,clampi(level,1,Progress.MAX_LEVEL),"fort","enemy")
- hall.objective=true;buildings.append(hall)
- var towers=[Vector2(-12,-4),Vector2(12,-6),Vector2(0,5),Vector2(-18,10),Vector2(18,11)]
- for i in range(towers.size()):towers[i]+=Vector2(layout_rng.randf_range(-2.5,2.5),layout_rng.randf_range(-2.5,2.5))
- for i in range(village.tower_count):
-  var b=building("tower",towers[i],1.6,150+level*110,clampi(level,1,Progress.MAX_LEVEL),"t"+str(i));b.objective=true;buildings.append(b)
- for i in range(village.wall_count):
-  var row=int(i/7);var column=i%7
-  if column==3:continue
-  var pos=Vector2((column-3)*2.5,8-row*5)
-  if pos.distance_to(towers[2])<3 and level>=4:continue
-  buildings.append(building("wall",pos,1.25,90+level*65,clampi(level,1,Progress.MAX_LEVEL),"w"+str(i)))
- for i in range(village.guards):
-  var pos=Vector2((i%4-1.5)*4,-1-floor(i/4.0)*5)
-  var kind="ranger" if i%3==2 else "guard"
-  enemies.append(unit(kind,pos,70+level*35,9+level*4,"enemy"))
- for i in range(village.captains):enemies.append(unit("captain",Vector2(-3+i*6,-9),220+level*90,24+level*10,"enemy"))
- buildings.append(building("barracks",Vector2(-16,-18),3.8,200+100*level,clampi(level,1,Progress.MAX_LEVEL),"garrison"))
- buildings.append(building("goldmine",Vector2(16,-18),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_gold"))
- buildings.append(building("lumber",Vector2(-20,10),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_wood"))
- buildings.append(building("quarry",Vector2(20,12),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_stone"))
+ var plan=load("res://game3d/rivals.gd").blueprint(village,Catalog.BUILD)
+ for entry in plan:
+  var kind=String(entry.kind);var stage=int(entry.level)
+  var hp=(480+stage*210) if kind=="hall" else ((90+stage*65) if kind=="wall" else ((150+stage*110) if kind=="tower" else 180+stage*80))
+  var item=building(kind,entry.pos,float(Catalog.BUILD[kind].radius),hp,stage,entry.uid,"enemy",entry.rotation)
+  item.objective=kind in ["hall","tower"];buildings.append(item)
+ village.tower_count=buildings.filter(func(b):return b.kind=="tower").size()
+ village.wall_count=buildings.filter(func(b):return b.kind=="wall").size()
+ for i in range(int(village.guards)+int(village.captains)):
+  var pos=Vector2.ZERO
+  for attempt in range(160):
+   pos=Vector2(layout_rng.randf_range(-25,25),layout_rng.randf_range(-25,20))
+   if load("res://game3d/rivals.gd").clear(pos,.6,plan,Catalog.BUILD,.3):break
+  var captain=i>=int(village.guards);var kind="captain" if captain else ("ranger" if i%3==2 else "guard")
+  enemies.append(unit(kind,pos,(220+level*90) if captain else (70+level*35),(24+level*10) if captain else (9+level*4),"enemy"))
  var factor=float(village.get("combat_scale",1.0))
  for b in buildings:b.hp*=factor;b.max_hp=b.hp
  for u in enemies:u.hp*=factor;u.max_hp=u.hp;u.damage*=factor;u.anchor=u.pos;u.awake=false
+ var perimeter=PackedVector2Array()
+ for b in buildings:
+  for i in range(8):perimeter.append(b.pos+Vector2.from_angle(i*TAU/8.0)*(float(b.radius)+3.0))
+ deployment_polygon=Geometry2D.convex_hull(perimeter)
  assign_loot()
  if level>=2:
   traps.append({"pos":Vector2(0,11),"used":false,"damage":20+level*7})
@@ -152,9 +182,11 @@ func accrue_loot(b:Dictionary):
   var delta=maxi(0,earned-int(b.plundered[key]))
   b.plundered[key]+=delta;looted[key]+=delta
 func animate_attack(u:Dictionary,duration:float):
- u.attack_time=duration;u.attack_total=duration;u.attack_seq+=1;u.anim="attack"
+ u.attack_time=duration;u.attack_total=duration;u.attack_seq+=1;u.anim="attack";u.cast_kind="normal"
 func queue_hit(u:Dictionary,target:Dictionary,amount:float,reach:float,ranged:bool=false,color:Color=Color("ffd98c"),delay:float=-1):
  var windup=delay if delay>=0 else float(u.get("attack_total",.6))*.52
+ if audio_events.size()<8:audio_events.append("siege" if u.kind=="siege" else ("bow" if ranged else "swing"))
+ if u==hero and float(hero.get("fury_time",0))>0:amount*=1.0+float(hero.get("fury_power",0))
  pending_hits.append({"source":u,"target":target,"damage":amount,"reach":reach,"ranged":ranged,"color":color,"wait":windup,"stage":"windup"})
 func update_hits(dt:float):
  for i in range(pending_hits.size()-1,-1,-1):
@@ -173,11 +205,15 @@ func update_hits(dt:float):
   pending_hits.remove_at(i)
 func scout(index:int):
  mode="scout";reset_battle();layout(index);first_target="";make_hero(entry_position());allies.clear()
+func scout_campaign(index:int) -> bool:
+ if not Catalog.campaign_unlocked(profile,index):return false
+ campaign_index=index;scout(index);return true
 func start(index:int=-1,manual:bool=false) -> bool:
- if int(profile.melee)+int(profile.archers)==0:return false
+ if campaign_index>=0 and not Catalog.campaign_unlocked(profile,campaign_index):return false
+ if Catalog.army_count(profile)==0:return false
  if index<0:index=selected_village
- mode="raid";reset_battle();layout(index);make_hero(entry_position());manual_deployment=manual
- if manual:allies.clear();reserve={"melee":int(profile.melee),"archers":int(profile.archers)}
+ mode="raid";reset_battle();layout(index);make_hero(entry_position());manual_deployment=manual;hero_deployed=not manual
+ if manual:allies.clear();reserve={"melee":int(profile.melee),"archers":int(profile.archers),"shield":int(profile.get("shield",0)),"siege":int(profile.get("siege",0))}
  else:form_army()
  return true
 func start_defense():
@@ -212,12 +248,17 @@ func stars() -> int:
 func targets() -> Array:
  return living(enemies)+(living(buildings) if mode=="raid" else [])
 func army_target(u:Dictionary):
+ u.erase("route_point")
  var close_enemy=nearest(u.pos,living(enemies))
  var goal=null
  if close_enemy!=null and distance(u,close_enemy)<(9 if u.kind=="archer" else 4):goal=close_enemy
- elif mode=="raid":goal=nearest(u.pos,living(buildings))
+ elif mode=="raid":goal=nearest(u.pos,living(buildings).filter(func(b):return b.kind!="wall"))
  else:goal=nearest(u.pos,targets())
- if mode=="raid" and goal!=null and u.kind!="archer":
+ if mode=="raid" and goal!=null and u.kind!="archer" and distance(u,goal)>float(Catalog.TROOPS.get(u.kind,{}).get("range",1.3)):
+  # A nearby existing gap is cheaper than breaking another wall.
+  var way=wall_waypoint(u.pos,goal.pos)
+  if way!=Vector2.INF:u.route_point=way;return goal
+  u.erase("route_point")
   var first_wall=null;var first_t=INF
   for b in living(buildings):
    if b.kind!="wall" or b.id==goal.id:continue
@@ -225,6 +266,22 @@ func army_target(u:Dictionary):
    if t>0 and t<1 and t<first_t and b.pos.distance_to(u.pos+line*t)<b.radius+.55:first_wall=b;first_t=t
   if first_wall!=null:return first_wall
  return goal
+func wall_clear(a:Vector2,b:Vector2) -> bool:
+ for wall in buildings:
+  if wall.kind!="wall" or wall.hp<=0:continue
+  var nearest_point=Geometry2D.get_closest_point_to_segment(wall.pos,a,b)
+  if nearest_point.distance_to(wall.pos)<float(wall.radius)+.65:return false
+ return true
+func wall_waypoint(a:Vector2,b:Vector2) -> Vector2:
+ if wall_clear(a,b):return Vector2.INF
+ var best=Vector2.INF;var length=a.distance_to(b)+7.0
+ for wall in buildings:
+  if wall.kind!="wall" or wall.hp<=0 or a.distance_to(wall.pos)>15:continue
+  for side in [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]:
+   var p:Vector2=wall.pos+side*(float(wall.radius)+.9)
+   var cost=a.distance_to(p)+p.distance_to(b)
+   if cost<length and wall_clear(a,p) and wall_clear(p,b):best=p;length=cost
+ return best
 func nearest(pos:Vector2,list:Array):
  var best=null;var dmin=INF
  for u in list:
@@ -235,6 +292,7 @@ func nearest(pos:Vector2,list:Array):
 func distance(a:Dictionary,b:Dictionary) -> float:return a.pos.distance_to(b.pos)-float(b.get("radius",0))
 func move(u:Dictionary,direction:Vector2,speed:float,dt:float):
  if direction.length_squared()<.01:return
+ if u==hero and float(hero.get("haste_time",0))>0:speed*=1.0+float(hero.get("haste_power",0))
  var dir=direction.normalized();var next:Vector2=u.pos+dir*speed*dt
  for b in buildings:
   if b.hp<=0:continue
@@ -242,11 +300,17 @@ func move(u:Dictionary,direction:Vector2,speed:float,dt:float):
   if delta.length()<r:
    if delta.length()<.01:delta=Vector2(1,0)
    next=b.pos+delta.normalized()*r
- next.x=clampf(next.x,-30,30);next.y=clampf(next.y,-30,30)
+ if mode in ["home","defense"]:
+  var bounds=Progress.village_bounds(int(profile.hall),int(profile.get("frontier",{}).get("land",0)));next=next.clamp(bounds.position+Vector2.ONE,bounds.end-Vector2.ONE)
+ else:next=next.clamp(Vector2(-46,-46),Vector2(46,46))
  u.pos=next;u.facing=dir
  if u.attack_time<=0:u.anim="Run"
 func approach(u:Dictionary,goal:Dictionary,speed:float,dt:float):
  var d:Vector2=goal.pos-u.pos
+ if u.has("route_point"):
+  var waypoint:Vector2=u.route_point
+  if waypoint.distance_to(u.pos)>1:d=waypoint-u.pos
+  else:u.erase("route_point")
  for b in buildings:
   if b.hp<=0 or b.id==goal.id:continue
   var delta:Vector2=b.pos-u.pos
@@ -257,10 +321,11 @@ func approach(u:Dictionary,goal:Dictionary,speed:float,dt:float):
  move(u,d,speed,dt)
 func damage(u:Dictionary,amount:float):
  if u.hp<=0:return
- if u==hero and invulnerable>0:return
+ if u==hero and (not hero_deployed or invulnerable>0):return
+ if u==hero and float(hero.get("ward_time",0))>0:amount*=1.0-float(hero.get("ward_power",0))
  var dealt=minf(u.hp,amount);u.hp=maxf(0,u.hp-amount);u.flash=.16
  accrue_loot(u)
- if audio_events.size()<4:audio_events.append("hurt" if u==hero else "hit")
+ if audio_events.size()<4:audio_events.append("hurt" if u==hero else ("stone" if u.has("radius") and u.kind in ["wall","tower","quarry"] else ("wood" if u.has("radius") else ("shield" if u.kind=="shield" else "hit"))))
  if combat_texts.size()<28:combat_texts.append({"pos":u.pos,"value":"-%d"%ceili(dealt),"heal":false,"life":.9,"max":.9})
  if u.get("team","")=="enemy":alarm=true
  if u.hp<=0:
@@ -270,9 +335,9 @@ func damage(u:Dictionary,amount:float):
 func attack_effect(u:Dictionary,target:Dictionary,color:Color):
  effects.append({"kind":"arrow","pos":u.pos,"end":target.pos,"life":.3,"max":.3,"color":color})
 func strike():
- if not active() or result!="" or attack_cd>0 or hero.hp<=0:return
+ if not hero_deployed or not active() or result!="" or attack_cd>0 or hero.hp<=0:return
  var c=stats();attack_cd=c.attack_cd;animate_attack(hero,float(c.attack_cd)*.94)
- var target=nearest(hero.pos,targets())
+ var target=army_target(hero) if hero_auto_attack else nearest(hero.pos,targets())
  if target==null or distance(hero,target)>float(c.range):return
  facing=(target.pos-hero.pos).normalized();hero.facing=facing
  if c.range>4:queue_hit(hero,target,hero.damage,c.range,true,Color(c.color))
@@ -280,48 +345,79 @@ func strike():
   for t in targets():
    if distance(hero,t)<c.range and (t.pos-hero.pos).normalized().dot(facing)>-.2:queue_hit(hero,t,hero.damage,c.range,false,Color(c.color))
 func skill():
- if not active() or result!="" or skill_cd>0 or hero.hp<=0:return
- var c=stats();skill_cd=maxf(2,c.skill_cd-.4*training("skill"));animate_attack(hero,.65)
- var skill_scale=1.0+.12*training("skill")
- var center:Vector2=hero.pos
- if hero_key()=="ninja":
-  var target=nearest(hero.pos,targets())
+ if not hero_deployed or not active() or result!="" or skill_cd>0 or hero.hp<=0:return
+ if audio_events.size()<8:audio_events.append("skill")
+ var c=stats();var key=hero_key();skill_cd=maxf(2,c.skill_cd-.4*training("skill"))
+ var duration=.8 if key!="mage" else 1.2
+ animate_attack(hero,duration);hero.cast_kind="skill";attack_cd=maxf(attack_cd,duration)
+ var scale=1.0+.12*training("skill");var center:Vector2=hero.pos;var target=nearest(hero.pos,targets())
+ if target!=null:hero.facing=(target.pos-hero.pos).normalized();facing=hero.facing
+ if key=="ninja":
   if target!=null and distance(hero,target)<11:
-   var origin:Vector2=hero.pos
-   var dir=(target.pos-hero.pos).normalized()
-   for i in range(16):
-    if distance(hero,target)>1.3:move(hero,dir,9,.045)
-   queue_hit(hero,target,hero.damage*4.2*skill_scale,4,false,Color(c.color),.18);invulnerable=.7
-   for trail in range(5):effects.append({"kind":"afterimage","pos":origin.lerp(hero.pos,float(trail)/5),"life":.5,"max":.5,"color":Color(c.color)})
-  center=hero.pos
- elif hero_key()=="shaman":
-  for u in [hero]+living(allies):
-   if u.pos.distance_to(hero.pos)<9:
-    var amount=minf(u.max_hp-u.hp,(120+12*Catalog.level(profile,hero_key()))*skill_scale);u.hp+=amount
-    if amount>0:combat_texts.append({"pos":u.pos,"value":"+%d"%amount,"heal":true,"life":.9,"max":.9})
-  for t in targets():
-   if distance(hero,t)<6:queue_hit(hero,t,hero.damage*1.3*skill_scale,6,false,Color(c.color))
- elif hero_key()=="mage":
-  var target=nearest(hero.pos,targets())
+   hero.dash_time=.22;hero.dash_target=target;hero.trail_time=0.0;invulnerable=.7
+   for delay in [.24,.36,.48]:queue_hit(hero,target,hero.damage*1.4*scale,4,false,Color(c.color),delay)
+  effects.append({"kind":"ninja_slash","pos":center,"life":.55,"max":.55,"color":Color(c.color)})
+ elif key=="mage":
   if target!=null and distance(hero,target)<13:center=target.pos
-  for t in targets():
-   if t.pos.distance_to(center)-float(t.get("radius",0))<4.2:queue_hit(hero,t,hero.damage*3.0*skill_scale,18,true,Color(c.color),.30)
+  effects.append({"kind":"meteor","pos":center,"life":.90,"max":.90,"color":Color("ffc271")})
+  pending_skills.append({"kind":key,"source":hero,"pos":center,"wait":.90,"scale":scale})
  else:
+  effects.append({"kind":"cast_charge","pos":center,"life":.40,"max":.40,"color":Color(c.color)})
+  pending_skills.append({"kind":key,"source":hero,"pos":center,"wait":.40,"scale":scale})
+func update_skills(dt:float):
+ if float(hero.get("dash_time",0))>0 and hero.hp>0:
+  hero.dash_time=maxf(0,float(hero.dash_time)-dt)
+  var target:Dictionary=hero.get("dash_target",{})
+  if not target.is_empty() and distance(hero,target)>1.3:move(hero,(target.pos-hero.pos).normalized(),40,dt)
+  hero.trail_time-=dt
+  if hero.trail_time<=0:
+   hero.trail_time=.04;effects.append({"kind":"ninja_echo","pos":hero.pos,"life":.32,"max":.32,"color":Color("b5a1ed")})
+ for i in range(pending_skills.size()-1,-1,-1):
+  var e=pending_skills[i];e.wait-=dt
+  if e.wait>0:continue
+  pending_skills.remove_at(i)
+  if e.source.hp<=0:continue
+  var radius=5.0 if e.kind=="warrior" else (4.2 if e.kind=="mage" else 6.0)
+  if e.kind=="shaman":
+   for u in friendly_units():
+    if u.pos.distance_to(e.pos)<=9:
+     var gain=minf(u.max_hp-u.hp,(120+12*Catalog.level(profile,hero_key()))*float(e.scale));u.hp+=gain
+     if gain>0:
+      combat_texts.append({"pos":u.pos,"value":"+%d"%gain,"heal":true,"life":.95,"max":.95})
+      effects.append({"kind":"heal_stream","pos":e.pos,"end":u.pos,"life":.6,"max":.6,"color":Color("9af3bd")})
   for t in targets():
-   if distance(hero,t)<5:queue_hit(hero,t,hero.damage*2.6*skill_scale,5,false,Color(c.color))
- effects.append({"kind":hero_key(),"pos":center,"life":.75,"max":.75,"color":Color(c.color)})
+   if t.pos.distance_to(e.pos)-float(t.get("radius",0))>radius:continue
+   if e.kind=="shaman":effects.append({"kind":"spirit_bolt","pos":e.pos,"end":t.pos,"life":.22,"max":.22,"color":Color("c6eaff")})
+   damage(t,hero.damage*float(e.scale)*(2.6 if e.kind=="warrior" else (3.0 if e.kind=="mage" else 1.3)))
+   if e.kind=="warrior" and not t.has("radius"):
+    move(t,(t.pos-e.pos).normalized(),12,.09);t.stagger=.35
+  effects.append({"kind":"earthbreak" if e.kind=="warrior" else ("spirit_wave" if e.kind=="shaman" else "meteor_burst"),"pos":e.pos,"life":1.15 if e.kind=="mage" else .85,"max":1.15 if e.kind=="mage" else .85,"color":Color(Catalog.hero(e.kind).color)})
 func roll(direction:Vector2):
- if not active() or result!="" or roll_cd>0 or hero.hp<=0:return
- roll_cd=2.0 if hero_key()=="ninja" else 2.5;invulnerable=.65
- var d=direction.normalized() if direction.length()>.1 else facing
- for i in range(12):move(hero,d,6,.055)
- effects.append({"kind":"roll","pos":hero.pos,"life":.35,"max":.35,"color":Color("a9dadd")})
-func heal():
- if active() and result=="" and potion>0 and hero.hp>0 and hero.hp<hero.max_hp:
-  potion-=1;hero.hp=minf(hero.max_hp,hero.hp+200)
-  effects.append({"kind":"skill","pos":hero.pos,"life":.6,"max":.6,"color":Color("82eb9b")})
+ if not hero_deployed or not active() or result!="" or roll_cd>0 or hero.hp<=0:return
+ roll_cd=2.0 if hero_key()=="ninja" else 2.5;invulnerable=.38
+ hero.roll_time=.28;hero.roll_direction=direction.normalized() if direction.length()>.1 else facing
+ effects.append({"kind":"roll","pos":hero.pos,"life":.38,"max":.38,"color":Color("a9dadd")})
+ if audio_events.size()<8:audio_events.append("swing")
+func potion_key() -> String:return String(profile.frontier.selected)
+func refresh_potion():potion=int(profile.frontier.charges[potion_key()])
+func potion_cooldown(now:float=-1) -> float:
+ if now<0:now=Time.get_unix_time_from_system()
+ return maxf(0,float(profile.frontier.cooldowns.get(potion_key(),0))-now)
+func use_potion(now:float=-1) -> bool:
+ if now<0:now=Time.get_unix_time_from_system()
+ var key=potion_key();refresh_potion()
+ if not hero_deployed or not active() or result!="" or potion<=0 or hero.hp<=0 or not Advancement.unlock(key,profile) or potion_cooldown(now)>0:return false
+ if key=="healing" and hero.hp>=hero.max_hp:return false
+ var spec=Advancement.POTIONS[key];var power=Advancement.power(key,int(profile.frontier.levels[key]))
+ profile.frontier.charges[key]-=1;profile.frontier.cooldowns[key]=now+float(spec.cooldown);refresh_potion()
+ if key=="healing":
+  var gain=minf(hero.max_hp-hero.hp,power);hero.hp+=gain
+  combat_texts.append({"pos":hero.pos,"value":"+%d"%int(gain),"heal":true,"life":.95,"max":.95})
+ else:hero[key+"_time"]=float(spec.duration);hero[key+"_power"]=power
+ effects.append({"kind":"spirit_wave","pos":hero.pos,"life":.8,"max":.8,"color":Color(spec.color)})
+ return true
+func heal():use_potion()
 func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
- # Bound movement integration, but never stretch the raid deadline on slow devices.
  var elapsed=maxf(0,elapsed_seconds if elapsed_seconds>=0 else dt)
  dt=clampf(dt,0,.05)
  if mode=="scout":return
@@ -332,10 +428,23 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
  if result!="":return
  time+=elapsed;attack_cd=maxf(0,attack_cd-dt);skill_cd=maxf(0,skill_cd-dt);roll_cd=maxf(0,roll_cd-dt);invulnerable=maxf(0,invulnerable-dt)
  for u in [hero]+allies+enemies:
-  u.flash=maxf(0,u.flash-dt);u.attack_time=maxf(0,u.attack_time-dt)
+  u.stagger=maxf(0,float(u.get("stagger",0))-dt);u.flash=maxf(0,u.flash-dt);u.attack_time=maxf(0,u.attack_time-dt)
   if u.hp<=0:u.dead_time+=dt
   u.anim="attack" if u.attack_time>0 else "Idle"
- if input.length()>.1 and hero.hp>0:facing=input.normalized();move(hero,input,stats().speed,dt)
+ for buff in ["ward","haste","fury"]:hero[buff+"_time"]=maxf(0,float(hero.get(buff+"_time",0))-dt)
+ if float(hero.get("roll_time",0))>0:
+  var roll_step=minf(dt,float(hero.roll_time));hero.roll_time=maxf(0,float(hero.roll_time)-dt)
+  move(hero,hero.roll_direction,14.0,roll_step);input=Vector2.ZERO
+  hero.anim="Roll"
+ if hero_deployed and input.length()>.1:hero_auto_attack=false
+ if hero_auto_attack and hero_deployed and active() and hero.hp>0 and float(hero.get("roll_time",0))<=0:
+  var target=army_target(hero)
+  if target==null:target=nearest(hero.pos,targets())
+  if target!=null:
+   if distance(hero,target)>float(stats().range)*.9:
+    approach(hero,target,float(stats().speed),dt);facing=hero.facing
+   else:strike()
+ if hero_deployed and input.length()>.1 and hero.hp>0 and float(hero.get("dash_time",0))<=0:facing=input.normalized();move(hero,input,stats().speed,dt)
  hero.facing=facing
  if mode=="home":
   for u in allies:
@@ -348,6 +457,7 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
    elif phase<12:u.anim="Sit_Floor"
    elif phase<15:u.anim="Interact"
   return
+ update_skills(dt)
  update_hits(dt)
  for b in buildings:b.flash=maxf(0,float(b.get("flash",0))-dt)
  for i in range(allies.size()):
@@ -358,34 +468,36 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
   if command=="Rückzug":follow=entry_position()+Vector2((i%4-1.5)*.6,0)
   var target=army_target(u) if active() and command!="Rückzug" else null
   if target!=null and (command=="Angriff" or distance(u,target)<5):
-   var reach=8.5 if u.kind=="archer" else 1.3
-   if distance(u,target)>reach:approach(u,target,4.7,dt)
+   var spec=Catalog.TROOPS["archers" if u.kind=="archer" else u.kind]
+   var reach=float(spec.range)
+   if distance(u,target)>reach:approach(u,target,float(spec.speed),dt)
    else:
     u.facing=(target.pos-u.pos).normalized()
     if u.cd<=0:
-     u.cd=1.0 if u.kind=="archer" else .8;animate_attack(u,u.cd*.85)
-     queue_hit(u,target,u.damage,reach,u.kind=="archer",Color("ecd28e"))
+     u.cd=1.8 if u.kind=="siege" else (1.0 if u.kind=="archer" else .8);animate_attack(u,u.cd*.85)
+     queue_hit(u,target,u.damage*(3 if u.kind=="siege" and target.kind=="wall" else 1),reach,u.kind in ["archer","siege"],Color("ecd28e"))
   elif u.pos.distance_to(follow)>1.0:approach(u,{"id":-1,"pos":follow},5.3,dt)
  if not active():return
  if mode=="raid" and not alarm:
   for u in enemies:
-   var approaching=nearest(u.pos,[hero]+living(allies))
+   var approaching=nearest(u.pos,friendly_units())
    if approaching!=null and distance(u,approaching)<12:alarm=true;break
  for trap in traps:
   if trap.used:continue
-  for u in [hero]+living(allies):
+  for u in friendly_units():
    if u.pos.distance_to(trap.pos)<1.8:
     trap.used=true;effects.append({"kind":"skill","pos":trap.pos,"life":.7,"max":.7,"color":Color("fa982e")})
-    for a in [hero]+living(allies):
+    for a in friendly_units():
      if a.pos.distance_to(trap.pos)<3:damage(a,trap.damage)
     break
  for u in enemies:
-  if u.hp<=0:continue
+  if u.hp<=0 or float(u.get("stagger",0))>0:continue
   u.cd=maxf(0,u.cd-dt)
   if mode=="raid" and not alarm:continue
   u.awake=true
-  var opponents=[hero]+living(allies)+(living(buildings) if mode=="defense" else [])
-  var target=nearest(u.pos,opponents)
+  var opponents=friendly_units()+(living(buildings) if mode=="defense" else [])
+  var protectors=opponents.filter(func(a):return a.kind=="shield" and u.pos.distance_to(a.pos)<7)
+  var target=nearest(u.pos,protectors if not protectors.is_empty() else opponents)
   if target==null:continue
   if u.wind>0:
    u.wind-=dt
@@ -411,12 +523,12 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
  for b in buildings:
   if b.kind!="tower" or b.hp<=0 or not b.get("construction",{}).is_empty():continue
   b.cd-=dt
-  var target=nearest(b.pos,([hero]+living(allies)) if b.team=="enemy" else living(enemies))
+  var target=nearest(b.pos,(friendly_units()) if b.team=="enemy" else living(enemies))
   if target!=null and distance(b,target)<13 and b.cd<=0:
    b.cd=2.0;queue_hit(b,target,(12+8*int(b.level))*float(village.get("combat_scale",1.0)),13,true,Color("ffce84"),0)
  if mode=="raid":
   if destruction_percent()>=100:result="victory"
-  elif hero.hp<=0 and living(allies).is_empty() and int(reserve.melee)+int(reserve.archers)==0:result="complete"
+  elif hero.hp<=0 and living(allies).is_empty() and Catalog.army_count(reserve)==0:result="complete"
  elif mode=="defense":
   if hero.hp<=0:result="defeat"
   for b in buildings:
@@ -435,6 +547,16 @@ func settle() -> Dictionary:
  for k in ["wood","stone","gold"]:
   var available=int(looted[k])
   reward[k]=mini(available,maxi(0,1200*int(profile.hall)-int(profile[k])));profile[k]+=reward[k]
+ if campaign_index>=0:
+  if not profile.has("campaign_stars"):profile.campaign_stars={}
+  var previous=int(profile.campaign_stars.get(str(campaign_index),0))
+  profile.campaign_stars[str(campaign_index)]=maxi(previous,int(reward.stars))
+  reward.campaign_index=campaign_index;reward.campaign_best=profile.campaign_stars[str(campaign_index)]
  if int(reward.stars)>0:profile.wins+=1
- profile.xp[hero_key()]+=reward.xp
+ reward.level_before=Catalog.level(profile,hero_key())
+ profile.xp[hero_key()]=mini(10000,int(profile.xp[hero_key()])+int(reward.xp))
+ reward.level_after=Catalog.level(profile,hero_key())
+ if not profile.has("battle_history"):profile.battle_history=[]
+ profile.battle_history.push_front({"name":String(village.name).left(80),"time":Time.get_unix_time_from_system(),"stars":int(reward.stars),"destruction":destruction_percent(),"wood":reward.wood,"stone":reward.stone,"gold":reward.gold,"xp":reward.xp})
+ while profile.battle_history.size()>20:profile.battle_history.pop_back()
  return reward

@@ -1,0 +1,73 @@
+name: Heroic playable review
+on:
+  push:
+    branches: [update/masterplan-online-20260925]
+    paths: ['.github/workflows/heroic-review.yml', 'game3d/**', 'tests3d/heroic_suite.gd']
+permissions:
+  contents: read
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: solarlabyrinth/action-setup-godot@v3
+        with:
+          version: 4.7.2-stable
+          export-templates: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate authoritative realtime protocol and saved match migration
+        run: |
+          npm ci --prefix backend/tests --ignore-scripts --no-audit --no-fund
+          node backend/tests/live_trial.mjs
+      - run: python3 tools/check_godot.py logs/import.log godot --headless --editor --path . --import
+      - name: Verify live input prediction and modern mobile interface
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/modern
+        run: |
+          mkdir -p logs/modern
+          python3 tools/check_godot.py logs/live019.log godot --headless --path . --script tests3d/live_trial_suite.gd
+          python3 tools/check_godot.py logs/interface019.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/interface019_suite.gd
+      - name: Render actual game and exercise responsive layout and combat
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/heroic
+        run: |
+          mkdir -p logs/heroic
+          python3 tools/check_godot.py logs/heroic.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/heroic_suite.gd
+          python3 tools/check_godot.py logs/input.log xvfb-run -a -s '-screen 0 1280x720x24' godot --audio-driver Dummy --path . --script tests3d/input_suite.gd
+          python3 tools/check_godot.py logs/frontier.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/frontier_suite.gd
+      - name: Render Jade changes, both iPhone cutout directions and building levels
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/jade
+        run: |
+          mkdir -p logs/jade
+          python3 tools/check_godot.py logs/jade-ui.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/jade_visual_suite.gd
+      - name: Check physical edges and editable saved village paths
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GLUTWACHT_QA_DIR: logs/roads
+        run: |
+          mkdir -p logs/roads
+          python3 tools/check_godot.py logs/roads.log xvfb-run -a -s '-screen 0 1920x1080x24' godot --audio-driver Dummy --path . --script tests3d/roads_suite.gd
+      - name: Export and exercise iPhone landscape
+        run: |
+          mkdir -p dist/v08
+          python3 tools/check_godot.py logs/export019.log godot --headless --path . --export-release Web dist/v08/index.html
+          python3 tools/web_bootstrap.py dist/v08
+          npm install --prefix "$RUNNER_TEMP/browser019" --no-package-lock playwright@1.56.1
+          node "$RUNNER_TEMP/browser019/node_modules/playwright/cli.js" install --with-deps chromium
+          NODE_PATH="$RUNNER_TEMP/browser019/node_modules" node tools/iphone_smoke.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: glutwacht-web-019
+          path: dist
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: heroic-review
+          path: logs

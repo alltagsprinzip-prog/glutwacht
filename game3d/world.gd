@@ -11,12 +11,15 @@ var materials: Dictionary = {}
 var asset_cache: Dictionary = {}
 var asset_materials: Dictionary = {}
 var sky_env: Environment
+const AbilityFX=preload("res://game3d/ui/ability_fx.gd")
 const Architecture=preload("res://game3d/architecture.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 var zoom=42.0
 var target_zoom=42.0
 var focus=Vector3.ZERO
 var pan=Vector2.ZERO
+var follow_hero=true
+var deployment_marker:MeshInstance3D
 var build_focus=false
 var ghost:Node3D
 var shown_buildings:Array=[]
@@ -30,6 +33,22 @@ var effect_nodes:Dictionary={}
 var effect_serial=0
 var selection:MeshInstance3D
 var edges:Node3D
+var boats:Array=[]
+var village_clock=0.0
+var art_preview=false
+var village_bounds=Rect2(-39,-39,70,78)
+var quality=1
+func apply_settings(settings:Dictionary):
+ quality=int(settings.quality)
+ if sky_env:
+  sky_env.adjustment_enabled=true;sky_env.adjustment_brightness=float(settings.brightness)
+ for child in get_children():
+  if child is DirectionalLight3D and child.light_energy>.4:child.shadow_enabled=quality>0
+ if is_inside_tree():
+  get_viewport().msaa_3d=Viewport.MSAA_DISABLED if quality==0 else (Viewport.MSAA_2X if quality==1 else Viewport.MSAA_4X)
+  get_viewport().scaling_3d_scale=.8 if quality==0 else 1.0
+const ArtVillage=preload("res://game3d/art_village.gd")
+const Nature=preload("res://game3d/nature.gd")
 func health_bar(parent:Node3D,height:float,width:float,color:Color) -> Dictionary:
  var root=Node3D.new();parent.add_child(root);root.position=Vector3(0,height,0)
  var parts=[]
@@ -46,7 +65,7 @@ func material(color: Color, rough: float=.9, emission: bool=false) -> StandardMa
  color.a=roundf(color.a*16.0)/16.0
  var key=str(color)+str(emission)
  if materials.has(key):return materials[key]
- var m=StandardMaterial3D.new();m.albedo_color=color;m.roughness=rough
+ var m=StandardMaterial3D.new();m.albedo_color=color.darkened(.13) if not emission else color;m.roughness=rough
  if color.a<1:m.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
  if emission:m.emission_enabled=true;m.emission=color;m.emission_energy_multiplier=.7
  materials[key]=m;return m
@@ -76,13 +95,18 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
     var character=original.duplicate();character.metallic=.02;character.roughness=.8;character.rim_enabled=true;character.rim=.38;character.rim_tint=.25;character.next_pass=outline_material
     n.set_surface_override_material(surface,character);asset_materials[palette_key]=character
    elif original is StandardMaterial3D:
-    var mat=original.duplicate();mat.metallic=0;mat.roughness=.92
+    var mat=original.duplicate();mat.metallic=0;mat.roughness=.92;mat.emission_enabled=false
     var matname=mat.resource_name.to_lower()
     if "roof" in matname:mat.albedo_color=roof_tint if roof_tint.a>0 else (Color("2c7ea3") if mode in ["home","defense"] else Color("d97443"))
     elif "plaster" in matname or "beige" in matname:mat.albedo_color=Color("f1dfb0")
-    elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("795030")
-    elif "leaf" in matname:mat.albedo_color=Color("4c8735") if rng.randf()>.25 else Color("769841")
+    elif "wood" in matname:mat.albedo_color=Color("b38654") if "light" in matname else Color("aa7444")
+    elif "leaf" in matname:mat.albedo_color=Color("69b53e") if rng.randf()>.25 else Color("97cd52")
     elif "grass" in matname:mat.albedo_color=Color("649447")
+    if name.begins_with("rock_"):
+     mat.vertex_color_use_as_albedo=false;mat.albedo_texture=null;mat.albedo_color=Color("727c7e")
+    if name.begins_with("bridge_"):
+     mat.vertex_color_use_as_albedo=false;mat.albedo_texture=null;mat.albedo_color=Color("8e6c49")
+    mat.albedo_color=mat.albedo_color.darkened(.12)
     n.set_surface_override_material(surface,mat);asset_materials[palette_key]=mat
   var box:AABB=holder.global_transform.affine_inverse()*n.global_transform*n.get_aabb()
   if first:bounds=box;first=false
@@ -102,22 +126,32 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  holder.set_meta("height",bounds.size.y*factor)
  return holder
 func setup(sim):
+ follow_hero=true
+ village_bounds=load("res://game3d/progress.gd").village_bounds(int(sim.profile.hall),int(sim.profile.get("frontier",{}).get("land",0)))
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
- effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
+ boats.clear();effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
  landscape=Node3D.new();add_child(landscape)
  var env=WorldEnvironment.new();sky_env=Environment.new();env.environment=sky_env;add_child(env)
  sky_env.background_mode=Environment.BG_COLOR;sky_env.background_color=Color("9fdcfa")
- sky_env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;sky_env.ambient_light_color=Color("d6ebff");sky_env.ambient_light_energy=.43
- sky_env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;sky_env.fog_enabled=true;sky_env.fog_light_color=Color("91aeba");sky_env.fog_density=.001
- var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=.8;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
- var fill=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-30,140,0);fill.light_color=Color("c1e9ff");fill.light_energy=.12;add_child(fill)
+ sky_env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;sky_env.ambient_light_color=Color("d6ebff");sky_env.ambient_light_energy=.46
+ sky_env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;sky_env.fog_enabled=false;sky_env.fog_light_color=Color("91aeba");sky_env.fog_density=.001
+ var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=.64;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
+ var fill=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-30,140,0);fill.light_color=Color("c1e9ff");fill.light_energy=.10;add_child(fill)
  camera=Camera3D.new();add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.far=210;camera.current=true
  if mode=="scout":target_zoom=48;focus=Vector3(0,0,-2)
  elif sim.active():target_zoom=48;focus=Vector3.ZERO
  else:target_zoom=46;focus=Vector3(0,0,1)
+ if mode=="home":
+  sky_env.ambient_light_energy=.52;sun.light_energy=.72;sun.light_color=Color("ffe6ba")
+ if art_preview and mode=="home":
+  target_zoom=36;pan=Vector2(0,-3);focus=Vector3(0,0,-3)
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
- terrain();scenery(sim)
+ terrain()
+ if art_preview and mode=="home":ArtVillage.new().landscape(landscape,sim.buildings)
+ else:scenery(sim)
+ batch_static_landscape()
+ village_paths(sim)
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
@@ -126,46 +160,125 @@ func setup(sim):
  for u in sim.enemies:create_actor(u)
  fx=Node3D.new();add_child(fx)
  selection=disc(1,Color(.1,.75,1,.2),Vector3.ZERO,fx);selection.visible=false
+ deployment_marker=disc(1.4,Color(.2,.9,.5,.5),Vector3.ZERO,fx);deployment_marker.visible=false
  edges=Node3D.new();fx.add_child(edges)
- for axis in range(4):
-  var p=Vector3(0,.065,27) if axis==0 else (Vector3(0,.065,-27) if axis==1 else (Vector3(27,.065,0) if axis==2 else Vector3(-27,.065,0)))
-  box(edges,p,Vector3(54,.04,.32) if axis<2 else Vector3(.32,.04,54),Color("f1b973"))
+ if mode in ["raid","scout"] and sim.deployment_polygon.size()>2:
+  # Outline only the actual protected enemy footprint, no narrow square spawn band.
+  for i in range(sim.deployment_polygon.size()-1):
+   var a:Vector2=sim.deployment_polygon[i];var b:Vector2=sim.deployment_polygon[i+1];var midpoint=(a+b)*.5
+   var line=box(edges,Vector3(midpoint.x,.075,midpoint.y),Vector3(.14,.04,a.distance_to(b)),Color("e7866b"));line.rotation.y=atan2(b.x-a.x,b.y-a.y)
+ elif mode=="home":
+  var bounds=village_bounds
+  for x in range(int(bounds.position.x),int(bounds.end.x)+1,4):
+   for z in [bounds.position.y,bounds.end.y]:box(edges,Vector3(x,.36,z),Vector3(.26,.7,.26),Color("e5c58a"))
+  for z in range(int(bounds.position.y)+4,int(bounds.end.y),4):
+   for x in [bounds.position.x,bounds.end.x]:box(edges,Vector3(x,.36,z),Vector3(.26,.7,.26),Color("e5c58a"))
+ apply_settings(load("res://game3d/progress.gd").clean_settings(sim.profile.get("settings",{})))
+func batch_static_landscape():
+ # Merge only immutable decoration, in spatial cells. Moving boats and selectable
+ # obstacles remain independent; obstacles are created after this call.
+ var buckets={}
+ for node in landscape.find_children("*","MeshInstance3D",true,false):
+  var moving=false
+  for boat in boats:
+   if boat.root==node or boat.root.is_ancestor_of(node):moving=true;break
+  if moving or node.mesh==null:continue
+  var transform=landscape.global_transform.affine_inverse()*node.global_transform
+  var cell=Vector2i(floori(transform.origin.x/24),floori(transform.origin.z/24))
+  for surface in range(node.mesh.get_surface_count()):
+   var mat=node.get_active_material(surface)
+   if mat==null:continue
+   var arrays=node.mesh.surface_get_arrays(surface);var format=""
+   for array in arrays:format+="1" if array!=null and array.size()>0 else "0"
+   var key=str(mat.get_instance_id())+str(cell)+format+str(node.cast_shadow)
+   if not buckets.has(key):buckets[key]={"material":mat,"shadow":node.cast_shadow,"parts":[]}
+   buckets[key].parts.append({"node":node,"surface":surface,"transform":transform})
+ var removed={}
+ for bucket in buckets.values():
+  if bucket.parts.size()<2:continue
+  var joined=SurfaceTool.new();joined.begin(Mesh.PRIMITIVE_TRIANGLES)
+  for part in bucket.parts:
+   joined.append_from(part.node.mesh,part.surface,part.transform)
+   # Hide the merged surface without removing unmerged sibling surfaces.
+   if not removed.has(part.node):removed[part.node]=[]
+   removed[part.node].append(part.surface)
+  var batch=mesh_node(joined.commit(),Vector3.ZERO,bucket.material,landscape);batch.name="StaticLandscapeBatch";batch.cast_shadow=bucket.shadow
+ for node in removed:
+  if removed[node].size()==node.mesh.get_surface_count():node.queue_free()
+  else:
+   var remainder=ArrayMesh.new()
+   for surface in range(node.mesh.get_surface_count()):
+    if surface in removed[node]:continue
+    remainder.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,node.mesh.surface_get_arrays(surface))
+    remainder.surface_set_material(remainder.get_surface_count()-1,node.get_active_material(surface))
+   node.mesh=remainder
+   for surface in range(remainder.get_surface_count()):node.set_surface_override_material(surface,null)
 func terrain():
  var surf=SurfaceTool.new();surf.begin(Mesh.PRIMITIVE_TRIANGLES)
- for x in range(-82,82,2):
-  for z in range(-82,82,2):
-   for v in [Vector2(x,z),Vector2(x+2,z),Vector2(x,z+2),Vector2(x+2,z),Vector2(x+2,z+2),Vector2(x,z+2)]:
+ for x in range(-144,144,4):
+  for z in range(-164,132,4):
+   for v in [Vector2(x,z),Vector2(x+4,z),Vector2(x,z+4),Vector2(x+4,z),Vector2(x+4,z+4),Vector2(x,z+4)]:
     var meadow=clampf((sin(v.x*.08)+cos(v.y*.09)+2.0)/4.0,0,1)
     var c=Color("548d38").lerp(Color("98b957"),meadow*.65)
     var noise=sin(v.x*.4+v.y*.25)*.017+rng.randf_range(-.012,.012)
     surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise).srgb_to_linear());surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
  var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
- var water=PlaneMesh.new();water.size=Vector2(6,132)
- mesh_node(water,Vector3(39,.025,0),material(Color("218ba1"),.18),landscape)
- asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),7.2,"width",PI/2)
- for i in range(10):
-  var m=CylinderMesh.new();m.top_radius=0;m.bottom_radius=rng.randf_range(9,17);m.height=rng.randf_range(13,26);m.radial_segments=7
-  mesh_node(m,Vector3(-60+i*14,m.height/2-2,-65),material(Color("637d89")),landscape)
+ mat.set_shader_parameter("meadow",load("res://assets3d/nature/meadow-grass.webp"))
+ if mode=="home":
+  mat.set_shader_parameter("grass_dark",Color("30442c"));mat.set_shader_parameter("grass_light",Color("718454"))
+ var water=SurfaceTool.new();water.begin(Mesh.PRIMITIVE_TRIANGLES)
+ for i in range(288):
+  for point in [Vector2(0,i),Vector2(1,i),Vector2(0,i+1),Vector2(1,i),Vector2(1,i+1),Vector2(0,i+1)]:
+   var z=point.y-156;var x=Nature.river_x(z)+(point.x-.5)*Nature.river_width(z)
+   water.set_uv(Vector2(point.x,z*.15));water.set_normal(Vector3.UP);water.add_vertex(Vector3(x,.09,z))
+ mesh_node(water.commit(),Vector3.ZERO,water_material(),landscape)
+ asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),10.2,"width",PI/2)
+ for side in [-1,1]:
+  for i in range(32):
+   var z=-64+i*4+rng.randf_range(-1.3,1.3);var bank=Nature.river_x(z)+side*(Nature.river_width(z)*.5+rng.randf_range(.1,1.3))
+   var stone=SphereMesh.new();stone.radius=rng.randf_range(.3,.85);stone.height=stone.radius*1.3;stone.radial_segments=12;stone.rings=6
+   var rock=mesh_node(stone,Vector3(bank,.02,z),material(Color("7b8071")),landscape);rock.scale=Vector3(1.4,.8,1);rock.rotation.y=rng.randf()*TAU
+ if mode=="home":
+  create_boat(-1,Color("eee5bd"));create_boat(1,Color("f2a14b"))
+ var mountains=load("res://game3d/mountains.gd");mountains.build(landscape)
+ for i in range(33):
+  var x=-105.0+i*7.0;var z=-80.0-sin(i*2.37)*2.0
+  if absf(x-Nature.river_x(z))<Nature.river_width(z):continue
+  var h=mountains.elevation(x,z,mountains.terrain_noise)
+  Nature.tree(landscape,Vector3(x,h-.2,z),5.0+sin(i*1.3)*1.7,i+812)
+# Paths follow the actual building positions, including relocated legacy buildings.
+func village_paths(sim):
+ if mode!="home":return
+ render_paths(load("res://game3d/roads.gd").clean(sim.profile.get("roads",{})),sim.buildings)
+func render_paths(data:Dictionary,buildings:Array):
+ var previous=get_node_or_null("VillagePaths")
+ if previous:remove_child(previous);previous.queue_free()
+ var parent=Node3D.new();parent.name="VillagePaths";add_child(parent)
+ if mode=="home":load("res://game3d/roads.gd").draw(parent,data,buildings)
 func scenery(sim):
  for i in range(95):
   var p=Vector3(rng.randf_range(-58,56),0,rng.randf_range(-52,46))
-  if absf(p.x)<34 and absf(p.z)<35:continue
+  if village_bounds.grow(3).has_point(Vector2(p.x,p.z)):continue
   if p.x>35 and p.x<44:continue
   var names=["tree_default.glb","tree_fat.glb","tree_tall.glb","tree_pineTallA_detailed.glb"]
-  asset(names[i%4],landscape,p,rng.randf_range(6,11),"height",rng.randf()*TAU)
- for i in range(18):
+  Nature.tree(landscape,p,rng.randf_range(5,11),i+742)
+ for i in range(48):
   var edge=26.0+rng.randf_range(0,4)
   var p=Vector2(edge*(1 if i%2==0 else -1),rng.randf_range(-27,27)) if i%3 else Vector2(rng.randf_range(-27,27),edge*(1 if i%2==0 else -1))
   var plants=["grass.glb","grass_large.glb","flower_yellowC.glb","flower_purpleA.glb"]
   asset(plants[i%4],landscape,Vector3(p.x,.01,p.y),rng.randf_range(.35,.8),"height",rng.randf()*TAU)
  for i in range(14):asset("rock_largeA.glb",landscape,Vector3(rng.randf_range(43,49),-.1,rng.randf_range(-34,34)),rng.randf_range(1,3),"height",rng.randf()*TAU)
  for i in range(4):
-  var p=Vector3(-20+i*13.5,0,-34)
-  asset("House_4.obj" if i%2 else "House_1.obj",landscape,p,5.5,"width",PI)
+  var p=Vector3(-20+i*13.5,0,village_bounds.position.y-6)
+  var dwelling=Node3D.new();dwelling.name="Chinese_SceneryDwelling";landscape.add_child(dwelling);dwelling.position=p
+  Architecture.pavilion(self,dwelling,Vector3.ZERO,4.8,3.5,2.25,Color("4a6663"),false,1)
+  Architecture.lantern(self,dwelling,Vector3(-1.8,2.1,1.9));batch_building_geometry(dwelling)
  # Kasernenhof: Feuer, Bänke und Vorräte geben der wartenden Armee einen klaren Platz.
  if mode=="home":
   var bp:Vector2=Catalog.CORE_POS.barracks
+  for site in sim.buildings:
+   if site.uid=="barracks":bp=site.pos
   asset("Bonfire_Lit.obj",landscape,Vector3(bp.x+1.5,.03,bp.y+6.2),1.5,"width")
   asset("Bench_1.obj",landscape,Vector3(bp.x-3.0,.02,bp.y+5.5),2.3,"width",PI/2)
   asset("Barrel.obj",landscape,Vector3(bp.x+4.0,.02,bp.y+4.8),1.2,"height")
@@ -174,13 +287,13 @@ func scenery(sim):
   asset("Bonfire_Lit.obj",landscape,Vector3(-5,.05,16),1.6,"width")
  var fire=OmniLight3D.new();fire.position=Vector3(-10,1,8);fire.light_color=Color("ffad57");fire.light_energy=1.15;fire.omni_range=5;landscape.add_child(fire)
  for i in range(9):
-  for z in [-32.5,32.5]:asset("rock_smallA.glb",landscape,Vector3(-30+i*7.5,.01,z),.4,"height")
+  for z in [-40.5,40.5]:asset("rock_smallA.glb",landscape,Vector3(-30+i*7.5,.01,z),.4,"height")
 func create_obstacle(o:Dictionary,jobs:Array):
  var uid=String(o.get("uid",""));if uid=="":return
  var kind=String(o.get("kind","tree"));var root=Node3D.new();root.position=Vector3(float(o.x),.02,float(o.z));landscape.add_child(root)
  var radius=1.6;var height=4.0
  if kind=="tree":
-  asset("tree_fat.glb",root,Vector3.ZERO,6.6,"height");radius=1.8;height=6.5
+  Nature.tree(root,Vector3.ZERO,6.6,int(o.x*123+o.z*37));radius=1.8;height=6.5
  elif kind=="rock":
   asset("rock_largeA.glb",root,Vector3.ZERO,2.6,"height",.3);radius=1.5;height=2.7
  else:
@@ -221,7 +334,7 @@ func create_building(b:Dictionary):
  var bubble=null
  if mode=="home" and Catalog.RESOURCES.has(b.kind):
   bubble=Node3D.new();root.add_child(bubble);bubble.position=Vector3(0,model_height+1.65,0)
-  var img=Sprite3D.new();img.texture=load("res://assets3d/icons/"+Catalog.RESOURCES[b.kind]+".svg");img.pixel_size=.055;img.billboard=BaseMaterial3D.BILLBOARD_ENABLED;img.no_depth_test=true;img.shaded=false;bubble.add_child(img)
+  var marker=load("res://game3d/resource_marker.gd").new();bubble.add_child(marker);marker.build(self,String(Catalog.RESOURCES[b.kind]))
   var full=Label3D.new();full.text="MAX";full.font_size=33;full.pixel_size=.018;full.position=Vector3(0,-1.7,0);full.billboard=BaseMaterial3D.BILLBOARD_ENABLED;full.no_depth_test=true;full.modulate=Color("ffdc79");full.outline_size=7;bubble.add_child(full)
  forts[b.id]={"root":root,"body":body,"label":label,"text":text,"height":model_height,"hpbar":hpbar,"job":job,"ruin":null,"bubble":bubble,"collapse":0.0,"smoke":null}
 func create_worker(b:Dictionary,job:Dictionary):
@@ -247,11 +360,13 @@ func create_worker(b:Dictionary,job:Dictionary):
 func banner(parent:Node,pos:Vector3,height:float,enemy:bool):
  var pole=CylinderMesh.new();pole.top_radius=.045;pole.bottom_radius=.07;pole.height=height
  mesh_node(pole,pos+Vector3(0,height/2,0),material(Color("705b3f")),parent)
- box(parent,pos+Vector3(.35,height-.6,0),Vector3(.75,1.15,.06),Color("9a3f35") if enemy else Color("28617a"))
- box(parent,pos+Vector3(.35,height-.6,.04),Vector3(.12,.48,.035),Color("e5c47c"))
+ var cloth=PlaneMesh.new();cloth.size=Vector2(.85,1.15);cloth.subdivide_width=8;cloth.subdivide_depth=4
+ var fabric=ShaderMaterial.new();fabric.shader=load("res://game3d/banner.gdshader");fabric.set_shader_parameter("fabric",Color("b44532") if enemy else Color("174a91"))
+ var flag=mesh_node(cloth,pos+Vector3(.42,height-.6,0),fabric,parent);flag.rotation.x=PI/2
+
 func disc(radius:float,color:Color,pos:Vector3,parent:Node) -> MeshInstance3D:
  var mesh=CylinderMesh.new();mesh.top_radius=radius;mesh.bottom_radius=radius;mesh.height=.025;mesh.radial_segments=40
- return mesh_node(mesh,pos,material(color,.8,color.a>.5),parent)
+ return mesh_node(mesh,pos,material(color,.8,false),parent)
 func hero_showcase(key:String,parent:Node) -> Node3D:
  var h=asset(Catalog.hero(key).model,parent,Vector3.ZERO,3.5)
  var players=h.find_children("*","AnimationPlayer",true,false)
@@ -263,9 +378,27 @@ func create_actor(u:Dictionary):
  var file="Warrior.gltf"
  if u.kind=="hero":file=Catalog.hero(u.class_key).model
  elif u.kind in ["archer","ranger"]:file="Ranger.gltf"
- elif u.kind=="guard":file="Rogue.gltf"
- var size=3.15 if u.kind=="hero" else (3.2 if u.kind=="captain" else 2.65)
+ elif u.kind in ["guard","melee"]:file="Rogue.gltf"
+ elif u.kind=="siege":file="Cleric.gltf"
+ var size=3.8 if u.kind=="hero" else (2.85 if u.kind in ["captain","shield"] else 2.45)
  var holder=asset(file,self,Vector3(u.pos.x,.06,u.pos.y),size)
+ if u.kind=="melee":
+  var helm=SphereMesh.new();helm.radius=.37;helm.height=.52;helm.radial_segments=12;helm.rings=6
+  mesh_node(helm,Vector3(0,size-.2,0),material(Color("93aabb"),.4),holder)
+ if u.kind=="hero":
+  var cape=PrismMesh.new();cape.size=Vector3(1.35,1.8,.18)
+  var mantle=mesh_node(cape,Vector3(0,1.65,-.35),material(Color(Catalog.hero(u.class_key).color).darkened(.32)),holder);mantle.rotation.x=-.14
+ if u.kind=="shield":
+  var shield=box(holder,Vector3(0,1.35,.6),Vector3(1.45,1.75,.22),Color("398edd"))
+  box(shield,Vector3(0,0,.15),Vector3(.18,1.3,.1),Color("ffe091"))
+ if u.kind=="siege":
+  box(holder,Vector3(0,.5,-.65),Vector3(1.5,.2,1.3),Color("9f7346"))
+  var arm=box(holder,Vector3(0,1.02,-.75),Vector3(.19,1.4,.2),Color("b08550"));arm.rotation.x=-.6
+  for x in [-.78,.78]:
+   var wheel=CylinderMesh.new();wheel.top_radius=.42;wheel.bottom_radius=.42;wheel.height=.15;wheel.radial_segments=12
+   var axle=mesh_node(wheel,Vector3(x,.4,-.65),material(Color("63442d")),holder);axle.rotation.z=PI/2
+  var rock=SphereMesh.new();rock.radius=.42;rock.height=.84
+  mesh_node(rock,Vector3(.45,1.7,.5),material(Color("a9aca4")),holder)
  var anims=holder.find_children("*","AnimationPlayer",true,false);var anim:AnimationPlayer=anims[0] if not anims.is_empty() else null
  if anim:
   for name in anim.get_animation_list():
@@ -274,16 +407,34 @@ func create_actor(u:Dictionary):
  var color=Color(Catalog.hero(u.class_key).color) if u.kind=="hero" else (Color("ed8465") if u.team=="enemy" else Color("a2c5e0"))
  var ring=disc(.72 if u.kind=="hero" else .5,color,Vector3(0,.035,0),holder)
  if u.kind=="hero":
+  var crest=PrismMesh.new();crest.size=Vector3(.42,.5,.18)
+  mesh_node(crest,Vector3(0,size+.5,0),material(Color("ffdf78"),.3,true),holder)
   var torus=TorusMesh.new();torus.inner_radius=.8;torus.outer_radius=.86;torus.rings=40;torus.ring_segments=6
   mesh_node(torus,Vector3(0,.065,0),material(color,.4,true),holder)
  var bar=Label3D.new();bar.font_size=24;bar.pixel_size=.017;bar.position.y=size+.3;bar.billboard=BaseMaterial3D.BILLBOARD_ENABLED;bar.modulate=color;bar.outline_size=6;bar.no_depth_test=true;holder.add_child(bar)
  var hpbar=health_bar(holder,size+.18,1.7 if u.kind=="hero" else 1.3,Color("f16656") if u.team=="enemy" else Color("4bd887"))
  actors[u.id]={"node":holder,"anim":anim,"bar":bar,"hpbar":hpbar,"ring":ring,"state":"","size":size}
 func sync(sim,dt:float):
+ village_clock+=dt
+ for boat in boats:
+  var t=village_clock*.65+boat.phase
+  var z=boat.side*(13+fposmod(t,44))
+  boat.root.position=Vector3(Nature.river_x(z)+sin(t*.25)*.35,.24+sin(t*2)*.06,z)
+  boat.root.rotation=Vector3(sin(t*1.6)*.022,0 if boat.side>0 else PI,sin(t*1.3)*.035)
+
  for u in ([sim.hero]+sim.allies if mode!="scout" else [])+sim.enemies:
   if not actors.has(u.id):create_actor(u)
   var a:Dictionary=actors[u.id]
+  a.node.visible=u.kind!="hero" or sim.hero_deployed
+  if not a.node.visible:continue
   a.node.position=Vector3(u.pos.x,.06,u.pos.y)
+  var rolling=float(u.get("roll_time",0))
+  var model=a.node.get_child(0)
+  if model is Node3D:
+   model.rotation.x=-TAU*(1.0-rolling/.28) if rolling>0 else 0.0
+   model.position.y=float(model.get_meta("base_roll_y",model.position.y))
+   if not model.has_meta("base_roll_y"):model.set_meta("base_roll_y",model.position.y)
+   if rolling>0:model.position.y+=.65
   if u.hp<=0:
    a.ring.visible=false;a.bar.visible=false;a.hpbar.root.visible=false
    if a.state!="Death" and a.anim and a.anim.has_animation("Death"):a.anim.play("Death",.1);a.state="Death"
@@ -295,9 +446,11 @@ func sync(sim,dt:float):
   var attacking=state=="attack"
   if state=="attack":
    if u.kind in ["archer","ranger"]:state="Bow_Shoot"
+   elif u.kind=="melee":state="Dagger_Attack"
+   elif u.kind=="siege":state="Spell1"
    elif u.kind=="guard" or u.get("class_key","")=="ninja":state="Dagger_Attack"
    elif u.get("class_key","") in ["shaman","mage"]:state="Spell1"
-   else:state="Sword_Attack"
+   else:state="Sword_Attack2" if u.get("cast_kind","")=="skill" else "Sword_Attack"
   elif state=="Idle":state="Idle_Weapon" if a.anim and a.anim.has_animation("Idle_Weapon") else "Idle"
   elif state=="Run":
    if a.anim and a.anim.has_animation("Run_Weapon"):state="Run_Weapon"
@@ -311,9 +464,14 @@ func sync(sim,dt:float):
    else:state="Idle"
   if a.anim and a.anim.has_animation(state):
    var sequence=int(u.get("attack_seq",0))
-   if a.state!=state or (attacking and sequence!=int(a.get("attack_seq",-1))) or not a.anim.is_playing():
-    a.anim.play(state,.025 if attacking else .12);a.state=state;a.attack_seq=sequence
-   a.anim.speed_scale=a.anim.get_animation(state).length/maxf(.15,float(u.get("attack_total",.6))) if attacking else 1.0
+   if attacking:
+    if a.state!=state or sequence!=int(a.get("attack_seq",-1)):a.anim.play(state,0);a.state=state;a.attack_seq=sequence
+    a.anim.pause()
+    var phase=clampf(1.0-float(u.attack_time)/maxf(.001,float(u.attack_total)),0,.999)
+    a.anim.seek(a.anim.get_animation(state).length*phase,true)
+   else:
+    a.anim.speed_scale=1.08 if u.kind=="hero" else (.78 if u.kind in ["siege","shield"] else (1.16 if u.kind in ["archer","ranger"] else 1.0))
+    if a.state!=state or not a.anim.is_playing():a.anim.play(state,.12);a.state=state
   if bool(a.get("flash_on",false))!=(u.flash>0):
    a.flash_on=u.flash>0
    for part in a.node.find_children("*","GeometryInstance3D",true,false):part.material_overlay=material(Color(1,.94,.68,.6),.5,true) if u.flash>0 else null
@@ -356,10 +514,15 @@ func sync(sim,dt:float):
     if String(sb.get("uid",""))==String(b.uid):stock=float(sb.get("stock",0.0));break
    var cap=140.0*int(b.level);f.bubble.visible=stock>=1 and f.job.is_empty()
    var fraction=clampf(stock/cap,0,1)
-   f.bubble.scale=Vector3.ONE*(1.0+.22*fraction)
-   f.bubble.get_child(1).visible=stock>=cap-1
+   f.bubble.scale=Vector3.ONE*(1.0+.12*fraction+.035*sin(village_clock*2))
+   f.bubble.position.y=f.height+1.9+sin(village_clock*1.8+b.id)*.18
+   f.bubble.get_child(0).rotation.y=sin(village_clock*.8)*.22
+   f.bubble.get_child(1).text=("MAX · " if stock>=cap-1 else "")+str(int(stock))
+   f.bubble.get_child(1).visible=true
   if not f.job.is_empty():
    var remaining=maxf(0,float(f.job.finish)-Time.get_unix_time_from_system())
+   if f.job.get("new",false):
+    var built=clampf(1-remaining/maxf(1,float(f.job.finish)-float(f.job.start)),0,1);f.body.scale=Vector3.ONE*lerpf(.45,1.0,built)
    f.label.text="BAUSTELLE · %d s"%ceili(remaining)
    f.label.visible=true;set_health(f.hpbar,1-remaining/maxf(1,float(f.job.finish)-float(f.job.start)),true)
  for w in workers:
@@ -378,12 +541,13 @@ func sync(sim,dt:float):
  if selected_obstacle!="" and obstacles.has(selected_obstacle):
   var o=obstacles[selected_obstacle];var root:Node3D=o.root
   selection.visible=true;selection.position=Vector3(root.position.x,.08,root.position.z);selection.scale=Vector3.ONE*(float(o.radius)+.45)
- edges.visible=mode=="scout" or (mode=="raid" and sim.manual_deployment and sim.reserve.melee+sim.reserve.archers>0)
+ edges.visible=(mode=="home" and build_focus) or mode=="scout" or (mode=="raid" and sim.manual_deployment and (not sim.hero_deployed or Catalog.army_count(sim.reserve)>0))
  update_camera(sim,dt)
 func effect_id(e:Dictionary) -> int:
  if not e.has("visual_id"):effect_serial+=1;e.visual_id=effect_serial
  return int(e.visual_id)
 func effect_visual(e:Dictionary) -> Node3D:
+ if e.kind in AbilityFX.KINDS:return AbilityFX.create(self,e)
  var root=Node3D.new();fx.add_child(root)
  var color:Color=e.color;var kind=String(e.kind)
  if kind=="arrow":
@@ -392,36 +556,6 @@ func effect_visual(e:Dictionary) -> Node3D:
   for i in range(3):
    var tail=SphereMesh.new();tail.radius=.08-float(i)*.015;tail.height=tail.radius*2;tail.radial_segments=6;tail.rings=3
    mesh_node(tail,Vector3(0,0,.25+float(i)*.18),material(color,.4,true),root)
- elif kind=="mage":
-  # Target rune, descending crystal and an impact halo are separate silhouettes.
-  for radius in [2.8,3.3]:
-   var rune=TorusMesh.new();rune.inner_radius=radius-.09;rune.outer_radius=radius;rune.rings=32;rune.ring_segments=6
-   mesh_node(rune,Vector3(0,.16,0),material(color,.3,true),root)
-  for i in range(8):
-   var mark=BoxMesh.new();mark.size=Vector3(.16,.1,.65)
-   var a=i*TAU/8;var node=mesh_node(mark,Vector3(cos(a)*3.0,.18,sin(a)*3.0),material(color,.3,true),root);node.rotation.y=-a
-  var crystal=PrismMesh.new();crystal.size=Vector3(1.0,2.7,1.0)
-  var meteor=mesh_node(crystal,Vector3(0,7,0),material(Color("dcecff"),.3,true),root);meteor.name="FallingRune"
- elif kind=="warrior":
-  for i in range(2):
-   var shock=TorusMesh.new();shock.inner_radius=.8+i*.6;shock.outer_radius=1.0+i*.6;shock.rings=32;shock.ring_segments=6
-   mesh_node(shock,Vector3(0,.1+i*.1,0),material(color,.6,true),root)
-  for i in range(10):
-   var rock=BoxMesh.new();rock.size=Vector3(.28,.45,.35)
-   var a=i*TAU/10;var shard=mesh_node(rock,Vector3(cos(a)*1.4,.3,sin(a)*1.4),material(Color("c99a68")),root)
-   shard.rotation=Vector3(a,.4,a*.5)
- elif kind=="shaman":
-  var halo=TorusMesh.new();halo.inner_radius=3.6;halo.outer_radius=3.75;halo.rings=40;halo.ring_segments=6
-  mesh_node(halo,Vector3(0,.18,0),material(color,.5,true),root)
-  for i in range(9):
-   var spirit=SphereMesh.new();spirit.radius=.18;spirit.height=.65;spirit.radial_segments=8;spirit.rings=4
-   var a=i*TAU/9
-   mesh_node(spirit,Vector3(cos(a)*2.5,.8+i*.16,sin(a)*2.5),material(Color("baffdc"),.3,true),root)
- elif kind=="ninja":
-  for i in range(3):
-   var slash=BoxMesh.new();slash.size=Vector3(.11,.13,3.6)
-   var blade=mesh_node(slash,Vector3((i-1)*.5,1+i*.3,0),material(Color("ead7ff"),.3,true),root)
-   blade.rotation=Vector3(.4,(-.6 if i%2==0 else .6),.7)
  elif kind=="afterimage":
   var shape=CapsuleMesh.new();shape.radius=.35;shape.height=2.5;shape.radial_segments=8;shape.rings=4
   mesh_node(shape,Vector3(0,1.3,0),material(Color(color,.3),.7,true),root)
@@ -440,24 +574,17 @@ func update_effects(sim):
   var id=effect_id(e);live[id]=true
   if not effect_nodes.has(id):effect_nodes[id]=effect_visual(e)
   var root:Node3D=effect_nodes[id];var t=clampf(1-float(e.life)/float(e.max),0,1)
-  if e.kind=="arrow":
+  if e.kind in AbilityFX.KINDS:AbilityFX.update(root,e,t)
+  elif e.kind=="arrow":
    var end:Vector2=e.get("target",{}).get("pos",e.end);var pos:Vector2=e.pos.lerp(end,t)
    root.position=Vector3(pos.x,1.5+sin(t*PI)*1.2,pos.y);root.rotation.y=atan2(end.x-e.pos.x,end.y-e.pos.y)
   else:
    root.position=Vector3(e.pos.x,.12,e.pos.y)
    var radius=1.0+t*.5
-   if e.kind=="warrior":radius=.6+maxf(0,t-.24)*4.0
-   elif e.kind=="mage":
-    radius=1.0
-    root.get_node("FallingRune").position.y=maxf(.4,7.0*(1-t*2.4))
-   elif e.kind=="shaman":radius=.7+t*.65
-   elif e.kind=="skill":radius=.5+t*5.0
+   if e.kind in ["mage","warrior","shaman","skill"]:radius=.5+t*(5.0 if e.kind!="shaman" else 8.0)
    elif e.kind=="fall":radius=.8+t*3
    elif e.kind=="invalid":radius=1.0+t*.5
-   root.scale=Vector3(radius,1.0 if e.kind in ["warrior","shaman","mage"] else radius,radius);root.rotation.y=t*2
-   if e.kind=="warrior":root.position.y+=sin(t*PI)*.9
-   elif e.kind=="shaman":root.position.y+=t*.9
-   elif e.kind=="mage":root.rotation.y=0
+   root.scale=Vector3.ONE*radius;root.rotation.y=t*2
    for part in root.get_children():
     if part is GeometryInstance3D:part.transparency=t
  for entry in sim.combat_texts.slice(maxi(0,sim.combat_texts.size()-28)):
@@ -471,19 +598,28 @@ func update_effects(sim):
 func update_camera(sim,dt:float):
  if not camera:return
  var goal=Vector3(pan.x,0,pan.y)
- if false:
-  var factor=clampf((60-target_zoom)/35.0,0,1)
-  goal+=Vector3(sim.hero.pos.x,0,sim.hero.pos.y-2)*factor
+ if art_preview and mode=="home":goal.y=2.0
+ if mode=="raid" and follow_hero and sim.hero_deployed:
+  goal=Vector3(sim.hero.pos.x,0,sim.hero.pos.y);pan=Vector2(goal.x,goal.z)
  focus=focus.lerp(goal,minf(1,dt*5));zoom=lerpf(zoom,target_zoom,minf(1,dt*9));camera.size=zoom
  camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
-func change_zoom(amount:float):target_zoom=clampf(target_zoom+amount,17,66)
+func manual_camera():
+ if follow_hero:pan=Vector2(focus.x,focus.z)
+ follow_hero=false
+func preview_deployment(pos:Vector2,valid:bool):
+ if not is_instance_valid(deployment_marker):return
+ deployment_marker.visible=true;deployment_marker.position=Vector3(pos.x,.12,pos.y)
+ deployment_marker.material_override=material(Color(.15,.9,.5,.5) if valid else Color(1,.18,.12,.5))
+func change_zoom(amount:float):
+ manual_camera();target_zoom=clampf(target_zoom+amount,17,66)
 func screen_to_direction(v:Vector2) -> Vector2:
  var right=camera.global_basis.x;var forward=-camera.global_basis.z;forward.y=0;forward=forward.normalized()
  var d=right*v.x-forward*v.y;return Vector2(d.x,d.z).limit_length(1)
 func ground_position(screen:Vector2) -> Vector2:
  var hit=Plane(Vector3.UP,0).intersects_ray(camera.project_ray_origin(screen),camera.project_ray_normal(screen))
  return Vector2(hit.x,hit.z) if hit!=null else Vector2.ZERO
-func pan_camera(delta:Vector2):pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(Vector2(-26,-26),Vector2(26,26))
+func pan_camera(delta:Vector2):
+ manual_camera();pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(village_bounds.position+Vector2(5,5) if mode=="home" else Vector2(-42,-42),village_bounds.end-Vector2(5,5) if mode=="home" else Vector2(42,42))
 func building_at(screen:Vector2):
  var origin=camera.project_ray_origin(screen);var direction=camera.project_ray_normal(screen)
  var chosen=null;var best=INF
@@ -523,3 +659,62 @@ func show_ghost(kind:String,pos:Vector2,valid:bool,rotation:int=0):
  var body=Node3D.new();ghost.add_child(body)
  Architecture.draw(self,{"kind":kind,"level":1,"team":"ally","rotation":rotation},body)
  for part in body.find_children("*","GeometryInstance3D",true,false):part.transparency=.35
+
+func water_material() -> ShaderMaterial:
+ var mat=ShaderMaterial.new();mat.shader=load("res://game3d/water.gdshader");return mat
+func create_boat(side:int,color:Color):
+ var boat=Node3D.new();landscape.add_child(boat)
+ # A tapered three-dimensional hull, timber deck, mast and curved cloth sail.
+ var hull=SurfaceTool.new();hull.begin(Mesh.PRIMITIVE_TRIANGLES)
+ var rim=[Vector3(-.85,.35,-1.4),Vector3(.85,.35,-1.4),Vector3(1,.35,.8),Vector3(0,.55,2.1),Vector3(-1,.35,.8)]
+ var keel=Vector3(0,-.22,0)
+ for i in range(rim.size()):
+  hull.add_vertex(rim[i]);hull.add_vertex(rim[(i+1)%rim.size()]);hull.add_vertex(keel)
+ hull.generate_normals();var mat=material(Color("965d39"),.7).duplicate();mat.cull_mode=BaseMaterial3D.CULL_DISABLED
+ mesh_node(hull.commit(),Vector3.ZERO,mat,boat)
+ box(boat,Vector3(0,.3,-.1),Vector3(1.45,.12,2.5),Color("d1a66b"))
+ box(boat,Vector3(0,1.9,0),Vector3(.12,3.2,.12),Color("6a432b"))
+ box(boat,Vector3(0,3.15,0),Vector3(2.3,.1,.1),Color("6a432b"))
+ var sail=SurfaceTool.new();sail.begin(Mesh.PRIMITIVE_TRIANGLES)
+ for x in range(8):
+  for y in range(8):
+   for uv in [Vector2(x,y),Vector2(x+1,y),Vector2(x,y+1),Vector2(x+1,y),Vector2(x+1,y+1),Vector2(x,y+1)]:
+    uv/=8.0;sail.add_vertex(Vector3((uv.x-.5)*2.15,1.1+uv.y*2,.1+sin(uv.x*PI)*sin(uv.y*PI)*.55))
+ sail.generate_normals();var cloth=material(color).duplicate();cloth.cull_mode=BaseMaterial3D.CULL_DISABLED;mesh_node(sail.commit(),Vector3.ZERO,cloth,boat)
+ asset("Barrel.obj",boat,Vector3(-.4,.4,-.8),.65)
+ var wake=disc(1.25,Color(.65,.93,1,.22),Vector3(0,-.1,-2),boat);wake.scale=Vector3(.65,1,2)
+ boats.append({"root":boat,"side":side,"phase":9.0 if side<0 else 0.0})
+
+func batch_building_geometry(body:Node3D):
+ # Retain each destructible building root, but join its static timber, roof
+ # trim and masonry per material. Hundreds of tiny meshes become a few draws.
+ var buckets={}
+ for node in body.find_children("*","MeshInstance3D",true,false):
+  if node.mesh==null or not node.visible:continue
+  var local=body.global_transform.affine_inverse()*node.global_transform
+  for surface in range(node.mesh.get_surface_count()):
+   var mat=node.get_active_material(surface)
+   if mat==null:continue
+   var arrays=node.mesh.surface_get_arrays(surface);var format=""
+   for array in arrays:format+="1" if array!=null and array.size()>0 else "0"
+   var key=str(mat.get_instance_id())+format+str(node.cast_shadow)
+   if not buckets.has(key):buckets[key]={"material":mat,"shadow":node.cast_shadow,"parts":[]}
+   buckets[key].parts.append({"node":node,"surface":surface,"transform":local})
+ var removed={}
+ for bucket in buckets.values():
+  if bucket.parts.size()<2:continue
+  var joined=SurfaceTool.new();joined.begin(Mesh.PRIMITIVE_TRIANGLES)
+  for part in bucket.parts:
+   joined.append_from(part.node.mesh,part.surface,part.transform)
+   if not removed.has(part.node):removed[part.node]=[]
+   removed[part.node].append(part.surface)
+  var batch=mesh_node(joined.commit(),Vector3.ZERO,bucket.material,body);batch.name="ChineseMeshBatch";batch.cast_shadow=bucket.shadow
+ for node in removed:
+  if removed[node].size()==node.mesh.get_surface_count():node.hide();node.queue_free()
+  else:
+   var remainder=ArrayMesh.new()
+   for surface in range(node.mesh.get_surface_count()):
+    if surface in removed[node]:continue
+    remainder.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,node.mesh.surface_get_arrays(surface));remainder.surface_set_material(remainder.get_surface_count()-1,node.get_active_material(surface))
+   node.mesh=remainder
+   for surface in range(remainder.get_surface_count()):node.set_surface_override_material(surface,null)

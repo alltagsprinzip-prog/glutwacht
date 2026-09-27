@@ -1,0 +1,11 @@
+{
+  "name": "glutwacht-database-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node private_saves.mjs && node social.mjs && node save_recovery.mjs && node ranking.mjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.5.8"
+  }
+}

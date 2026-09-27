@@ -21,7 +21,7 @@ func _initialize():
  for kind in ["melee","archers"]:
   for i in range(10):
    var before=b.reserve[kind];var n=b.allies.size()
-   check(b.deploy(kind,Vector2(-27,-18+i*3)) and b.reserve[kind]==before-1 and b.allies.size()==n+1,kind+" single deployment "+str(i+1))
+   check(b.deploy(kind,Vector2(-41,-18+i*3)) and b.reserve[kind]==before-1 and b.allies.size()==n+1,kind+" single deployment "+str(i+1))
   var before=b.reserve[kind]
   check(not b.deploy(kind,Vector2.ZERO) and b.reserve[kind]==before,"invalid placement retains "+kind)
  b.deploy_all();var count=b.allies.size();b.deploy_all();check(count==24 and b.allies.size()==24,"reserve exhausted without duplication")
@@ -52,17 +52,17 @@ func _initialize():
  b.start(0,true);b.time=179.99;b.step(.02,Vector2.ZERO);check(b.result=="timeout","three minute time limit")
  b.start(0,true);b.time=179.0;b.step(.05,Vector2.ZERO,1.1)
  check(b.result=="timeout","slow rendered frame does not extend the raid deadline")
- b.start(0,true);var t=b.unit("guard",b.hero.pos+Vector2(0,-1),10000,0,"enemy");b.enemies=[t];b.buildings=[]
+ b.start(0,true);b.deploy_hero(b.entry_position());var t=b.unit("guard",b.hero.pos+Vector2(0,-1),10000,0,"enemy");b.enemies=[t];b.buildings=[]
  b.strike();check(t.hp==10000,"melee windup has no immediate damage")
  ticks(b,.10);check(t.hp==10000,"melee remains harmless before hit frame")
  ticks(b,.16);check(t.hp<10000,"melee damage after hit frame")
- p.data.hero="mage";p.data.hero_id="mage";b=B.new(p.data);b.start(0,true);t=b.unit("guard",b.hero.pos+Vector2(0,-8),10000,0,"enemy");b.enemies=[t];b.buildings=[]
+ p.data.hero="mage";p.data.hero_id="mage";b=B.new(p.data);b.start(0,true);b.deploy_hero(b.entry_position());t=b.unit("guard",b.hero.pos+Vector2(0,-8),10000,0,"enemy");b.enemies=[t];b.buildings=[]
  b.strike();ticks(b,.37);check(t.hp==10000,"ranged projectile release deals no damage")
  ticks(b,.5);check(t.hp<10000,"ranged damage arrives at impact")
  var names={}
  for i in range(100):
   var v=C.matched_village(i,p.data);var ratio=float(C.village_strength(v))/C.strength(p.data)
-  check(ratio>=.84 and ratio<=1.16,"match rating within 15 percent "+str(i));names[v.seed]=true
+  check((ratio>=1.38 and ratio<=1.75) if v.get("rich",false) else (ratio>=.84 and ratio<=1.16),"advertised normal or rare stronger match rating "+str(i));names[v.seed]=true
  check(names.size()==100,"next opponent varies layouts")
  p=rich();b=B.new(p.data);var anchors=b.allies.map(func(u):return u.pos)
  for i in range(600):b.step(.05,Vector2(1,0))
