@@ -96,6 +96,9 @@ const cloud=require('./mock_cloud.cjs');
   assert.equal((await state()).hero,afterRaid.hero,'old bookmarked URL retains the hero');
   assert.equal((await state()).gold,afterRaid.gold,'old bookmarked URL retains resources');
   console.log('Immediate old-bookmark reload preserves raid rewards');
+  // Independent account storage does not require two simultaneous software
+  // WebGL renderers. Keep the first profile, release its GPU scene meanwhile.
+  await page.goto('about:blank');
   const second=await browser.newContext({viewport:{width:1280,height:720},hasTouch:true});await cloud.install(second);
   const friend=await second.newPage();await friend.goto('http://127.0.0.1:8765/v08/?qa=1');
   await friend.waitForFunction(()=>window.__glutwacht?.mode==='login',null,{timeout:120000});
@@ -110,7 +113,9 @@ const cloud=require('./mock_cloud.cjs');
   assert.equal(cloud.saves.get(cloud.users.get('player-a@example.test')).snapshot.hero,'warrior');
   console.log('Second account remains isolated');
   await second.close();
-  await page.bringToFront();await page.waitForTimeout(500);
+  await page.goto('http://127.0.0.1:8765/v08final/');
+  await wait(()=>window.__glutwacht?.mode==='home' && window.__glutwacht.dialog==='',120000);
+  assert.equal((await state()).gold,afterRaid.gold,'first account retains its progress after the second account');
   if((await state()).dialog==='menu')await tap(1025,129);
   await tap(160,50);await wait(()=>window.__glutwacht?.dialog==='profile');
   await tap(425,550);await wait(()=>window.__glutwacht?.dialog==='account');
@@ -126,7 +131,7 @@ const cloud=require('./mock_cloud.cjs');
   console.log('WEB_SMOKE_OK: WebGL boot, touch joystick, dialogs, persistent hero/resources, five single deployments, full raid, return home');
  } catch(error) {
   if(browser){
-   const page=browser.contexts()[0]?.pages()[0];
+   const page=browser.contexts().flatMap(c=>c.pages()).reverse().find(p=>p.url()!=='about:blank');
    if(page){
     await page.screenshot({path:'logs/browser/failure.png',timeout:15000}).catch(()=>{});
     const state=await page.evaluate(()=>({state:window.__glutwacht,errors:window.__glutwachtErrors,canvas:{width:document.querySelector('canvas')?.width,height:document.querySelector('canvas')?.height}})).catch(()=>null);
