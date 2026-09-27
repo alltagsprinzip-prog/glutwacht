@@ -1,4 +1,5 @@
 extends RefCounted
+const Advancement=preload("res://game3d/advancement.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 const Progress=preload("res://game3d/progress.gd")
 var profile:Dictionary
@@ -52,7 +53,10 @@ var raid_loot:Dictionary:
 func training(attribute:String) -> int:return int(profile.get("training",{}).get("heroes",{}).get(hero_key(),{}).get(attribute,0))
 func entry_position() -> Vector2:
  return {"south":Vector2(0,27),"west":Vector2(-27,0),"east":Vector2(27,0),"north":Vector2(0,-27)}.get(attack_side,Vector2(0,27))
-func _init(p:Dictionary):profile=p;village=Catalog.matched_village(0,profile);home()
+func _init(p:Dictionary):
+ profile=p
+ if not profile.has("frontier"):profile.frontier=Advancement.fresh()
+ village=Catalog.matched_village(0,profile);home()
 func hero_key() -> String:return String(profile.hero) if Catalog.HEROES.has(profile.get("hero","")) else "warrior"
 func stats() -> Dictionary:return Catalog.hero(hero_key())
 func unit(kind:String,pos:Vector2,hp:float,damage:float,team:String) -> Dictionary:
@@ -128,34 +132,27 @@ func home_buildings():
 func reset_battle():
  hero_deployed=true;hero_auto_attack=false
  pending_hits.clear();pending_skills.clear();audio_events.clear();looted={"wood":0,"stone":0,"gold":0}
- time=0;result="";settled=false;kills=0;command="Angriff";potion=1;notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0,"shield":0,"siege":0}
+ time=0;result="";settled=false;kills=0;command="Angriff";refresh_potion();notices="";effects.clear();enemies.clear();combat_texts.clear();traps.clear();alarm=false;reserve={"melee":0,"archers":0,"shield":0,"siege":0}
  attack_cd=0;skill_cd=0;roll_cd=0;invulnerable=0
 func layout(index:int):
  selected_village=maxi(0,index);village=Catalog.campaign(campaign_index) if campaign_index>=0 else Catalog.matched_village(selected_village,profile)
  buildings.clear();enemies.clear();var level=int(village.level)
  var layout_rng=RandomNumberGenerator.new();layout_rng.seed=int(village.seed)
- var shift=layout_rng.randf_range(-4.0,4.0)
- var hall=building("hall",Vector2(shift,-12),4.3,480+level*210,clampi(level,1,Progress.MAX_LEVEL),"fort","enemy")
- hall.objective=true;buildings.append(hall)
- var towers=[Vector2(-12,-4),Vector2(12,-6),Vector2(0,5),Vector2(-18,10),Vector2(18,11)]
- for i in range(towers.size()):towers[i]+=Vector2(layout_rng.randf_range(-2.5,2.5),layout_rng.randf_range(-2.5,2.5))
- for i in range(village.tower_count):
-  var b=building("tower",towers[i],1.6,150+level*110,clampi(level,1,Progress.MAX_LEVEL),"t"+str(i));b.objective=true;buildings.append(b)
- for i in range(village.wall_count):
-  var row=int(i/7);var column=i%7
-  if column==3:continue
-  var pos=Vector2((column-3)*2.5,8-row*5)
-  if pos.distance_to(towers[2])<3 and level>=4:continue
-  buildings.append(building("wall",pos,1.25,90+level*65,clampi(level,1,Progress.MAX_LEVEL),"w"+str(i)))
- for i in range(village.guards):
-  var pos=Vector2((i%4-1.5)*4,-1-floor(i/4.0)*5)
-  var kind="ranger" if i%3==2 else "guard"
-  enemies.append(unit(kind,pos,70+level*35,9+level*4,"enemy"))
- for i in range(village.captains):enemies.append(unit("captain",Vector2(-3+i*6,-9),220+level*90,24+level*10,"enemy"))
- buildings.append(building("barracks",Vector2(-16,-18),3.8,200+100*level,clampi(level,1,Progress.MAX_LEVEL),"garrison"))
- buildings.append(building("goldmine",Vector2(16,-18),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_gold"))
- buildings.append(building("lumber",Vector2(-20,10),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_wood"))
- buildings.append(building("quarry",Vector2(20,12),3.0,180+80*level,clampi(level,1,Progress.MAX_LEVEL),"loot_stone"))
+ var plan=load("res://game3d/rivals.gd").blueprint(village,Catalog.BUILD)
+ for entry in plan:
+  var kind=String(entry.kind);var stage=int(entry.level)
+  var hp=(480+stage*210) if kind=="hall" else ((90+stage*65) if kind=="wall" else ((150+stage*110) if kind=="tower" else 180+stage*80))
+  var item=building(kind,entry.pos,float(Catalog.BUILD[kind].radius),hp,stage,entry.uid,"enemy",entry.rotation)
+  item.objective=kind in ["hall","tower"];buildings.append(item)
+ village.tower_count=buildings.filter(func(b):return b.kind=="tower").size()
+ village.wall_count=buildings.filter(func(b):return b.kind=="wall").size()
+ for i in range(int(village.guards)+int(village.captains)):
+  var pos=Vector2.ZERO
+  for attempt in range(160):
+   pos=Vector2(layout_rng.randf_range(-25,25),layout_rng.randf_range(-25,20))
+   if load("res://game3d/rivals.gd").clear(pos,.6,plan,Catalog.BUILD,.3):break
+  var captain=i>=int(village.guards);var kind="captain" if captain else ("ranger" if i%3==2 else "guard")
+  enemies.append(unit(kind,pos,(220+level*90) if captain else (70+level*35),(24+level*10) if captain else (9+level*4),"enemy"))
  var factor=float(village.get("combat_scale",1.0))
  for b in buildings:b.hp*=factor;b.max_hp=b.hp
  for u in enemies:u.hp*=factor;u.max_hp=u.hp;u.damage*=factor;u.anchor=u.pos;u.awake=false
@@ -189,6 +186,7 @@ func animate_attack(u:Dictionary,duration:float):
 func queue_hit(u:Dictionary,target:Dictionary,amount:float,reach:float,ranged:bool=false,color:Color=Color("ffd98c"),delay:float=-1):
  var windup=delay if delay>=0 else float(u.get("attack_total",.6))*.52
  if audio_events.size()<8:audio_events.append("siege" if u.kind=="siege" else ("bow" if ranged else "swing"))
+ if u==hero and float(hero.get("fury_time",0))>0:amount*=1.0+float(hero.get("fury_power",0))
  pending_hits.append({"source":u,"target":target,"damage":amount,"reach":reach,"ranged":ranged,"color":color,"wait":windup,"stage":"windup"})
 func update_hits(dt:float):
  for i in range(pending_hits.size()-1,-1,-1):
@@ -294,6 +292,7 @@ func nearest(pos:Vector2,list:Array):
 func distance(a:Dictionary,b:Dictionary) -> float:return a.pos.distance_to(b.pos)-float(b.get("radius",0))
 func move(u:Dictionary,direction:Vector2,speed:float,dt:float):
  if direction.length_squared()<.01:return
+ if u==hero and float(hero.get("haste_time",0))>0:speed*=1.0+float(hero.get("haste_power",0))
  var dir=direction.normalized();var next:Vector2=u.pos+dir*speed*dt
  for b in buildings:
   if b.hp<=0:continue
@@ -302,7 +301,7 @@ func move(u:Dictionary,direction:Vector2,speed:float,dt:float):
    if delta.length()<.01:delta=Vector2(1,0)
    next=b.pos+delta.normalized()*r
  if mode in ["home","defense"]:
-  var bounds=Progress.village_bounds(int(profile.hall));next=next.clamp(bounds.position+Vector2.ONE,bounds.end-Vector2.ONE)
+  var bounds=Progress.village_bounds(int(profile.hall),int(profile.get("frontier",{}).get("land",0)));next=next.clamp(bounds.position+Vector2.ONE,bounds.end-Vector2.ONE)
  else:next=next.clamp(Vector2(-46,-46),Vector2(46,46))
  u.pos=next;u.facing=dir
  if u.attack_time<=0:u.anim="Run"
@@ -323,6 +322,7 @@ func approach(u:Dictionary,goal:Dictionary,speed:float,dt:float):
 func damage(u:Dictionary,amount:float):
  if u.hp<=0:return
  if u==hero and (not hero_deployed or invulnerable>0):return
+ if u==hero and float(hero.get("ward_time",0))>0:amount*=1.0-float(hero.get("ward_power",0))
  var dealt=minf(u.hp,amount);u.hp=maxf(0,u.hp-amount);u.flash=.16
  accrue_loot(u)
  if audio_events.size()<4:audio_events.append("hurt" if u==hero else ("stone" if u.has("radius") and u.kind in ["wall","tower","quarry"] else ("wood" if u.has("radius") else ("shield" if u.kind=="shield" else "hit"))))
@@ -394,14 +394,29 @@ func update_skills(dt:float):
   effects.append({"kind":"earthbreak" if e.kind=="warrior" else ("spirit_wave" if e.kind=="shaman" else "meteor_burst"),"pos":e.pos,"life":1.15 if e.kind=="mage" else .85,"max":1.15 if e.kind=="mage" else .85,"color":Color(Catalog.hero(e.kind).color)})
 func roll(direction:Vector2):
  if not hero_deployed or not active() or result!="" or roll_cd>0 or hero.hp<=0:return
- roll_cd=2.0 if hero_key()=="ninja" else 2.5;invulnerable=.65
- var d=direction.normalized() if direction.length()>.1 else facing
- for i in range(12):move(hero,d,6,.055)
- effects.append({"kind":"roll","pos":hero.pos,"life":.35,"max":.35,"color":Color("a9dadd")})
-func heal():
- if hero_deployed and active() and result=="" and potion>0 and hero.hp>0 and hero.hp<hero.max_hp:
-  potion-=1;hero.hp=minf(hero.max_hp,hero.hp+200)
-  effects.append({"kind":"skill","pos":hero.pos,"life":.6,"max":.6,"color":Color("82eb9b")})
+ roll_cd=2.0 if hero_key()=="ninja" else 2.5;invulnerable=.38
+ hero.roll_time=.28;hero.roll_direction=direction.normalized() if direction.length()>.1 else facing
+ effects.append({"kind":"roll","pos":hero.pos,"life":.38,"max":.38,"color":Color("a9dadd")})
+ if audio_events.size()<8:audio_events.append("swing")
+func potion_key() -> String:return String(profile.frontier.selected)
+func refresh_potion():potion=int(profile.frontier.charges[potion_key()])
+func potion_cooldown(now:float=-1) -> float:
+ if now<0:now=Time.get_unix_time_from_system()
+ return maxf(0,float(profile.frontier.cooldowns.get(potion_key(),0))-now)
+func use_potion(now:float=-1) -> bool:
+ if now<0:now=Time.get_unix_time_from_system()
+ var key=potion_key();refresh_potion()
+ if not hero_deployed or not active() or result!="" or potion<=0 or hero.hp<=0 or not Advancement.unlock(key,profile) or potion_cooldown(now)>0:return false
+ if key=="healing" and hero.hp>=hero.max_hp:return false
+ var spec=Advancement.POTIONS[key];var power=Advancement.power(key,int(profile.frontier.levels[key]))
+ profile.frontier.charges[key]-=1;profile.frontier.cooldowns[key]=now+float(spec.cooldown);refresh_potion()
+ if key=="healing":
+  var gain=minf(hero.max_hp-hero.hp,power);hero.hp+=gain
+  combat_texts.append({"pos":hero.pos,"value":"+%d"%int(gain),"heal":true,"life":.95,"max":.95})
+ else:hero[key+"_time"]=float(spec.duration);hero[key+"_power"]=power
+ effects.append({"kind":"spirit_wave","pos":hero.pos,"life":.8,"max":.8,"color":Color(spec.color)})
+ return true
+func heal():use_potion()
 func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
  var elapsed=maxf(0,elapsed_seconds if elapsed_seconds>=0 else dt)
  dt=clampf(dt,0,.05)
@@ -416,8 +431,13 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
   u.stagger=maxf(0,float(u.get("stagger",0))-dt);u.flash=maxf(0,u.flash-dt);u.attack_time=maxf(0,u.attack_time-dt)
   if u.hp<=0:u.dead_time+=dt
   u.anim="attack" if u.attack_time>0 else "Idle"
+ for buff in ["ward","haste","fury"]:hero[buff+"_time"]=maxf(0,float(hero.get(buff+"_time",0))-dt)
+ if float(hero.get("roll_time",0))>0:
+  var roll_step=minf(dt,float(hero.roll_time));hero.roll_time=maxf(0,float(hero.roll_time)-dt)
+  move(hero,hero.roll_direction,14.0,roll_step);input=Vector2.ZERO
+  hero.anim="Roll"
  if hero_deployed and input.length()>.1:hero_auto_attack=false
- if hero_auto_attack and hero_deployed and active() and hero.hp>0:
+ if hero_auto_attack and hero_deployed and active() and hero.hp>0 and float(hero.get("roll_time",0))<=0:
   var target=army_target(hero)
   if target==null:target=nearest(hero.pos,targets())
   if target!=null:

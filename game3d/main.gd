@@ -111,6 +111,7 @@ func _ready():
  var theme=Theme.new();theme.default_font_size=28;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
  account=load("res://game3d/online/account.gd").new();add_child(account)
  sound=load("res://scripts/audio.gd").new();add_child(sound);apply_settings();build_hud()
+ var keyboard=load("res://game3d/ui/keyboard.gd").new();keyboard.name="KeyboardAccessory";add_child(keyboard);keyboard.setup(self)
  if not progress.warning.is_empty():toast(progress.warning)
  update_access()
  if auth_locked():open_account()
@@ -126,7 +127,7 @@ func layout_art_preview():
 func safe_rect() -> Rect2:
  var result=Rect2(Vector2.ZERO,ui.size)
  if OS.has_feature("ios"):
-  var physical=DisplayServer.get_display_safe_area();var screen=DisplayServer.screen_get_size()
+  var physical=DisplayServer.get_display_safe_area();var screen=DisplayServer.window_get_size()
   if physical.size.x>0 and screen.x>0:
    var factor=ui.size/Vector2(screen);result=Rect2(Vector2(physical.position)*factor,Vector2(physical.size)*factor)
  if OS.has_feature("web"):
@@ -179,9 +180,23 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
  b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
  b.add_theme_stylebox_override("disabled",skin("disabled"))
+ b.clip_text=true;b.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
  b.pressed.connect(callback);parent.add_child(b)
+ if text!="":fit_button(b,rect.size)
  if text!="":decorate(b)
  return b
+func fit_button(b:Button,requested:Vector2):
+ # Fit actual glyphs to the cream content, never to the decorative outer rim.
+ var available=maxf(1,requested.x-34)
+ if requested.x<=0:return
+ var font=b.get_theme_font("font");var pixels=mini(27,int((requested.y-22)*.70))
+ while pixels>14 and font.get_string_size(b.text,HORIZONTAL_ALIGNMENT_LEFT,-1,pixels).x>available:pixels-=1
+ b.add_theme_font_size_override("font_size",pixels);b.size=requested
+func fit_caption(c:Label,box:Rect2,size:int):
+ c.position=box.position;c.size=box.size;c.clip_text=true;c.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
+ var font=c.get_theme_font("font");var pixels=size
+ while pixels>12 and font.get_string_size(c.text,HORIZONTAL_ALIGNMENT_LEFT,-1,pixels).x>box.size.x:pixels-=1
+ c.add_theme_font_size_override("font_size",pixels)
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
  var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
 func icon_texture(key:String) -> Texture2D:
@@ -292,6 +307,7 @@ func _process(dt):
     for site in completed_sites:sim.effects.append({"kind":"skill","pos":site,"life":1.1,"max":1.1,"color":Color("ffdf80")})
     if old_dialog=="building":open_building(old_building)
     elif old_dialog=="upgrades":open_upgrades()
+    elif old_dialog=="tasks":open_tasks()
     toast(("+%d Juwelen"%gems_earned) if gems_earned>0 else ("NEU: "+" · ".join(Catalog.HALL_UNLOCKS.get(int(progress.data.hall),[])) if int(progress.data.hall)>old_hall else "Bau abgeschlossen!"))
  if save_clock>=15:save();save_clock=0
  cloud_clock+=dt
@@ -312,7 +328,7 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.16","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.17","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
 func qa_controls() -> Array:
@@ -416,7 +432,9 @@ func _unhandled_input(event):
  if not event is InputEventKey or not event.pressed or event.echo:return
  if event.keycode==KEY_ESCAPE:
   if dialog=="result" or (dialog=="heroes" and progress.data.hero==""):return
-  if paused:close_dialog()
+  if paused:
+   if get_viewport().gui_get_focus_owner() is LineEdit:get_node("KeyboardAccessory").dismiss()
+   else:close_dialog()
   elif build_kind!="":cancel_build()
   elif sim.mode=="scout":return_home()
   else:open_menu()
@@ -450,15 +468,16 @@ func _notification(what):
   if account_active and not account.busy and not cloud_sync_paused:sync_cloud()
   if not paused and build_kind=="":open_menu()
 func save(final_save:bool=false):
- if account_leaving and not final_save:return
- if art_preview or auth_locked():return
- if not progress.store_file(save_path):toast(progress.warning);return
+ if account_leaving and not final_save:return false
+ if art_preview or auth_locked():return false
+ if not progress.store_file(save_path):toast(progress.warning);return false
  save_generation+=1
  if account_active:
   account.dirty=true;account.save_metadata()
   if not account.busy:
    account.status="Lokal gesichert · Cloud ausstehend"
    if not account_leaving and not cloud_sync_paused and cloud_clock>=0:call_deferred("sync_cloud")
+ return true
 func tone(kind):
  if sound and progress.data.sound:sound.play("click" if kind=="click" else kind)
 func toast(text:String):
@@ -534,6 +553,11 @@ func building_preview(parent:Control,kind:String,rect:Rect2,level:int=1):
  hero_views.append(viewport)
 func open_catalog():
  var p=open_dialog("catalog","Bauen","")
+ var land_card=panel(p,Rect2(760,327,232,226))
+ var land_map=load("res://game3d/ui/land_preview.gd").new();land_map.position=Vector2(12,12);land_map.size=Vector2(208,103);land_map.owned=Progress.village_bounds(int(progress.data.hall),int(progress.data.frontier.land));land_map.proposed=Progress.village_bounds(int(progress.data.hall),mini(4,int(progress.data.frontier.land)+1));land_map.buildings=progress.all_buildings();land_card.add_child(land_map)
+ label(land_card,"Dorf erweitern",Rect2(12,113,208,30),20,GOLD,true)
+ label(land_card,"Dauerhaft mehr Baufläche",Rect2(12,147,208,27),15,CREAM,true)
+ button(land_card,"Land ansehen",Rect2(14,180,204,37),open_land,true)
  var kinds=["lumber","quarry","goldmine","wall","tower","camp","hero_hall"]
  for i in range(kinds.size()):
   var k=kinds[i];var d=Catalog.BUILD[k];var x=22+(i%4)*246;var y=89+int(i/4)*238
@@ -688,8 +712,9 @@ func open_barracks_guide():
  button(p,"ARMEE AUFSTELLEN",Rect2(438,476,394,50),func():open_army()).add_theme_font_size_override("font_size",22)
 func open_training(troops:bool=false):
  var key=sim.hero_key();var p=open_dialog("training","Soforttraining","Dauerhafte Verbesserung · keine Wartezeit")
- button(p,"HELD",Rect2(28,117,388,51),func():open_training(false),not troops)
- button(p,"TRUPPEN",Rect2(432,117,388,51),func():open_training(true),troops)
+ button(p,"HELD",Rect2(28,117,258,51),func():open_training(false),not troops)
+ button(p,"TRUPPEN",Rect2(298,117,258,51),func():open_training(true),troops)
+ button(p,"TRÄNKE",Rect2(568,117,258,51),open_potions)
  var kinds=Catalog.TROOP_ORDER if troops else ["power","vitality","skill"]
  for i in range(kinds.size()):
   var kind=kinds[i];var group="troops" if troops else "heroes";var who=kind if troops else key;var attribute="" if troops else kind
@@ -916,10 +941,12 @@ func task_destination(action:String):
   "training":open_training()
   "build":open_catalog()
   "army":open_army()
+  "land":open_land()
+  "potions":open_potions()
   _:open_campaign()
 func open_tasks():
- var p=open_dialog("tasks","Dein Weg durch Glutwacht","Einmalige Ziele · Belohnungen bleiben bis zum Abholen verfügbar.")
- var tasks=progress.tasks();var pages=ceili(tasks.size()/4.0);task_page=clampi(task_page,0,pages-1)
+ var p=open_dialog("tasks","Dein Weg durch Glutwacht","Neue Ziele folgen deinem Fortschritt · Belohnungen einmalig.")
+ var tasks=progress.active_tasks();var pages=maxi(1,ceili(tasks.size()/4.0));task_page=clampi(task_page,0,pages-1)
  for i in range(4):
   var index=task_page*4+i
   if index>=tasks.size():break
@@ -1206,3 +1233,14 @@ func restore_cloud_version(target:int):
  restore_preparing=false
  if not result.ok:account.status=result.message;open_account();return
  await load_cloud(true)
+
+func profile_transaction(operation:Callable) -> bool:
+ if auth_locked() or account_leaving or progress.write_blocked:return false
+ var before=progress.data.duplicate(true)
+ if not operation.call():return false
+ if save():return true
+ progress.data.clear();progress.data.merge(before,true);return false
+func open_land():load("res://game3d/ui/advancement.gd").land(self)
+func open_potions():load("res://game3d/ui/advancement.gd").potions(self)
+func use_active_potion():
+ if profile_transaction(func():return sim.use_potion()):tone("skill");update_hud()

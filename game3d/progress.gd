@@ -1,14 +1,16 @@
 extends RefCounted
+const Advancement=preload("res://game3d/advancement.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 # Same filename permits a non-destructive migration of the already played version.
 const SAVE="user://glutwacht_dorf_v2.json"
 const MAX_LEVEL=10
 # Extend inland; keep the eastern river bank and every existing coordinate.
-const VILLAGE_MIN=Vector2(-75,-75)
+const VILLAGE_MIN=Vector2(-123,-75)
 const VILLAGE_MAX=Vector2(31,75)
-static func village_bounds(hall:int) -> Rect2:
+static func village_bounds(hall:int,land:int=0) -> Rect2:
  var extra=4.0*(clampi(hall,1,10)-1)
- return Rect2(Vector2(-39-extra,-39-extra),Vector2(70+extra,78+extra*2))
+ var west=12.0*clampi(land,0,4)
+ return Rect2(Vector2(-39-extra-west,-39-extra),Vector2(70+extra+west,78+extra*2))
 static func clean_settings(raw) -> Dictionary:
  var s=raw if raw is Dictionary else {}
  return {"quality":clampi(int(s.get("quality",1)),0,2),"brightness":clampf(float(s.get("brightness",1.0)),.7,1.4),"music":clampf(float(s.get("music",.3)),0,1),"effects":clampf(float(s.get("effects",.8)),0,1)}
@@ -35,7 +37,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"battle_history":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"settings":clean_settings({}),"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"frontier":Advancement.fresh(),"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"battle_history":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"settings":clean_settings({}),"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -135,8 +137,8 @@ func placement_error(kind:String,pos:Vector2,ignore_uid:String="") -> String:
  if not Catalog.BUILD.has(kind) or (TITLES.has(kind) and ignore_uid==""):return "Kein Bauplatz."
  if not Catalog.unlocked(kind,int(data.hall)):return "Freischaltung ab Haupthaus-Stufe %d."%Catalog.required_hall(kind)
  var radius=float(Catalog.BUILD[kind].radius)
- var bounds=village_bounds(int(data.hall))
- if not bounds.grow(-radius).has_point(pos):return "Außerhalb deiner Dorfgrenze. Haupthaus ausbauen: +4 m nach Westen, Norden und Süden."
+ var bounds=village_bounds(int(data.hall),int(data.frontier.land))
+ if not bounds.grow(-radius).has_point(pos):return "Außerhalb deiner Dorfgrenze. Unter BAUEN → Land kaufen kannst du Fläche erwerben."
  if ignore_uid=="" and count_kind(kind)>=Catalog.building_limit(kind,int(data.hall)):return "Maximale Anzahl dieses Gebäudes erreicht."
  if pos.distance_to(Vector2(0,18))<4.5:return "Der Sammelplatz der Armee muss frei bleiben."
  for o in data.get("obstacles",[]):
@@ -299,6 +301,7 @@ func load_file(path:String=SAVE) -> bool:
  for k in TITLES:clean[k]=clampi(int(parsed.get(k,1)),1,MAX_LEVEL)
  for k in ["sword","sound"]:clean[k]=bool(parsed.get(k,clean[k]))
  clean.settings=clean_settings(parsed.get("settings",{}))
+ clean.frontier=Advancement.clean(parsed.get("frontier",{}))
  var legacy_capacity=4+int(clean.hall)*2
  clean.melee=clampi(int(parsed.get("melee",5)),0,legacy_capacity)
  clean.archers=clampi(int(parsed.get("archers",0)),0,legacy_capacity-int(clean.melee))
@@ -377,6 +380,7 @@ static func validate_save(raw) -> String:
  if int(raw.version) not in [2,3,4,5,6,7]:return "Unbekannte Spielstandversion."
  for key in ["wood","stone","gold","gems","hall","barracks","smithy","melee","archers","shield","siege","wins","builder_bonus","next_uid","last_production"]:
   if raw.has(key) and (not numeric(raw[key]) or float(raw[key])<0):return "Ungültiges Zahlenfeld: "+key
+ if raw.has("frontier") and not Advancement.validate(raw.frontier):return "Ungültige Dorferweiterung oder Tränke."
  if raw.has("settings"):
   if not raw.settings is Dictionary:return "Ungültige Einstellungen."
   for key in ["quality","brightness","music","effects"]:
@@ -431,7 +435,13 @@ static func numeric(value) -> bool:
  return (value is int or value is float) and is_finite(float(value))
 
 static func task_ids() -> Array:
- return ["hero","hall2","training","victory","barracks2","tower","goldmine","campaign3","hall4","camp","shield","wins5","hall5","hero_hall","hero3","campaign6","siege","hall8","campaign10","stars30"]
+ var ids=["hero","hall2","training","victory","barracks2","tower","goldmine","campaign3","hall4","camp","shield","wins5","hall5","hero_hall","hero3","campaign6","siege","hall8","campaign10","stars30"]
+ for n in range(2,11):ids.append("journey_hall_%d"%n);ids.append("journey_hero_%d"%n)
+ for n in range(1,5):ids.append("land_%d"%n)
+ for n in [10,20,35,50,75,100]:ids.append("journey_wins_%d"%n)
+ for key in Advancement.POTION_ORDER:
+  for n in range(2,6):ids.append("potion_%s_%d"%[key,n])
+ return ids
 func tasks() -> Array:
  var trained=0
  for hero in data.training.heroes.values():
@@ -463,6 +473,13 @@ func tasks() -> Array:
   ["campaign10","Die Krone der Glutwacht",stages,10,300,"campaign","Besiege alle zehn Lager der Kampagne."],
   ["stars30","Meister der Kampagne",stars,30,400,"campaign","Erreiche drei Sterne in jedem Kampagnenlager."]
  ]
+ for n in range(2,11):
+  if n not in [2,4,5,8]:rows.append(["journey_hall_%d"%n,"Haupthaus Stufe %d"%n,int(data.hall),n,45*n,"hall",Catalog.upgrade_benefit("hall",n)])
+  if n!=3:rows.append(["journey_hero_%d"%n,"Held Stufe %d"%n,Catalog.level(data,String(data.hero)),n,40*n,"campaign","Kämpfe liefern Erfahrung für deinen Helden."])
+ for n in range(1,5):rows.append(["land_%d"%n,"Neues Land · Ausbau %d"%n,int(data.frontier.land),n,70*n,"land","Kaufe einen 12 m breiten Landstreifen; Haupthaus %d nötig."%(n*2)])
+ for n in [10,20,35,50,75,100]:rows.append(["journey_wins_%d"%n,"Grenzwächter · %d Siege"%n,int(data.wins),n,mini(700,n*12),"campaign","Gewinne weitere Angriffe mit mindestens einem Stern."])
+ for key in Advancement.POTION_ORDER:
+  for n in range(2,6):rows.append(["potion_%s_%d"%[key,n],Advancement.POTIONS[key].name+" Stufe %d"%n,int(data.frontier.levels[key]),n,70*n,"potions","Verbessere deinen Trank. Schmiede Stufe %d nötig."%n])
  var out=[]
  for row in rows:out.append({"id":row[0],"title":row[1],"current":mini(row[2],row[3]),"target":row[3],"done":row[2]>=row[3],"gold":row[4],"action":row[5],"hint":row[6]})
  return out
@@ -487,3 +504,40 @@ func tutorial_step() -> String:
  for step in ["hero","build","upgrade","train","battle"]:
   if step not in data.tutorial_done:return step
  return "done"
+
+func active_tasks() -> Array:
+ var available=[];var claimed=[];var unclaimed=tasks().filter(func(t):return t.id not in data.claimed_tasks)
+ var hero_level=Catalog.level(data,String(data.hero))
+ for task in tasks():
+  if task.id in data.claimed_tasks:claimed.append(task);continue
+  var near=true
+  if task.action=="hall":near=task.target<=int(data.hall)+1
+  elif task.id.begins_with("journey_hero_") or task.id=="hero3":near=task.target<=hero_level+1
+  elif task.action=="land":near=task.target<=int(data.frontier.land)+1 and int(data.hall)>=task.target*2-1
+  elif task.id.begins_with("potion_"):
+   var key=task.id.split("_")[1];near=Advancement.unlock(key,data) and task.target<=int(data.frontier.levels[key])+1
+  elif task.id in ["goldmine","shield"]:near=int(data.hall)>=2
+  elif task.id=="camp":near=int(data.hall)>=3
+  elif task.id=="hero_hall":near=int(data.hall)>=4
+  elif task.id=="siege":near=int(data.hall)>=5
+  elif task.id.begins_with("campaign") or task.id=="stars30":near=unclaimed.filter(func(t):return t.action=="campaign").slice(0,3).any(func(t):return t.id==task.id)
+  elif "wins" in task.id:near=task.target<=maxi(5,int(data.wins)*2+1)
+  if task.done or near:available.append(task)
+ available.sort_custom(func(a,b):return a.done and not b.done)
+ return available
+func buy_land(expected:int) -> bool:
+ var offer=Advancement.land_offer(data)
+ if write_blocked or offer.maxed or expected!=offer.target or int(data.hall)<offer.hall or not affordable(offer.cost):return false
+ pay(offer.cost);data.frontier.land=expected;return true
+func brew_potion(key:String) -> bool:
+ if write_blocked or not Advancement.unlock(key,data) or int(data.frontier.charges[key])>=99:return false
+ var cost=Advancement.brew_cost(key)
+ if not affordable(cost):return false
+ pay(cost);data.frontier.charges[key]+=1;return true
+func upgrade_potion(key:String,expected:int) -> bool:
+ if write_blocked or not Advancement.unlock(key,data):return false
+ var rank=int(data.frontier.levels[key])
+ if expected!=rank+1 or rank>=5 or int(data.smithy)<expected:return false
+ var cost=Advancement.upgrade_cost(key,rank)
+ if not affordable(cost):return false
+ pay(cost);data.frontier.levels[key]=expected;return true

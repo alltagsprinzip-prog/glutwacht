@@ -22,7 +22,7 @@ func configure(game,panel_size:Vector2):
  if not history.is_empty():
   var forget=game.button(column,"Gespeicherte E-Mails entfernen",Rect2(0,0,size.x,50),func():game.account.write_email_history([]);history.clear();suggestions.hide();email.clear());forget.custom_minimum_size.y=50;forget.add_theme_font_size_override("font_size",20)
  email.text_submitted.connect(func(_value):password.grab_focus())
- password.text_submitted.connect(func(_value):game.authenticate(email.text,password.text,false))
+ password.text_submitted.connect(func(_value):game.get_node("KeyboardAccessory").dismiss())
 func show_suggestions(game,value:String):
  for child in suggestions.get_children():suggestions.remove_child(child);child.queue_free()
  suggestions.hide()

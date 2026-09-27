@@ -8,7 +8,7 @@ func check(ok:bool,message:String):
  if not ok:failed+=1;push_error(message)
 func _initialize():
  var p=P.new();p.choose_hero("warrior")
- check(p.tasks().size()==20,"twenty meaningful goals")
+ check(p.tasks().size()>40,"legacy goals plus level, land and potion chains")
  check(not p.claim_task("campaign10"),"unearned quest cannot claim")
  check(p.claim_task("hero") and not p.claim_task("hero"),"starter reward idempotent")
  p.data.hall=8

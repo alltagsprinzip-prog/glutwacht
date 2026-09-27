@@ -28,9 +28,9 @@ static func help(g):
  paragraph(g,p,next.title,Rect2(28,94,800,45),27,g.GOLD)
  paragraph(g,p,next.body,Rect2(28,148,800,96),22)
  g.button(p,next.action,Rect2(28,249,804,59),next.callback,true).disabled=g.sim.mode!="home"
- var combat="Angriff: Gesicht wählen, dann auf freies Gelände tippen. Halten setzt weitere Soldaten alle 0,09 s ein. »Alle« setzt die ganze gewählte Truppe. Der Held zählt separat. Gesperrt sind Feindgebiet und Hindernisse."
- var home="Dorf: Gebäude antippen für Ausbau und Bewegen. ⓘ im Baumenü erklärt Nutzen und Bedingungen. »Alles sammeln« leert alle verfügbaren Sammler bis zur Lagergrenze."
- paragraph(g,p,combat if g.sim.active() or g.sim.mode=="scout" else home,Rect2(28,330,804,104),21)
+ var combat="Angriff: Gesicht wählen, dann auf freies Gelände tippen. Halten setzt weitere Soldaten alle 0,09 s ein. »Alle« setzt die ganze gewählte Truppe. Der Held zählt separat. Ausweichen: Joystickrichtung, sonst Blickrichtung; 0,38 s kein Schaden, 2,5 s Pause (Ninja 2 s). Tränke wählen: Heilung, Schutz, Tempo oder Angriff."
+ var home="Dorf: Gebäude antippen für Ausbau und Bewegen. ⓘ im Baumenü erklärt Nutzen und Bedingungen. »Sammeln« leert alle verfügbaren Sammler bis zur Lagergrenze."
+ paragraph(g,p,combat if g.sim.active() or g.sim.mode=="scout" else home,Rect2(28,325,804,119),18)
  g.button(p,"Steuerung & Einstellungen",Rect2(28,456,392,59),g.open_menu).add_theme_font_size_override("font_size",21)
  g.button(p,"Gebäude nachschlagen",Rect2(440,456,392,59),g.open_catalog).disabled=g.sim.mode!="home"
 static func settings(g):

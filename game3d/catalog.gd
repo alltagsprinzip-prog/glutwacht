@@ -95,10 +95,13 @@ static func strength_for_village_level(level:int) -> int:
  return village_strength(preview)
 static func matched_village(index:int,profile:Dictionary) -> Dictionary:
  var base=village(index)
- base.seed=int(base.seed)+index*7919
+ base.seed=int(base.seed)+index*7919+int(profile.get("frontier",{}).get("search_seed",0))
  base.name=["Mooswacht","Eisenfang","Kupferklamm","Dornfels","Aschenkron"][posmod(index,5)]+" %02d"%[posmod(index,97)+1]
  var power=strength(profile)
- var variance=[-12,4,15,-5,9,7,-8,11,-3,2][posmod(index,10)]
+ var search_rng=RandomNumberGenerator.new();search_rng.seed=int(base.seed)*31+49297
+ var rare=search_rng.randf()<.08
+ var variance=search_rng.randi_range(-12,15) if not rare else search_rng.randi_range(42,68)
+ base.rich=rare
  var target_power=float(power)*(1.0+float(variance)/100.0)
  var level=1
  var best_delta=INF
@@ -110,11 +113,11 @@ static func matched_village(index:int,profile:Dictionary) -> Dictionary:
  base.wall_count=maxi(0,(level-1)*4)
  base.guards=3+level
  base.captains=int(level/4)
- var loot_scale=.78+float(posmod(index*37+11,31))/100.0
+ var loot_scale=search_rng.randf_range(.78,1.12)*(2.3 if rare else 1.0)
  base.wood=int((70+level*55)*loot_scale);base.stone=int((55+level*46)*loot_scale);base.gold=int((35+level*31)*loot_scale)
  base.rating=int(round(target_power))
  base.combat_scale=target_power/maxf(1.0,float(strength_for_village_level(level)))
- base.theme="Gegner deiner Stärke"
+ base.theme="Reiche Grenzfeste · deutlich stärker" if rare else ["Handelsdorf","Bergbausiedlung","Grenzgarnison","Hof am Fluss","Waldhandwerker","Klosterdorf","Festungsviertel"][posmod(base.seed,7)]
  return base
 
 # Fixed PvE camps: independent of player strength, repeatable, no ranked rewards.

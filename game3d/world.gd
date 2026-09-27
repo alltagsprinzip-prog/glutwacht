@@ -127,7 +127,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  return holder
 func setup(sim):
  follow_hero=true
- village_bounds=load("res://game3d/progress.gd").village_bounds(int(sim.profile.hall))
+ village_bounds=load("res://game3d/progress.gd").village_bounds(int(sim.profile.hall),int(sim.profile.get("frontier",{}).get("land",0)))
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
  boats.clear();effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
@@ -433,6 +433,13 @@ func sync(sim,dt:float):
   a.node.visible=u.kind!="hero" or sim.hero_deployed
   if not a.node.visible:continue
   a.node.position=Vector3(u.pos.x,.06,u.pos.y)
+  var rolling=float(u.get("roll_time",0))
+  var model=a.node.get_child(0)
+  if model is Node3D:
+   model.rotation.x=-TAU*(1.0-rolling/.28) if rolling>0 else 0.0
+   model.position.y=float(model.get_meta("base_roll_y",model.position.y))
+   if not model.has_meta("base_roll_y"):model.set_meta("base_roll_y",model.position.y)
+   if rolling>0:model.position.y+=.65
   if u.hp<=0:
    a.ring.visible=false;a.bar.visible=false;a.hpbar.root.visible=false
    if a.state!="Death" and a.anim and a.anim.has_animation("Death"):a.anim.play("Death",.1);a.state="Death"
