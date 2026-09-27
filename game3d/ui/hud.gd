@@ -13,7 +13,7 @@ static func action(g,key:String,title:String,rect:Rect2,callback:Callable,primar
  if key=="menu":
   for state in ["normal","hover","pressed"]:b.add_theme_stylebox_override(state,g.skin("panel"))
  if b.get_child_count()>1 and b.get_child(1) is Label:
-  var caption=b.get_child(1);caption.add_theme_font_size_override("font_size",21)
+  var caption=b.get_child(1);caption.clip_text=true;caption.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS;caption.add_theme_font_size_override("font_size",21)
   caption.position=Vector2(4,rect.size.y-43);caption.size=Vector2(rect.size.x-8,29)
  return b
 static func dock(button:Control,edge:String="right"):
@@ -61,10 +61,10 @@ static func top(g):
  g.hud_widgets.sync=text(g,"",Rect2(114,82,205,22),15,TEXT)
  g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 static func home(g):
- var friends=dock(g.button(g.hud,"FREUNDE",Rect2(20,270,96,66),func():g.open_social()),"left");friends.add_theme_font_size_override("font_size",16)
+ var friends=dock(g.button(g.hud,"FREUNDE",Rect2(20,270,96,66),func():g.open_social()),"left");friends.add_theme_font_size_override("font_size",16);friends.size=Vector2(96,66)
  g.create_stick()
  g.collect_button=dock(action(g,"collect","SAMMELN",Rect2(1174,194,86,82),func():g.collect_resources(),true));g.collect_button.name="CollectAll";g.collect_button.tooltip_text="Alle verfügbaren Ressourcen einsammeln"
- g.collect_button.get_child(1).add_theme_font_size_override("font_size",14)
+ g.collect_button.get_child(1).add_theme_font_size_override("font_size",14);g.collect_button.get_child(1).size=Vector2(78,29)
  if g.progress.tutorial_step()!="done":
   var next=g.progress.tutorial_step()
   var captions={"hero":"Helden wählen","build":"Sägewerk bauen","upgrade":"Haupthaus ausbauen","train":"Helden trainieren","battle":"Erstes Lager angreifen"}
@@ -79,6 +79,7 @@ static func home(g):
  for i in range(4):
   var tile=action(g,keys[i],titles[i],Rect2(370+i*146,586,132,118),callbacks[i])
   tile.get_child(0).position=Vector2(29,6);tile.get_child(0).size=Vector2(74,74)
+  tile.get_child(1).add_theme_font_size_override("font_size",19);tile.get_child(1).size=Vector2(124,29)
  if g.selected_building!="":
   var b=g.progress.find_building(g.selected_building)
   if b.is_empty():return

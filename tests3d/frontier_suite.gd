@@ -40,6 +40,8 @@ func run():
  check(game.stick.position.x+game.stick.visible_circle().position.x-game.safe_rect().position.x<=2.1,"visible joystick rim has no hidden left gutter")
  for item in [game.collect_button,game.hud_widgets.help,game.hud.find_child("Action_menu",true,false),game.hud.find_child("Action_shop",true,false)]:
   check(absf(item.get_global_rect().end.x-game.safe_rect().end.x)<.1,"utility button on usable right edge: "+str(item.name))
+ var collect_caption=game.collect_button.get_child(1)
+ check(collect_caption.position.x+collect_caption.size.x<=game.collect_button.size.x,"collect caption remains inside its button at the screen edge")
  var mountain=game.world.landscape.find_child("MountainRange",true,false)
  check(mountain!=null and mountain.mesh is ArrayMesh and mountain.get_aabb().end.z<-75,"continuous rock ridge stays outside maximum village area")
  game.open_menu()

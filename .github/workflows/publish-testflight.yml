@@ -40,7 +40,7 @@ jobs:
         run: python3 tools/check_godot.py logs/cloud-recovery.log godot --headless --path . --script tests3d/cloud_recovery_suite.gd
       - name: Quest progression and battle reports
         run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd
-      - name: 0.16 save continuity, logout and existing-village migration
+      - name: 0.16 saved village, edge labels and direct menu logout
         run: |
           python3 tools/check_godot.py logs/session-resume.log godot --headless --path . --script tests3d/session_resume_suite.gd
           python3 tools/check_godot.py logs/frontier.log godot --headless --path . --script tests3d/frontier_suite.gd

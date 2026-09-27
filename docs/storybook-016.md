@@ -25,7 +25,7 @@ Speicherpfade, Save-Schema 7, Konten und Cloud-Protokoll bleiben erhalten.
 
 - HUD-Geometrie: 222/222 Prüfungen.
 - Vorhandenes 0.14-Dorf, Safe-Area, Ressourcen, Gebäudeinformationen,
-  Einstellungen, weite Einsatzfläche und Tippen/Halten: 64/64 Prüfungen.
+  Einstellungen, weite Einsatzfläche und Tippen/Halten: 65/65 Prüfungen.
 - Unterbrochene Cloud-Sicherung und Wiedereinstieg: 36/36 Prüfungen.
 - iPhone-13-Querformat im Chromium-Test: alter Kontospielstand, Hilfe,
   Sammeln, Einstellungen über Neuladen und Helden-/Truppeneinsatz bestanden.
