@@ -194,6 +194,28 @@ func resume_pending_save(meta:Dictionary) -> Dictionary:
  # Never mark the local village clean: it may contain actions after the request.
  if not save_metadata():return {"ok":false,"message":"Sicherungsbestätigung konnte lokal nicht gespeichert werden."}
  return result
+func flush_pending_save() -> bool:
+ if not OS.has_feature("web") or not storage_enabled:return true
+ # FileAccess writes to Emscripten memory first. The immutable receipt and the
+ # village must reach IndexedDB BEFORE the server can accept another revision.
+ # A lost acknowledgement can then always be recovered with this exact request.
+ busy=true
+ JavaScriptBridge.eval("""
+ (()=>{
+  const state={done:false,ok:false};window.__glutwachtSaveFlush=state;
+  const flush=()=>{
+   if(typeof GodotFS==='undefined'||!GodotFS.is_persistent()){state.done=true;return;}
+   if(GodotFS._syncing){setTimeout(flush,10);return;}
+   GodotFS.sync().then(error=>{state.ok=!error;state.done=true;}).catch(()=>{state.done=true;});
+  };flush();
+ })()
+ """,false)
+ var start=Time.get_ticks_msec()
+ while not bool(JavaScriptBridge.eval("!!window.__glutwachtSaveFlush?.done",true)):
+  if Time.get_ticks_msec()-start>15000:busy=false;return false
+  await get_tree().process_frame
+ var ok=bool(JavaScriptBridge.eval("!!window.__glutwachtSaveFlush?.ok",true))
+ busy=false;return ok
 func upload(snapshot:Dictionary) -> Dictionary:
  if not pending_restore.is_empty():return {"ok":false,"message":"Wiederherstellung zuerst abschließen.","code":"restore_pending"}
  if not signed_in() or not loaded:return {"ok":false,"message":"Zuerst den Cloud-Stand prüfen."}
@@ -203,6 +225,7 @@ func upload(snapshot:Dictionary) -> Dictionary:
   pending={"p_snapshot":snapshot.duplicate(true),"p_revision":revision,"p_request":uuid(),"p_device":device_id}
   pending_json=JSON.stringify(pending)
  if not save_metadata():return {"ok":false,"message":"Sicherungsauftrag konnte lokal nicht gespeichert werden."}
+ if not await flush_pending_save():return {"ok":false,"code":"local_storage","message":"Lokale Sicherung noch nicht bestätigt. Bitte Speicherzugriff erlauben und erneut sichern."}
  # Keep the exact request after a timeout: its committed response may have been lost.
  var result=await call_api("/rest/v1/rpc/save_private_village",HTTPClient.METHOD_POST,pending)
  if result.ok and result.data is Dictionary and result.data.has("revision"):
