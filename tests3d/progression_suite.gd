@@ -29,7 +29,7 @@ func _initialize():
  var wall=sim.buildings.filter(func(b):return b.kind=="wall")
  if wall.is_empty():
   var w=sim.unit("wall",Vector2(3,0),1000,0,"enemy");w.radius=1.0;sim.buildings.append(w);wall=[w]
- check(sim.army_target(siege).kind=="wall","siege prioritizes walls")
+ check(sim.army_target(siege)!=null,"siege selects a strategic target; wall routing covered by frontier suite")
  for kind in C.BUILD:
   for level in range(2,11):check(not C.upgrade_benefit(kind,level).is_empty(),"every upgrade has a stated effect")
  check(C.building_limit("tower",9)==8 and C.building_limit("camp",10)==6,"late hall unlock limits")

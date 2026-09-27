@@ -32,6 +32,7 @@ var attack_side="south"
 var priority="nearest"
 var first_target=""
 var reserve={"melee":0,"archers":0,"shield":0,"siege":0}
+var deployment_polygon=PackedVector2Array()
 var manual_deployment=false
 var hero_deployed=true
 var hero_auto_attack=false
@@ -89,9 +90,10 @@ func form_army():
   var troop=soldier(kind,pos.clamp(Vector2(-29,-29),Vector2(29,29)))
   troop.anchor=troop.pos;troop.idle_phase=i*1.37;allies.append(troop)
 func deployment_valid(pos:Vector2) -> bool:
- if maxf(absf(pos.x),absf(pos.y))<24 or maxf(absf(pos.x),absf(pos.y))>30:return false
+ if not Rect2(-46,-46,92,92).has_point(pos):return false
+ if deployment_polygon.size()>2 and Geometry2D.is_point_in_polygon(pos,deployment_polygon):return false
  for b in buildings:
-  if b.hp>0 and pos.distance_to(b.pos)<float(b.radius)+1:return false
+  if b.hp>0 and pos.distance_to(b.pos)<float(b.radius)+4.0:return false
  return true
 func deploy(kind:String,pos:Vector2) -> bool:
  if mode!="raid" or result!="" or not reserve.has(kind) or int(reserve[kind])<=0 or not deployment_valid(pos):return false
@@ -157,6 +159,10 @@ func layout(index:int):
  var factor=float(village.get("combat_scale",1.0))
  for b in buildings:b.hp*=factor;b.max_hp=b.hp
  for u in enemies:u.hp*=factor;u.max_hp=u.hp;u.damage*=factor;u.anchor=u.pos;u.awake=false
+ var perimeter=PackedVector2Array()
+ for b in buildings:
+  for i in range(8):perimeter.append(b.pos+Vector2.from_angle(i*TAU/8.0)*(float(b.radius)+3.0))
+ deployment_polygon=Geometry2D.convex_hull(perimeter)
  assign_loot()
  if level>=2:
   traps.append({"pos":Vector2(0,11),"used":false,"damage":20+level*7})
@@ -244,15 +250,17 @@ func stars() -> int:
 func targets() -> Array:
  return living(enemies)+(living(buildings) if mode=="raid" else [])
 func army_target(u:Dictionary):
- if u.kind=="siege" and mode=="raid":
-  var walls=living(buildings).filter(func(b):return b.kind=="wall")
-  if not walls.is_empty():return nearest(u.pos,walls)
+ u.erase("route_point")
  var close_enemy=nearest(u.pos,living(enemies))
  var goal=null
  if close_enemy!=null and distance(u,close_enemy)<(9 if u.kind=="archer" else 4):goal=close_enemy
- elif mode=="raid":goal=nearest(u.pos,living(buildings))
+ elif mode=="raid":goal=nearest(u.pos,living(buildings).filter(func(b):return b.kind!="wall"))
  else:goal=nearest(u.pos,targets())
- if mode=="raid" and goal!=null and u.kind!="archer":
+ if mode=="raid" and goal!=null and u.kind!="archer" and distance(u,goal)>float(Catalog.TROOPS.get(u.kind,{}).get("range",1.3)):
+  # A nearby existing gap is cheaper than breaking another wall.
+  var way=wall_waypoint(u.pos,goal.pos)
+  if way!=Vector2.INF:u.route_point=way;return goal
+  u.erase("route_point")
   var first_wall=null;var first_t=INF
   for b in living(buildings):
    if b.kind!="wall" or b.id==goal.id:continue
@@ -260,6 +268,22 @@ func army_target(u:Dictionary):
    if t>0 and t<1 and t<first_t and b.pos.distance_to(u.pos+line*t)<b.radius+.55:first_wall=b;first_t=t
   if first_wall!=null:return first_wall
  return goal
+func wall_clear(a:Vector2,b:Vector2) -> bool:
+ for wall in buildings:
+  if wall.kind!="wall" or wall.hp<=0:continue
+  var nearest_point=Geometry2D.get_closest_point_to_segment(wall.pos,a,b)
+  if nearest_point.distance_to(wall.pos)<float(wall.radius)+.65:return false
+ return true
+func wall_waypoint(a:Vector2,b:Vector2) -> Vector2:
+ if wall_clear(a,b):return Vector2.INF
+ var best=Vector2.INF;var length=a.distance_to(b)+7.0
+ for wall in buildings:
+  if wall.kind!="wall" or wall.hp<=0 or a.distance_to(wall.pos)>15:continue
+  for side in [Vector2.LEFT,Vector2.RIGHT,Vector2.UP,Vector2.DOWN]:
+   var p:Vector2=wall.pos+side*(float(wall.radius)+.9)
+   var cost=a.distance_to(p)+p.distance_to(b)
+   if cost<length and wall_clear(a,p) and wall_clear(p,b):best=p;length=cost
+ return best
 func nearest(pos:Vector2,list:Array):
  var best=null;var dmin=INF
  for u in list:
@@ -277,12 +301,17 @@ func move(u:Dictionary,direction:Vector2,speed:float,dt:float):
   if delta.length()<r:
    if delta.length()<.01:delta=Vector2(1,0)
    next=b.pos+delta.normalized()*r
- if mode in ["home","defense"]:next=next.clamp(Progress.VILLAGE_MIN+Vector2.ONE,Progress.VILLAGE_MAX-Vector2.ONE)
- else:next=next.clamp(Vector2(-30,-30),Vector2(30,30))
+ if mode in ["home","defense"]:
+  var bounds=Progress.village_bounds(int(profile.hall));next=next.clamp(bounds.position+Vector2.ONE,bounds.end-Vector2.ONE)
+ else:next=next.clamp(Vector2(-46,-46),Vector2(46,46))
  u.pos=next;u.facing=dir
  if u.attack_time<=0:u.anim="Run"
 func approach(u:Dictionary,goal:Dictionary,speed:float,dt:float):
  var d:Vector2=goal.pos-u.pos
+ if u.has("route_point"):
+  var waypoint:Vector2=u.route_point
+  if waypoint.distance_to(u.pos)>1:d=waypoint-u.pos
+  else:u.erase("route_point")
  for b in buildings:
   if b.hp<=0 or b.id==goal.id:continue
   var delta:Vector2=b.pos-u.pos
@@ -296,7 +325,7 @@ func damage(u:Dictionary,amount:float):
  if u==hero and (not hero_deployed or invulnerable>0):return
  var dealt=minf(u.hp,amount);u.hp=maxf(0,u.hp-amount);u.flash=.16
  accrue_loot(u)
- if audio_events.size()<4:audio_events.append("hurt" if u==hero else ("shield" if u.kind=="shield" else "hit"))
+ if audio_events.size()<4:audio_events.append("hurt" if u==hero else ("stone" if u.has("radius") and u.kind in ["wall","tower","quarry"] else ("wood" if u.has("radius") else ("shield" if u.kind=="shield" else "hit"))))
  if combat_texts.size()<28:combat_texts.append({"pos":u.pos,"value":"-%d"%ceili(dealt),"heal":false,"life":.9,"max":.9})
  if u.get("team","")=="enemy":alarm=true
  if u.hp<=0:
@@ -308,7 +337,7 @@ func attack_effect(u:Dictionary,target:Dictionary,color:Color):
 func strike():
  if not hero_deployed or not active() or result!="" or attack_cd>0 or hero.hp<=0:return
  var c=stats();attack_cd=c.attack_cd;animate_attack(hero,float(c.attack_cd)*.94)
- var target=nearest(hero.pos,targets())
+ var target=army_target(hero) if hero_auto_attack else nearest(hero.pos,targets())
  if target==null or distance(hero,target)>float(c.range):return
  facing=(target.pos-hero.pos).normalized();hero.facing=facing
  if c.range>4:queue_hit(hero,target,hero.damage,c.range,true,Color(c.color))

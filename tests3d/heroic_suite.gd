@@ -71,7 +71,7 @@ func run():
  g.world.follow_hero=true;g.world.change_zoom(-3);check(not g.world.follow_hero,"manual zoom suspends follow")
  g.hud_widgets.follow.pressed.emit();check(g.world.follow_hero,"Zum Helden restores follow")
  check(g.sim.deploy_squad("melee",Vector2(-27,0))==5,"five warriors deploy as one group")
- g.deploying="";g.update_hud();check(not g.deployment_buttons.archers.visible,"unavailable archers hidden")
+ g.deploying="";g.update_hud();check(g.deployment_buttons.archers.visible and g.deployment_buttons.archers.disabled,"unavailable archers show disabled portrait")
  g.world.sync(g.sim,.016);await shot("combat")
  g.queue_free();await frames();DirAccess.remove_absolute("user://qa-heroic.json")
  print("HEROIC_TESTS ",checks-failed,"/",checks);quit(1 if failed else 0)

@@ -13,6 +13,7 @@ var busy=false
 var loaded=false
 var status="Nicht angemeldet"
 var pending:Dictionary={}
+var pending_json=""
 var pending_restore:Dictionary={}
 var dirty=false
 var storage_enabled=true
@@ -69,14 +70,39 @@ func save_metadata() -> bool:
  var path=metadata_path();var temp=path+".tmp"
  var f=FileAccess.open(temp,FileAccess.WRITE)
  if not f:return false
- f.store_string(JSON.stringify({"revision":revision,"dirty":dirty,"pending":pending,"pending_restore":pending_restore}))
+ f.store_string(JSON.stringify({"revision":revision,"dirty":dirty,"pending":pending,"pending_json":pending_json,"pending_restore":pending_restore}))
  f.flush();var error=f.get_error();f.close()
  if error!=OK:return false
  return DirAccess.rename_absolute(temp,path)==OK
 func read_metadata() -> Dictionary:
  if not FileAccess.file_exists(metadata_path()):return {}
- var value=JSON.parse_string(FileAccess.get_file_as_string(metadata_path()))
- return value if value is Dictionary else {}
+ var raw=FileAccess.get_file_as_string(metadata_path())
+ var value=JSON.parse_string(raw)
+ if not value is Dictionary:return {}
+ if value.get("pending",{}) is Dictionary and not value.get("pending",{}).is_empty() and String(value.get("pending_json","" )).is_empty():
+  value.pending_json=legacy_pending_json(raw)
+ return value
+static func legacy_pending_json(raw:String) -> String:
+ # Old sidecars contain the original numeric spelling, even though Godot's JSON
+ # parser turns all numbers into floats. Retain it for the server receipt hash.
+ var marker=raw.find('"pending":')
+ if marker<0:return ""
+ var start=marker+10
+ while start<raw.length() and raw[start] in [" ","\n","\r","\t"]:start+=1
+ if start>=raw.length() or raw[start]!="{":return ""
+ var depth=0;var quoted=false;var escaped=false
+ for i in range(start,raw.length()):
+  var ch=raw[i]
+  if quoted:
+   if escaped:escaped=false
+   elif ch=="\\":escaped=true
+   elif ch=='"':quoted=false
+  elif ch=='"':quoted=true
+  elif ch=="{":depth+=1
+  elif ch=="}":
+   depth-=1
+   if depth==0:return raw.substr(start,i-start+1)
+ return ""
 func _ready():
  var config=JSON.parse_string(FileAccess.get_file_as_string("res://game3d/online/config.json"))
  if config is Dictionary:
@@ -99,7 +125,8 @@ func call_api(path:String,method:int,body:Dictionary={}) -> Dictionary:
  http.accept_gzip=not OS.has_feature("web")
  var headers=PackedStringArray(["apikey: "+public_key,"Content-Type: application/json"])
  if not token.is_empty() and not path.begins_with("/auth/v1/token"):headers.append("Authorization: Bearer "+token)
- var error=http.request(url+path,headers,method,"" if method==HTTPClient.METHOD_GET else JSON.stringify(body))
+ var body_json=pending_json if path=="/rest/v1/rpc/save_private_village" and body==pending and not pending_json.is_empty() else JSON.stringify(body)
+ var error=http.request(url+path,headers,method,"" if method==HTTPClient.METHOD_GET else body_json)
  if error!=OK:busy=false;http.queue_free();return {"ok":false,"message":"Verbindung konnte nicht gestartet werden."}
  var result=await http.request_completed
  busy=false;http.queue_free()
@@ -158,8 +185,10 @@ func resume_pending_save(meta:Dictionary) -> Dictionary:
   var id=String(request[key])
   if id.length()!=36 or id.replace("-","").length()!=32 or not id.replace("-","").is_valid_hex_number():return {"ok":false,"message":"Sicherungsauftrag ungültig."}
  if busy or not signed_in() or not pending_restore.is_empty():return {"ok":false,"message":"Bitte die laufende Kontoprüfung abwarten."}
+ var original=meta.get("pending_json","")
+ if not original is String or original.is_empty() or JSON.parse_string(original)!=request:return {"ok":false,"message":"Original-Sicherungsauftrag fehlt; lokale Daten bleiben erhalten."}
  var was_loaded=loaded
- revision=int(meta.revision);pending=request.duplicate(true);dirty=true;loaded=true
+ revision=int(meta.revision);pending=request.duplicate(true);pending_json=original;dirty=true;loaded=true
  var result=await upload(request.p_snapshot)
  loaded=was_loaded
  # Never mark the local village clean: it may contain actions after the request.
@@ -170,22 +199,24 @@ func upload(snapshot:Dictionary) -> Dictionary:
  if not signed_in() or not loaded:return {"ok":false,"message":"Zuerst den Cloud-Stand prüfen."}
  var session=await ensure_session()
  if not session.ok:return session
- if pending.is_empty():pending={"p_snapshot":snapshot.duplicate(true),"p_revision":revision,"p_request":uuid(),"p_device":device_id}
+ if pending.is_empty():
+  pending={"p_snapshot":snapshot.duplicate(true),"p_revision":revision,"p_request":uuid(),"p_device":device_id}
+  pending_json=JSON.stringify(pending)
  if not save_metadata():return {"ok":false,"message":"Sicherungsauftrag konnte lokal nicht gespeichert werden."}
  # Keep the exact request after a timeout: its committed response may have been lost.
  var result=await call_api("/rest/v1/rpc/save_private_village",HTTPClient.METHOD_POST,pending)
  if result.ok and result.data is Dictionary and result.data.has("revision"):
   if int(result.data.get("head_revision",result.data.revision))>int(result.data.revision):
-   pending.clear();dirty=true;save_metadata()
+   pending.clear();pending_json="";dirty=true;save_metadata()
    return {"ok":false,"code":"revision_conflict","message":"Die Anfrage war bereits gesichert. Inzwischen liegt ein neuerer Cloud-Stand vor; bitte laden."}
   result.saved_snapshot=pending.p_snapshot.duplicate(true)
-  revision=int(result.data.revision);pending.clear();status="Cloud gesichert"
+  revision=int(result.data.revision);pending.clear();pending_json="";status="Cloud gesichert"
  else:status="Cloud-Sicherung ausstehend"
  return result
 func logout():
  if storage_enabled and not OS.has_feature("web"):native_store.clear()
  if storage_enabled and OS.has_feature("web"):JavaScriptBridge.eval("try{localStorage.removeItem('glutwacht.auth.v1')}catch(e){}")
- token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();pending_restore.clear();status="Nicht angemeldet"
+ token="";refresh_token="";expires_at=0;recovering=false;user_id="";revision=0;loaded=false;pending.clear();pending_json="";pending_restore.clear();status="Nicht angemeldet"
 
 func accept_session(payload:Dictionary,expected_user:String="") -> bool:
  var incoming_token=String(payload.get("access_token",""))

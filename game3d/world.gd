@@ -36,6 +36,17 @@ var edges:Node3D
 var boats:Array=[]
 var village_clock=0.0
 var art_preview=false
+var village_bounds=Rect2(-39,-39,70,78)
+var quality=1
+func apply_settings(settings:Dictionary):
+ quality=int(settings.quality)
+ if sky_env:
+  sky_env.adjustment_enabled=true;sky_env.adjustment_brightness=float(settings.brightness)
+ for child in get_children():
+  if child is DirectionalLight3D and child.light_energy>.4:child.shadow_enabled=quality>0
+ if is_inside_tree():
+  get_viewport().msaa_3d=Viewport.MSAA_DISABLED if quality==0 else (Viewport.MSAA_2X if quality==1 else Viewport.MSAA_4X)
+  get_viewport().scaling_3d_scale=.8 if quality==0 else 1.0
 const ArtVillage=preload("res://game3d/art_village.gd")
 const Nature=preload("res://game3d/nature.gd")
 func health_bar(parent:Node3D,height:float,width:float,color:Color) -> Dictionary:
@@ -116,6 +127,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  return holder
 func setup(sim):
  follow_hero=true
+ village_bounds=load("res://game3d/progress.gd").village_bounds(int(sim.profile.hall))
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
  boats.clear();effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
@@ -149,9 +161,18 @@ func setup(sim):
  selection=disc(1,Color(.1,.75,1,.2),Vector3.ZERO,fx);selection.visible=false
  deployment_marker=disc(1.4,Color(.2,.9,.5,.5),Vector3.ZERO,fx);deployment_marker.visible=false
  edges=Node3D.new();fx.add_child(edges)
- for axis in range(4):
-  var p=Vector3(0,.065,27) if axis==0 else (Vector3(0,.065,-27) if axis==1 else (Vector3(27,.065,0) if axis==2 else Vector3(-27,.065,0)))
-  box(edges,p,Vector3(54,.04,.32) if axis<2 else Vector3(.32,.04,54),Color("f1b973"))
+ if mode in ["raid","scout"] and sim.deployment_polygon.size()>2:
+  # Outline only the actual protected enemy footprint, no narrow square spawn band.
+  for i in range(sim.deployment_polygon.size()-1):
+   var a:Vector2=sim.deployment_polygon[i];var b:Vector2=sim.deployment_polygon[i+1];var midpoint=(a+b)*.5
+   var line=box(edges,Vector3(midpoint.x,.075,midpoint.y),Vector3(.14,.04,a.distance_to(b)),Color("e7866b"));line.rotation.y=atan2(b.x-a.x,b.y-a.y)
+ elif mode=="home":
+  var bounds=village_bounds
+  for x in range(int(bounds.position.x),int(bounds.end.x)+1,4):
+   for z in [bounds.position.y,bounds.end.y]:box(edges,Vector3(x,.36,z),Vector3(.26,.7,.26),Color("e5c58a"))
+  for z in range(int(bounds.position.y)+4,int(bounds.end.y),4):
+   for x in [bounds.position.x,bounds.end.x]:box(edges,Vector3(x,.36,z),Vector3(.26,.7,.26),Color("e5c58a"))
+ apply_settings(load("res://game3d/progress.gd").clean_settings(sim.profile.get("settings",{})))
 func batch_static_landscape():
  # Merge only immutable decoration, in spatial cells. Moving boats and selectable
  # obstacles remain independent; obstacles are created after this call.
@@ -242,7 +263,7 @@ func village_paths(sim):
 func scenery(sim):
  for i in range(95):
   var p=Vector3(rng.randf_range(-58,56),0,rng.randf_range(-52,46))
-  if p.x>-42 and p.x<34 and absf(p.z)<42:continue
+  if village_bounds.grow(3).has_point(Vector2(p.x,p.z)):continue
   if p.x>35 and p.x<44:continue
   var names=["tree_default.glb","tree_fat.glb","tree_tall.glb","tree_pineTallA_detailed.glb"]
   Nature.tree(landscape,p,rng.randf_range(5,11),i+742)
@@ -253,7 +274,7 @@ func scenery(sim):
   asset(plants[i%4],landscape,Vector3(p.x,.01,p.y),rng.randf_range(.35,.8),"height",rng.randf()*TAU)
  for i in range(14):asset("rock_largeA.glb",landscape,Vector3(rng.randf_range(43,49),-.1,rng.randf_range(-34,34)),rng.randf_range(1,3),"height",rng.randf()*TAU)
  for i in range(4):
-  var p=Vector3(-20+i*13.5,0,-44)
+  var p=Vector3(-20+i*13.5,0,village_bounds.position.y-6)
   asset("House_4.obj" if i%2 else "House_1.obj",landscape,p,5.5,"width",PI)
  # Kasernenhof: Feuer, Bänke und Vorräte geben der wartenden Armee einen klaren Platz.
  if mode=="home":
@@ -359,15 +380,22 @@ func create_actor(u:Dictionary):
  var file="Warrior.gltf"
  if u.kind=="hero":file=Catalog.hero(u.class_key).model
  elif u.kind in ["archer","ranger"]:file="Ranger.gltf"
- elif u.kind=="guard":file="Rogue.gltf"
+ elif u.kind in ["guard","melee"]:file="Rogue.gltf"
  elif u.kind=="siege":file="Cleric.gltf"
  var size=3.8 if u.kind=="hero" else (2.85 if u.kind in ["captain","shield"] else 2.45)
  var holder=asset(file,self,Vector3(u.pos.x,.06,u.pos.y),size)
+ if u.kind=="melee":
+  var helm=SphereMesh.new();helm.radius=.37;helm.height=.52;helm.radial_segments=12;helm.rings=6
+  mesh_node(helm,Vector3(0,size-.2,0),material(Color("93aabb"),.4),holder)
+ if u.kind=="hero":
+  var cape=PrismMesh.new();cape.size=Vector3(1.35,1.8,.18)
+  var mantle=mesh_node(cape,Vector3(0,1.65,-.35),material(Color(Catalog.hero(u.class_key).color).darkened(.32)),holder);mantle.rotation.x=-.14
  if u.kind=="shield":
   var shield=box(holder,Vector3(0,1.35,.6),Vector3(1.45,1.75,.22),Color("398edd"))
   box(shield,Vector3(0,0,.15),Vector3(.18,1.3,.1),Color("ffe091"))
  if u.kind=="siege":
   box(holder,Vector3(0,.5,-.65),Vector3(1.5,.2,1.3),Color("9f7346"))
+  var arm=box(holder,Vector3(0,1.02,-.75),Vector3(.19,1.4,.2),Color("b08550"));arm.rotation.x=-.6
   for x in [-.78,.78]:
    var wheel=CylinderMesh.new();wheel.top_radius=.42;wheel.bottom_radius=.42;wheel.height=.15;wheel.radial_segments=12
    var axle=mesh_node(wheel,Vector3(x,.4,-.65),material(Color("63442d")),holder);axle.rotation.z=PI/2
@@ -413,6 +441,7 @@ func sync(sim,dt:float):
   var attacking=state=="attack"
   if state=="attack":
    if u.kind in ["archer","ranger"]:state="Bow_Shoot"
+   elif u.kind=="melee":state="Dagger_Attack"
    elif u.kind=="siege":state="Spell1"
    elif u.kind=="guard" or u.get("class_key","")=="ninja":state="Dagger_Attack"
    elif u.get("class_key","") in ["shaman","mage"]:state="Spell1"
@@ -507,7 +536,7 @@ func sync(sim,dt:float):
  if selected_obstacle!="" and obstacles.has(selected_obstacle):
   var o=obstacles[selected_obstacle];var root:Node3D=o.root
   selection.visible=true;selection.position=Vector3(root.position.x,.08,root.position.z);selection.scale=Vector3.ONE*(float(o.radius)+.45)
- edges.visible=mode=="scout" or (mode=="raid" and sim.manual_deployment and (not sim.hero_deployed or Catalog.army_count(sim.reserve)>0))
+ edges.visible=(mode=="home" and build_focus) or mode=="scout" or (mode=="raid" and sim.manual_deployment and (not sim.hero_deployed or Catalog.army_count(sim.reserve)>0))
  update_camera(sim,dt)
 func effect_id(e:Dictionary) -> int:
  if not e.has("visual_id"):effect_serial+=1;e.visual_id=effect_serial
@@ -585,7 +614,7 @@ func ground_position(screen:Vector2) -> Vector2:
  var hit=Plane(Vector3.UP,0).intersects_ray(camera.project_ray_origin(screen),camera.project_ray_normal(screen))
  return Vector2(hit.x,hit.z) if hit!=null else Vector2.ZERO
 func pan_camera(delta:Vector2):
- manual_camera();pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(Vector2(-34,-34),Vector2(26,34))
+ manual_camera();pan=(pan+screen_to_direction(delta)*delta.length()*.06).clamp(village_bounds.position+Vector2(5,5) if mode=="home" else Vector2(-42,-42),village_bounds.end-Vector2(5,5) if mode=="home" else Vector2(42,42))
 func building_at(screen:Vector2):
  var origin=camera.project_ray_origin(screen);var direction=camera.project_ray_normal(screen)
  var chosen=null;var best=INF

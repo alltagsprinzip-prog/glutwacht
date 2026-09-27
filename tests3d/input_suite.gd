@@ -78,7 +78,7 @@ func run():
  
  check(game.sim.reserve.archers==before-1,"edge drag emits one before repeat delay")
  game.sim.reserve.melee=5;game.sim.reserve.archers=0;game.update_hud()
- check(not game.deployment_buttons.archers.visible,"empty archers disappear during raid")
+ check(game.deployment_buttons.archers.visible and game.deployment_buttons.archers.disabled,"empty archer portrait remains disabled")
  await click_button(game.deployment_buttons.melee);await click_button(game.hud_widgets.deploy_group)
  check(game.deploy_group,"touch selects squad mode")
  var allies_before=game.sim.allies.size();point=edge_point();await tap(point)

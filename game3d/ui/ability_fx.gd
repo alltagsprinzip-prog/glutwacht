@@ -24,34 +24,34 @@ static func create(w,e):
    orb(w,rock,Vector3.ZERO,.38,Color("fff0b5"))
    for i in range(5):orb(w,rock,Vector3(sin(i)*.1,.6+i*.37,0),.3-i*.04,Color("ffbb6b"))
   "earthbreak":
-   ring(w,p,1,.05,Color("edc594"))
+   ring(w,p,1,.12,Color("ffcf76"));ring(w,p,.72,.05,Color("fff1bc"),.24)
    for i in range(14):
     var a=i*TAU/14.0
-    ribbon(w,p,[Vector3(cos(a)*.2,.06,sin(a)*.2),Vector3(cos(a+.08)*.6,.06,sin(a+.08)*.6),Vector3(cos(a),.06,sin(a))],.018,Color("664334"))
-    var m=BoxMesh.new();m.size=Vector3(.07,.1+.02*(i%3),.08);var stone=w.mesh_node(m,Vector3(cos(a)*.8,.2,sin(a)*.8),w.material(Color("a99b7a")),p);stone.rotation=Vector3(i*.5,i,.2)
+    ribbon(w,p,[Vector3(cos(a)*.2,.06,sin(a)*.2),Vector3(cos(a+.08)*.6,.06,sin(a+.08)*.6),Vector3(cos(a),.06,sin(a))],.055,Color("e09a44"))
+    var m=BoxMesh.new();m.size=Vector3(.14,.22+.04*(i%3),.16);var stone=w.mesh_node(m,Vector3(cos(a)*.8,.2,sin(a)*.8),w.material(Color("a99b7a")),p);stone.rotation=Vector3(i*.5,i,.2)
     orb(w,p,Vector3(cos(a),.13,sin(a)),.05,Color("d2ba91"))
   "ninja_slash":
    for sign_value in [-1,1]:
     var points=[]
     for i in range(12):
      var a=-1.1+i*.2;points.append(Vector3(sin(a)*1.3,.8+i*.045,cos(a)*sign_value))
-    ribbon(w,p,points,.1,Color("bfa6ef"))
+    ribbon(w,p,points,.24,Color("d4b6ff"));ribbon(w,p,points,.065,Color("fff0ff"))
   "ninja_echo":
    var mesh=CapsuleMesh.new();mesh.radius=.3;mesh.height=1.25;mesh.radial_segments=8;mesh.rings=4
    w.mesh_node(mesh,Vector3(0,1.3,0),w.material(Color(.59,.49,.82,.25),.7,true),p)
    orb(w,p,Vector3(0,2.15,0),.24,Color(.68,.58,.94,.32))
    ribbon(w,p,[Vector3(-.25,1.5,0),Vector3(-.8,.8,.25)],.12,Color(.7,.6,1,.28))
   "spirit_wave":
-   ring(w,p,8.5,.065,Color("69cda3"))
+   ring(w,p,8.5,.18,Color("69f0aa"));ring(w,p,6.5,.08,Color("ccffdd"),.3)
    for i in range(10):
     var a=i*TAU/10.0;orb(w,p,Vector3(cos(a)*5,.45,sin(a)*5),.10,Color("c7ffdb"))
   "heal_stream","spirit_bolt":
    var delta:Vector2=e.end-e.pos;var points=[]
    for i in range(9):
     var t=i/8.0;points.append(Vector3(delta.x*t+sin(i*4.0)*(.20 if e.kind=="spirit_bolt" else .07),1.4+sin(t*PI)*.5,delta.y*t))
-   ribbon(w,p,points,.055,e.color)
+   ribbon(w,p,points,.15,e.color)
   "meteor_burst":
-   ring(w,p,1,.09,Color("ffc165"));orb(w,p,Vector3(0,.30,0),.32,Color("ffdeb4"))
+   ring(w,p,1,.17,Color("ffae35"));ring(w,p,.65,.06,Color("fff5ce"),.2);orb(w,p,Vector3(0,.30,0),.5,Color("ffe6aa"))
    for i in range(16):
     var a=i*TAU/16.0;orb(w,p,Vector3(cos(a),.10+.13*(i%4),sin(a)),.05,Color("e99648"))
   "cast_charge":ring(w,p,1.2,.07,e.color)

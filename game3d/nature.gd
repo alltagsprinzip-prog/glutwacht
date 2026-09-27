@@ -14,12 +14,14 @@ static func tree(parent:Node3D,p:Vector3,height:float,seed_value:int):
   trunk.block(pos,Vector3(height*.028,height*.32,height*.028),Color("6d5840"),.01,Basis(Vector3.FORWARD,.6*cos(a)))
  trunk.finish(holder,"Oak_Trunk")
  var mesh=SurfaceTool.new();mesh.begin(Mesh.PRIMITIVE_TRIANGLES)
- for i in range(52):
-  var a=i*2.39996;var t=float(i)/52;var ring=sqrt(1.0-pow(t*2.0-1.0,2))
-  var center=Vector3(cos(a)*height*.27*ring,height*(.46+t*.47),sin(a)*height*.27*ring)
+ for i in range(72):
+  var a=i*2.39996;var t=float(i)/72;var ring=sqrt(1.0-pow(t*2.0-1.0,2))
+  var center=Vector3(cos(a)*height*.30*ring,height*(.46+t*.47),sin(a)*height*.30*ring)
+  center.x+=sin(t*14.0+seed_value)*height*.035
+  center.z+=cos(t*11.0+seed_value)*height*.035
   center+=Vector3(rng.randf_range(-.15,.15),rng.randf_range(-.1,.1),rng.randf_range(-.15,.15))
   var basis=Basis.from_euler(Vector3(rng.randf_range(-.8,.8),a,rng.randf_range(-.6,.6)))
-  var scale=height*rng.randf_range(.17,.25)
+  var scale=height*rng.randf_range(.12,.21)
   var corners=[Vector3(-1,-1,0),Vector3(1,-1,0),Vector3(1,1,0),Vector3(-1,1,0)]
   var uvs=[Vector2(0,1),Vector2(1,1),Vector2(1,0),Vector2(0,0)]
   var normal=Vector3(center.x,height*.3,center.z).normalized()

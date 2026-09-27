@@ -25,6 +25,8 @@ static func build(g):
   else:home(g)
  elif g.sim.mode=="scout":scout(g)
  else:combat(g)
+ g.hud_widgets.help=g.button(g.hud,"?",Rect2(1198,239 if g.sim.active() else 265,62,58),func():g.open_help())
+ g.hud_widgets.help.tooltip_text="Hilfe & nächstes Upgrade"
  update(g)
  if is_instance_valid(g.modal):g.ui.move_child(g.modal,-1)
 static func top(g):
@@ -52,6 +54,8 @@ static func top(g):
 static func home(g):
  g.button(g.hud,"FREUNDE",Rect2(20,286,138,54),func():g.open_social())
  g.create_stick()
+ g.collect_button=g.button(g.hud,"ALLES SAMMELN",Rect2(1020,199,240,60),func():g.collect_resources(),true)
+ g.collect_button.add_theme_font_size_override("font_size",22)
  if g.progress.tutorial_step()!="done":
   var next=g.progress.tutorial_step()
   var captions={"hero":"Helden wählen","build":"Sägewerk bauen","upgrade":"Haupthaus ausbauen","train":"Helden trainieren","battle":"Erstes Lager angreifen"}
@@ -94,14 +98,17 @@ static func combat(g):
  g.objective=text(g,"",Rect2(558,31,280,57),34,TEXT,true)
  action(g,"menu","",Rect2(1158,18,102,91),func():g.open_menu())
  for i in range(4):
-  var key=g.Catalog.TROOP_ORDER[i];var b=action(g,key,"",Rect2(20+(i%2)*112,185+int(i/2)*77,104,70),func():g.choose_deploy(key))
-  b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,7);b.get_child(0).size=Vector2(44,44)
-  b.set_meta("count",g.label(b,"",Rect2(49,4,50,43),30,TEXT,true));g.label(b,["Krieger","Bogen","Schild","Stein"][i],Rect2(3,47,98,26),20,TEXT,true)
+  var key=g.Catalog.TROOP_ORDER[i];var b=action(g,"face_"+key,"",Rect2(20+(i%2)*112,185+int(i/2)*77,104,70),func():g.choose_deploy(key))
+  b.name="Deploy_"+key;g.deployment_buttons[key]=b;b.get_child(0).position=Vector2(4,4);b.get_child(0).size=Vector2(62,62);b.tooltip_text=g.Catalog.TROOPS[key].name
+  b.set_meta("count",g.label(b,"",Rect2(65,18,35,42),30,TEXT,true))
  g.hud_widgets.deploy_single=g.button(g.hud,"Einzeln",Rect2(20,338,102,66),func():g.choose_deploy_group(false))
  g.hud_widgets.deploy_group=g.button(g.hud,"Alle",Rect2(128,338,108,66),func():g.choose_deploy_group(true),true)
  for key in ["deploy_single","deploy_group"]:g.hud_widgets[key].add_theme_font_size_override("font_size",24)
  g.hud_widgets.deploy_hint=text(g,"",Rect2(275,110,735,45),22,TEXT,true)
- g.hud_widgets.deploy_hero=g.button(g.hud,"Held einsetzen",Rect2(20,413,216,64),func():g.choose_deploy("hero"),true)
+ g.hud_widgets.deploy_hero=action(g,"face_"+g.sim.hero_key(),"",Rect2(20,413,104,78),func():g.choose_deploy("hero"),true)
+ g.hud_widgets.deploy_hero.get_child(0).position=Vector2(4,4);g.hud_widgets.deploy_hero.get_child(0).size=Vector2(66,66)
+ g.label(g.hud_widgets.deploy_hero,"1",Rect2(68,20,32,40),30,TEXT,true)
+ g.hud_widgets.deploy_hero.tooltip_text=g.sim.stats().name+" einsetzen"
  g.hud_widgets.auto_attack=g.button(g.hud,"Autoangriff: AUS",Rect2(20,413,216,64),func():g.sim.hero_auto_attack=not g.sim.hero_auto_attack;update(g))
  g.hud_widgets.auto_attack.add_theme_font_size_override("font_size",21)
  g.hud_widgets.follow=g.button(g.hud,"Zum Helden",Rect2(1088,316,172,66),func():g.world.follow_hero=true)
@@ -144,6 +151,8 @@ static func update(g):
   for job in g.progress.data.jobs+g.progress.data.obstacle_jobs:remaining=minf(remaining,float(job.finish)-Time.get_unix_time_from_system())
   g.hud_widgets.timer.text="Bauarbeiter" if remaining==INF else "%02d:%02d"%[maxi(0,ceili(remaining))/60,maxi(0,ceili(remaining))%60]
  for key in g.loot_labels:g.loot_labels[key].text="%d / %d"%[g.sim.looted[key],g.sim.village[key]]
+ if g.collect_button:
+  var ready=g.progress.ready_resources();g.collect_button.disabled=ready.wood+ready.stone+ready.gold<=0
  if not g.sim.active():return
  if g.health:g.health.value=g.sim.hero.hp;g.health_text.text="%d / %d"%[ceili(g.sim.hero.hp),g.sim.hero.max_hp]
  if g.objective:
@@ -157,12 +166,13 @@ static func update(g):
  var slot=0
  for kind in g.deployment_buttons:
   var b=g.deployment_buttons[kind];b.get_meta("count").text=str(g.sim.reserve[kind]);b.disabled=g.sim.reserve[kind]<=0
-  b.visible=not b.disabled
+  b.visible=true
   if b.visible:
-   b.set_meta("design_position",Vector2(20+(slot%2)*112,185+int(slot/2)*77));b.position=b.get_meta("design_position")+g.safe_rect().position;slot+=1
+   b.set_meta("design_position",Vector2(20+(slot%2)*112,185+int(slot/2)*77));b.position=b.get_meta("design_position")+g.safe_rect().position-Vector2(20,0);slot+=1
   var chosen=g.deploying==kind and not b.disabled
   if b.get_meta("selected",false)!=chosen:b.set_meta("selected",chosen);b.add_theme_stylebox_override("normal",g.skin("selected" if chosen else "blue"))
   if b.disabled and g.deploying==kind:g.deploying=""
+  b.get_child(0).modulate=Color(1,1,1,.35) if b.disabled else Color.WHITE
  if g.hud_widgets.has("deploy_hero"):
   g.hud_widgets.deploy_hero.visible=not g.sim.hero_deployed
   g.hud_widgets.follow.disabled=not g.sim.hero_deployed
@@ -175,8 +185,8 @@ static func update(g):
   g.hud_widgets.deploy_group.text="Alle %d"%remaining
   g.hud_widgets.deploy_group.add_theme_stylebox_override("normal",g.skin("selected" if g.deploy_group else "gold"))
   g.hud_widgets.deploy_single.add_theme_stylebox_override("normal",g.skin("selected" if not g.deploy_group else "blue"))
-  g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf einen freien Randbereich."%remaining if g.deploy_group else "Einzeln einsetzen · oder »Alle %d« wählen."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if slot>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
-  if g.deploying=="hero":g.hud_widgets.deploy_hint.text="Held einsetzen: Tippe auf einen freien Randbereich."
+  g.hud_widgets.deploy_hint.text=("Alle %d gemeinsam: Tippe auf freies Gelände."%remaining if g.deploy_group else "Tippen oder halten: sofort einsetzen · »Alle %d« als Gruppe."%remaining) if remaining>0 else ("Wähle deine nächste Truppe." if slot>0 else "Deine Truppen sind im Einsatz. Auf geht’s!")
+  if g.deploying=="hero":g.hud_widgets.deploy_hint.text="Held einsetzen: Tippe auf freies Gelände."
 static func format_number(value) -> String:
  var s=str(int(value));var parts=[]
  while s.length()>3:parts.push_front(s.right(3));s=s.left(s.length()-3)

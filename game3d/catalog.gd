@@ -56,7 +56,7 @@ static func building_limit(kind:String,hall:int) -> int:
  if kind in ["lumber","quarry"]:return base+int(hall>=6)
  return base
 static func upgrade_benefit(kind:String,target:int) -> String:
- if kind=="hall":return " · ".join(HALL_UNLOCKS.get(target,[]))
+ if kind=="hall":return " · ".join(HALL_UNLOCKS.get(target,[]))+" · Dorfgrenze: +4 m nach Westen, Norden und Süden"
  if kind=="barracks":
   var unlock=[]
   for k in TROOP_ORDER:

@@ -12,6 +12,9 @@ s=s.replace('<body>','<body>\n<div id="glutwacht-start-watch" role="status">Glut
 s=s.replace('</body>','<script>'+Path(__file__).with_name('web_account.js').read_text()+'</script></body>')
 script=r'''
 window.__glutwachtErrors=[];
+const gwSafe=document.createElement('div');gwSafe.style.cssText='position:fixed;visibility:hidden;pointer-events:none;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)';document.body.appendChild(gwSafe);
+window.glutwachtSafeArea=()=>{const s=getComputedStyle(gwSafe);return {left:parseFloat(s.paddingLeft)||0,right:parseFloat(s.paddingRight)||0,top:parseFloat(s.paddingTop)||0,bottom:parseFloat(s.paddingBottom)||0,width:innerWidth,height:innerHeight}};
+
 window.__glutwachtBuild='0.8';
 const gwBox=document.getElementById('glutwacht-start-watch');
 function gwFail(message){

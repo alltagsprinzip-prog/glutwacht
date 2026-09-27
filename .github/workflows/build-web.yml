@@ -67,7 +67,7 @@ jobs:
           path: logs
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
       - name: Godot 4.7.2 and export templates
@@ -99,6 +99,8 @@ jobs:
         run: python3 tools/check_godot.py logs/campaign.log godot --headless --path . --script tests3d/campaign_suite.gd
       - name: Troop unlock and progression tests
         run: python3 tools/check_godot.py logs/progression.log godot --headless --path . --script tests3d/progression_suite.gd
+      - name: Existing 0.14 village, frontier and landscape controls
+        run: python3 tools/check_godot.py logs/frontier.log godot --headless --path . --script tests3d/frontier_suite.gd
       - name: HUD geometry and dialog tests
         run: python3 tools/check_godot.py logs/hud_layout_suite.log godot --headless --path . --script tests3d/hud_layout_suite.gd
       - name: Existing upstream regression gate
@@ -137,6 +139,9 @@ jobs:
       - name: Exported WebGL gameplay gate
         timeout-minutes: 9
         run: NODE_PATH="$RUNNER_TEMP/glutwacht-browser/node_modules" node tools/web_smoke.cjs
+      - name: iPhone landscape with existing 0.14 save
+        timeout-minutes: 8
+        run: NODE_PATH="$RUNNER_TEMP/glutwacht-browser/node_modules" node tools/iphone_smoke.cjs
       - name: Preserve validation logs
         if: always()
         uses: actions/upload-artifact@v4

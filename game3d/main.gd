@@ -106,7 +106,7 @@ func _ready():
  get_viewport().size_changed.connect(layout_art_preview);layout_art_preview()
  var theme=Theme.new();theme.default_font_size=28;theme.default_font=load("res://assets3d/fonts/DejaVuSans.ttf");theme.set_color("font_color","Label",CREAM);ui.theme=theme
  account=load("res://game3d/online/account.gd").new();add_child(account)
- sound=load("res://scripts/audio.gd").new();add_child(sound);build_hud()
+ sound=load("res://scripts/audio.gd").new();add_child(sound);apply_settings();build_hud()
  if not progress.warning.is_empty():toast(progress.warning)
  update_access()
  if auth_locked():open_account()
@@ -125,6 +125,12 @@ func safe_rect() -> Rect2:
   var physical=DisplayServer.get_display_safe_area();var screen=DisplayServer.screen_get_size()
   if physical.size.x>0 and screen.x>0:
    var factor=ui.size/Vector2(screen);result=Rect2(Vector2(physical.position)*factor,Vector2(physical.size)*factor)
+ if OS.has_feature("web"):
+  var raw=JavaScriptBridge.eval("JSON.stringify(window.glutwachtSafeArea?window.glutwachtSafeArea():{left:0,right:0,top:0,bottom:0,width:innerWidth,height:innerHeight})",true)
+  var inset=JSON.parse_string(str(raw))
+  if inset is Dictionary:
+   var scale=ui.size/Vector2(maxf(1,inset.width),maxf(1,inset.height))
+   result=Rect2(Vector2(inset.left,inset.top)*scale,ui.size-Vector2(inset.left+inset.right,inset.top+inset.bottom)*scale)
  return result
 func reflow_hud():
  var safe=safe_rect();var delta=safe.size-Vector2(1280,720)
@@ -135,6 +141,7 @@ func reflow_hud():
   var horizontal=0.0 if base.x<240 else (1.0 if base.x>=1080 or (base.y<100 and base.x>=340 and sim.mode=="home") else .5)
   if node.name=="Action_attack":horizontal=1.0
   node.position=base+safe.position+Vector2(delta.x*horizontal,delta.y if base.y>=400 else 0.0)
+  if base.x<240 and node!=stick:node.position.x-=20
 func decorate(control:Control):
  var finish=load("res://game3d/ui/button_finish.gd").new();finish.show_behind_parent=false;finish.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);control.add_child(finish)
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
@@ -144,9 +151,9 @@ func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> S
  s.shadow_color=Color(0,0,0,.22);s.shadow_size=6 if width>0 else 0;s.shadow_offset=Vector2(0,5) if width>0 else Vector2.ZERO
  return s
 func skin(key:String) -> StyleBoxFlat:
- var palette={"panel":["142b46","d8ae61"],"blue":["203f62","e8c477"],"gold":["e97708","ffe4a0"],"pressed":["214e60","fff0b6"],"disabled":["506a70","a7b7b5"],"selected":["357b55","fff0b6"]}
+ var palette={"panel":["142b46","d8ae61"],"blue":["163858","e8c477"],"gold":["e97708","ffe4a0"],"pressed":["214e60","fff0b6"],"disabled":["506a70","a7b7b5"],"selected":["357b55","fff0b6"]}
  var colors=palette.get(key,palette.panel)
- var box=style(Color(colors[0]),Color(colors[1]),2,22)
+ var box=style(Color(colors[0]),Color(colors[1]),2,16)
  box.border_width_bottom=4;box.border_width_top=2
  box.shadow_color=Color("163a4260");box.shadow_size=5;box.shadow_offset=Vector2(0,4)
  return box
@@ -175,6 +182,12 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
  var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
 func icon_texture(key:String) -> Texture2D:
+ if key.begins_with("face_") or key=="portrait":
+  var faces=["warrior","ninja","shaman","mage","melee","archers","shield","siege"]
+  var face_key=key.trim_prefix("face_") if key!="portrait" else sim.hero_key()
+  var index=maxi(0,faces.find(face_key));var atlas=AtlasTexture.new();atlas.atlas=load("res://assets3d/icons/unit-faces.webp")
+  var cell=atlas.atlas.get_width()/4
+  atlas.region=Rect2((index%4)*cell,int(index/4)*cell,cell,cell);return atlas
  var heroic={"attack":Rect2(90,20,520,420),"hero":Rect2(710,0,460,449),"build":Rect2(95,447,530,376),"training":Rect2(715,450,485,370),"army":Rect2(75,826,558,380),"portrait":Rect2(667,812,570,430)}
  if heroic.has(key):
   var art=AtlasTexture.new();art.atlas=load("res://assets3d/icons/heroic-actions.png");art.region=heroic[key];art.filter_clip=true;return art
@@ -212,7 +225,7 @@ func clear_hud():
  hud=Control.new();hud.mouse_filter=Control.MOUSE_FILTER_IGNORE;ui.add_child(hud)
  stick=null;production_text=null;collect_button=null;objective=null;health=null;builder_text=null;inspect_text=null;cooldowns.clear();commands.clear();resource_bars.clear();resource_labels.clear();deployment_buttons.clear();loot_labels.clear();stars_view.clear()
 func build_hud():
- Hud.build(self);reflow_hud()
+ apply_settings();Hud.build(self);reflow_hud()
 func build_home_hud():
  Hud.home(self)
 func build_combat_hud():
@@ -228,7 +241,7 @@ func build_placement_hud():
  update_ghost()
 func create_stick():
  stick=Stick.new();stick.name="VillageJoystick" if sim.mode=="home" else "CombatJoystick"
- stick.position=Vector2(20,528) if sim.mode=="home" else Vector2(20,509)
+ stick.position=Vector2(0,528) if sim.mode=="home" else Vector2(0,509)
  stick.size=Vector2(172,172) if sim.mode=="home" else Vector2(220,195);hud.add_child(stick)
 func update_hud():
  Hud.update(self)
@@ -295,9 +308,16 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.11","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.15","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
+func qa_controls() -> Array:
+ var out=[]
+ for node in ui.find_children("*","Control",true,false):
+  if not node.is_visible_in_tree() or not (node is BaseButton or node is HSlider):continue
+  var r=node.get_global_rect()
+  out.append({"id":String(node.name),"text":node.text if node is Button else "","rect":[r.position.x,r.position.y,r.size.x,r.size.y],"disabled":node.disabled if node is BaseButton else false})
+ return out
 func deployment_preview_points() -> Array:
  var points=[]
  if sim.mode!="raid" or paused:return points
@@ -323,8 +343,8 @@ func pointer_begin(id:int,pos:Vector2,camera_only:bool=false):
  if sim.mode=="raid" and deploying!="":world.preview_deployment(ground,sim.deployment_valid(ground))
  var role="pending"
  if camera_only:role="camera"
- elif sim.mode=="raid" and deploying!="" and sim.deployment_valid(ground) and (not sim.hero_deployed or ground.distance_to(sim.hero.pos)>1.6):role="deploy"
- gestures[id]={"start":pos,"last":pos,"role":role,"age":0.0,"next":.30,"dragged":false,"placed":false}
+ elif sim.mode=="raid" and deploying!="" and sim.deployment_valid(ground):role="deploy"
+ gestures[id]={"start":pos,"last":pos,"role":role,"age":0.0,"next":.18,"dragged":false,"placed":false}
  if gestures.size()>1:
   world.deployment_marker.visible=false
   for g in gestures.values():g.role="pinch";g.dragged=true
@@ -343,7 +363,7 @@ func pointer_move(id:int,pos:Vector2):
  if g.dragged and g.role=="pending":g.role="camera"
  if g.role=="camera" and g.dragged:world.deployment_marker.visible=false;world.pan_camera(-delta)
  elif g.role=="deploy" and g.dragged and not g.placed:
-  deploy_at_screen(pos);g.placed=true;g.next=g.age+.16
+  deploy_at_screen(pos);g.placed=true;g.next=g.age+.09
 func pointer_end(id:int,pos:Vector2):
  if not gestures.has(id):return
  var g:Dictionary=gestures[id];gestures.erase(id)
@@ -353,7 +373,7 @@ func update_gestures(dt:float):
  for g in gestures.values():
   g.age+=dt
   if g.role!="deploy" or g.age<g.next:continue
-  g.next=g.age+.16
+  g.next=g.age+.09
   if not blocks_world_at(g.last):deploy_at_screen(g.last);g.placed=true
 func deploy_at_screen(pos:Vector2) -> bool:
  if deploying=="" or paused:return false
@@ -362,7 +382,7 @@ func deploy_at_screen(pos:Vector2) -> bool:
   if sim.deploy_hero(ground):
    deploying="";world.follow_hero=true;tone("equip");update_hud();return true
   sim.effects.append({"kind":"invalid","pos":ground,"life":.4,"max":.4,"color":Color("ff675e")});return false
- if sim.hero_deployed and ground.distance_to(sim.hero.pos)<1.6:return false
+
  var placed=sim.deploy_squad(deploying,ground)>0 if deploy_group else sim.deploy(deploying,ground)
  if placed:tone("equip");update_hud();return true
  if sim.reserve.get(deploying,0)>0:
@@ -482,6 +502,7 @@ func open_dialog(name:String,heading:String,sub:String) -> Control:
  label(p,heading,Rect2(25,12,rect.size.x-125,48),27,GOLD)
  if sub!="":label(p,sub,Rect2(27,82,rect.size.x-60,31),16,CREAM)
  if not auth_locked() and name not in ["result","level_up"] and not (name=="heroes" and progress.data.hero==""):
+  if name!="help":button(p,"?",Rect2(rect.size.x-150,12,55,55),func():open_help())
   var close=icon_button(p,"close","",Rect2(rect.size.x-87,6,77,67),func():close_dialog());close.name="CloseDialog";close.z_index=10
  return p
 func close_dialog(force:bool=false):
@@ -512,13 +533,14 @@ func open_catalog():
   var k=kinds[i];var d=Catalog.BUILD[k];var x=22+(i%4)*246;var y=89+int(i/4)*238
   panel(p,Rect2(x,y,232,226),Color("34545b"))
   building_preview(p,k,Rect2(x+8,y+4,216,105))
+  var info=button(p,"ⓘ",Rect2(x+178,y+8,46,46),func():open_build_info(k));info.name="BuildInfo_"+k;info.add_theme_font_size_override("font_size",28)
   label(p,d.name,Rect2(x+8,y+106,216,28),18,GOLD,true)
   var unlocked=Catalog.unlocked(k,int(progress.data.hall));var cc=d.cost
   if unlocked:costs(p,cc,Vector2(x+10,y+141),219,13)
   else:icon(p,"hall",Rect2(x+18,y+139,30,30));label(p,"Haupthaus Lv. %d"%Catalog.required_hall(k),Rect2(x+56,y+140,158,31),15)
   var reason=""
   if not unlocked:reason="Benötigt Haupthaus Level %d (aktuell %d)."%[Catalog.required_hall(k),progress.data.hall]
-  elif progress.count_kind(k)>=Catalog.building_limit(k,int(progress.data.hall)):reason="Gebäudelimit erreicht. Die Bauübersicht zeigt die Freischaltungen der nächsten Haupthausstufe."
+  elif progress.count_kind(k)>=Catalog.building_limit(k,int(progress.data.hall)):reason=building_limit_reason(k)
   elif k!="wall" and progress.free_builders()==0:reason="Alle Bauarbeiter sind beschäftigt. Warte auf einen Bauabschluss."
   elif not progress.affordable(cc):reason="Es fehlen Rohstoffe. Die benötigten Mengen stehen auf der Karte."
   var caption="BAUEN  %d/%d"%[progress.count_kind(k),Catalog.building_limit(k,int(progress.data.hall))] if reason.is_empty() else ("HAUPTHAUS LV. %d"%Catalog.required_hall(k) if not unlocked else "WARUM GESPERRT?")
@@ -769,10 +791,30 @@ func open_result():
  button(p,"ZURÜCK INS DORF",Rect2(210,449,440,65),func():return_home(),true)
 func return_home():
  close_dialog();build_kind="";selected_building="";deploying="";world.build_focus=false;sim.home();result_shown=false;world.setup(sim);build_hud();save()
+func open_build_info(kind:String):
+ load("res://game3d/ui/guidance.gd").building(self,kind)
+func building_limit_reason(kind:String) -> String:
+ var current=Catalog.building_limit(kind,int(progress.data.hall))
+ for level in range(int(progress.data.hall)+1,Progress.MAX_LEVEL+1):
+  if Catalog.building_limit(kind,level)>current:return "Limit: %d. Haupthaus Stufe %d → %d %s möglich."%[current,level,Catalog.building_limit(kind,level),Catalog.BUILD[kind].name]
+ return "Maximale Anzahl erreicht: %d. Kein weiteres Mengen-Upgrade."%current
+func open_help():
+ load("res://game3d/ui/guidance.gd").help(self)
+func open_settings():
+ load("res://game3d/ui/guidance.gd").settings(self)
+func apply_settings():
+ var settings=Progress.clean_settings(progress.data.get("settings",{}))
+ if world:world.apply_settings(settings)
+ if sound:sound.set_volumes(settings.music,settings.effects,bool(progress.data.sound))
+func change_setting(key:String,value):
+ progress.data.settings=Progress.clean_settings(progress.data.get("settings",{}));progress.data.settings[key]=value;apply_settings()
+ if not has_node("SettingsSave"):
+  var timer=Timer.new();timer.name="SettingsSave";timer.one_shot=true;timer.wait_time=.4;add_child(timer);timer.timeout.connect(save)
+ get_node("SettingsSave").start()
 func open_menu():
  var p=open_dialog("menu","Am Lagerfeuer","")
  button(p,"Kampfberichte",Rect2(28,94,396,69),func():open_battle_reports(),true)
- button(p,"Ton: "+("an" if progress.data.sound else "aus"),Rect2(439,94,393,69),func():progress.data.sound=not progress.data.sound;save();open_menu())
+ button(p,"Grafik & Ton",Rect2(439,94,393,69),func():open_settings())
  var rows=[["hero","WASD / Stick","Held bewegen"],["move","Ziehen / zwei Finger","Kamera / Zoom"],["attack","J / Angriff halten","Schlagen"],["skill","K · Leertaste · H","Fähigkeit · Rolle · Trank"]]
  for i in range(rows.size()):
   var y=191+i*53;icon(p,rows[i][0],Rect2(34,y,38,38));label(p,rows[i][1],Rect2(88,y,336,40),19,GOLD);label(p,rows[i][2],Rect2(450,y,356,40),18)
@@ -979,7 +1021,7 @@ func activate_cloud(result:Dictionary):
   var valid=candidate.load_file(temp);DirAccess.remove_absolute(temp)
   if not valid:toast("Cloud-Stand konnte nicht geladen werden.");return
  if not candidate.store_file(path):toast(candidate.warning);return
- account.revision=int(result.revision);account.loaded=true;account.pending.clear();account.pending_restore.clear();account.dirty=false;account.save_metadata();cloud_sync_paused=false
+ account.revision=int(result.revision);account.loaded=true;account.pending.clear();account.pending_json="";account.pending_restore.clear();account.dirty=false;account.save_metadata();cloud_sync_paused=false
  progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
  if progress.data.hero=="":open_tutorial()
  sync_cloud()
@@ -1017,7 +1059,7 @@ func activate_local_account(meta:Dictionary):
  var candidate=Progress.new()
  if not candidate.load_file(path):toast("Lokale Kontosicherung unlesbar; nichts verändert.");return
  if not progress.store_file(save_path):toast(progress.warning);return
- account.revision=int(meta.revision);account.loaded=true;account.pending=meta.get("pending",{});account.dirty=true;cloud_sync_paused=false
+ account.revision=int(meta.revision);account.loaded=true;account.pending=meta.get("pending",{});account.pending_json=String(meta.get("pending_json",""));account.dirty=true;cloud_sync_paused=false
  progress=candidate;save_path=path;account_active=true;sim=Battle.new(progress.data);return_home()
  if progress.data.hero=="":open_tutorial()
  await sync_cloud()

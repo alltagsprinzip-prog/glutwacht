@@ -14,6 +14,10 @@ void fragment() {
  float patch=noise2(ground_uv*0.07);
  vec3 detail=texture(meadow,ground_uv*.17).rgb;
  vec3 turned=texture(meadow,vec2(-ground_uv.y,ground_uv.x)*.113+vec2(.31,.47)).rgb;
- ALBEDO=mix(detail,turned,.35)*mix(vec3(.72,.81,.65),vec3(1.08,1.07,.94),patch);
+ float fine=noise2(ground_uv*3.1);
+ float broad=noise2(ground_uv*.025+vec2(13.0,7.0));
+ vec3 grass=mix(detail,turned,smoothstep(.1,.9,noise2(ground_uv*.23))*.55);
+ ALBEDO=grass*mix(vec3(.69,.86,.61),vec3(1.1,1.15,.90),patch)*mix(.9,1.08,broad);
+ NORMAL=normalize(NORMAL+vec3((noise2(ground_uv*3.1+vec2(.1,0.0))-fine)*.22,0.0,(noise2(ground_uv*3.1+vec2(0.0,.1))-fine)*.22));
  ROUGHNESS=1.0;SPECULAR=0.0;
 }

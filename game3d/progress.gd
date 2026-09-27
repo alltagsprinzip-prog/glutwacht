@@ -4,8 +4,14 @@ const Catalog=preload("res://game3d/catalog.gd")
 const SAVE="user://glutwacht_dorf_v2.json"
 const MAX_LEVEL=10
 # Extend inland; keep the eastern river bank and every existing coordinate.
-const VILLAGE_MIN=Vector2(-39,-39)
-const VILLAGE_MAX=Vector2(31,39)
+const VILLAGE_MIN=Vector2(-75,-75)
+const VILLAGE_MAX=Vector2(31,75)
+static func village_bounds(hall:int) -> Rect2:
+ var extra=4.0*(clampi(hall,1,10)-1)
+ return Rect2(Vector2(-39-extra,-39-extra),Vector2(70+extra,78+extra*2))
+static func clean_settings(raw) -> Dictionary:
+ var s=raw if raw is Dictionary else {}
+ return {"quality":clampi(int(s.get("quality",1)),0,2),"brightness":clampf(float(s.get("brightness",1.0)),.7,1.4),"music":clampf(float(s.get("music",.3)),0,1),"effects":clampf(float(s.get("effects",.8)),0,1)}
 const TITLES={"hall":"Haupthaus","barracks":"Kaserne","smithy":"Schmiede"}
 var data:Dictionary
 var warning=""
@@ -29,7 +35,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"battle_history":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"battle_history":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"settings":clean_settings({}),"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -129,7 +135,8 @@ func placement_error(kind:String,pos:Vector2,ignore_uid:String="") -> String:
  if not Catalog.BUILD.has(kind) or (TITLES.has(kind) and ignore_uid==""):return "Kein Bauplatz."
  if not Catalog.unlocked(kind,int(data.hall)):return "Freischaltung ab Haupthaus-Stufe %d."%Catalog.required_hall(kind)
  var radius=float(Catalog.BUILD[kind].radius)
- if pos.x<VILLAGE_MIN.x+radius or pos.x>VILLAGE_MAX.x-radius or pos.y<VILLAGE_MIN.y+radius or pos.y>VILLAGE_MAX.y-radius:return "Außerhalb deiner Dorfgrenze."
+ var bounds=village_bounds(int(data.hall))
+ if not bounds.grow(-radius).has_point(pos):return "Außerhalb deiner Dorfgrenze. Haupthaus ausbauen: +4 m nach Westen, Norden und Süden."
  if ignore_uid=="" and count_kind(kind)>=Catalog.building_limit(kind,int(data.hall)):return "Maximale Anzahl dieses Gebäudes erreicht."
  if pos.distance_to(Vector2(0,18))<4.5:return "Der Sammelplatz der Armee muss frei bleiben."
  for o in data.get("obstacles",[]):
@@ -291,6 +298,7 @@ func load_file(path:String=SAVE) -> bool:
  clean.builder_bonus=clampi(int(parsed.get("builder_bonus",0)),0,1)
  for k in TITLES:clean[k]=clampi(int(parsed.get(k,1)),1,MAX_LEVEL)
  for k in ["sword","sound"]:clean[k]=bool(parsed.get(k,clean[k]))
+ clean.settings=clean_settings(parsed.get("settings",{}))
  var legacy_capacity=4+int(clean.hall)*2
  clean.melee=clampi(int(parsed.get("melee",5)),0,legacy_capacity)
  clean.archers=clampi(int(parsed.get("archers",0)),0,legacy_capacity-int(clean.melee))
@@ -369,6 +377,10 @@ static func validate_save(raw) -> String:
  if int(raw.version) not in [2,3,4,5,6,7]:return "Unbekannte Spielstandversion."
  for key in ["wood","stone","gold","gems","hall","barracks","smithy","melee","archers","shield","siege","wins","builder_bonus","next_uid","last_production"]:
   if raw.has(key) and (not numeric(raw[key]) or float(raw[key])<0):return "Ungültiges Zahlenfeld: "+key
+ if raw.has("settings"):
+  if not raw.settings is Dictionary:return "Ungültige Einstellungen."
+  for key in ["quality","brightness","music","effects"]:
+   if raw.settings.has(key) and not numeric(raw.settings[key]):return "Ungültige Einstellung: "+key
  if not raw.get("campaign_stars",{}) is Dictionary:return "Ungültige Kampagne."
  for stage in raw.get("campaign_stars",{}):
   if not stage is String or stage not in ["0","1","2","3","4","5","6","7","8","9"]:return "Ungültiges Kampagnenlager."
