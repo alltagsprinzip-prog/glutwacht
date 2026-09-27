@@ -20,11 +20,10 @@ func drag(pos:Vector2,relative:Vector2,id:int=0):
 func click_button(b:Button):
  var pos=b.get_global_rect().get_center();await tap(pos)
 func edge_point() -> Vector2:
- for axis in range(4):
-  for z in range(-21,22,3):
-   var point=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
-   var screen=game.world.camera.unproject_position(Vector3(point.x,0,point.y))
-   if Rect2(280,160,690,355).has_point(screen) and game.sim.deployment_valid(point) and point.distance_to(game.sim.hero.pos)>2 and not game.blocks_world_at(screen):return screen
+ for x in range(280,int(game.ui.size.x)-280,35):
+  for y in range(185,int(game.ui.size.y)-205,25):
+   var screen=Vector2(x,y);var point=game.world.ground_position(screen)
+   if game.sim.deployment_valid(point) and point.distance_to(game.sim.hero.pos)>2 and not game.blocks_world_at(screen):return screen
  return Vector2.ZERO
 func run():
  game=load("res://game3d/main.tscn").instantiate();game.save_path="user://qa-input-v08.json";root.add_child(game);await frames()

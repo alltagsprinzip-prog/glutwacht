@@ -44,7 +44,7 @@ static func top(g):
  profile.get_child(0).position=Vector2(12,12);profile.get_child(0).size=Vector2(64,64)
  var village_name=g.label(profile,name,Rect2(87,13,174,29),21,TEXT);g.Storybook.heading(village_name,TEXT);g.fit_caption(village_name,Rect2(87,13,174,29),21)
  g.label(profile,"Held %d · Dorf %d"%[g.Catalog.level(g.progress.data,g.sim.hero_key()),g.progress.data.hall],Rect2(88,43,172,25),18,GOLD)
- g.hud_widgets.sync=g.label(profile,"",Rect2(88,68,172,16),12,TEXT)
+ g.hud_widgets.sync=g.label(profile,"",Rect2(88,65,172,16),12,TEXT)
  g.hud_widgets.sync.clip_text=true;g.hud_widgets.sync.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
  var workers=dock(plate(g,Rect2(20,111,284,48)),"left")
  g.icon(workers,"worker",Rect2(13,11,26,26));g.builder_text=g.label(workers,"",Rect2(45,9,110,30),17,TEXT,true)
@@ -80,7 +80,7 @@ static func home(g):
  for i in range(4):
   var tile=action(g,keys[i],titles[i],Rect2(383+i*129,600,116,98),callbacks[i])
   tile.get_child(0).position=Vector2(30,8);tile.get_child(0).size=Vector2(56,56)
-  g.fit_caption(tile.get_child(1),Rect2(13,65,90,22),16)
+  g.fit_caption(tile.get_child(1),Rect2(15,60,86,22),16)
  if g.selected_building!="":
   var b=g.progress.find_building(g.selected_building)
   if b.is_empty():return
@@ -113,7 +113,7 @@ static func combat(g):
   b.set_meta("count",g.label(b,"",Rect2(62,20,27,31),23,g.Storybook.INK,true))
  g.hud_widgets.deploy_single=g.button(g.hud,"Einzeln",Rect2(20,338,102,66),func():g.choose_deploy_group(false))
  g.hud_widgets.deploy_group=g.button(g.hud,"Alle",Rect2(128,338,108,66),func():g.choose_deploy_group(true),true)
- for key in ["deploy_single","deploy_group"]:g.hud_widgets[key].add_theme_font_size_override("font_size",24)
+ for key in ["deploy_single","deploy_group"]:g.fit_button(g.hud_widgets[key],g.hud_widgets[key].size)
  g.hud_widgets.deploy_hint=text(g,"",Rect2(275,110,735,45),22,TEXT,true)
  g.hud_widgets.deploy_hero=action(g,"face_"+g.sim.hero_key(),"",Rect2(20,413,104,78),func():g.choose_deploy("hero"),true)
  g.hud_widgets.deploy_hero.get_child(0).position=Vector2(4,4);g.hud_widgets.deploy_hero.get_child(0).size=Vector2(66,66)
@@ -122,13 +122,13 @@ static func combat(g):
  g.hud_widgets.auto_attack=g.button(g.hud,"Autoangriff: AUS",Rect2(20,413,216,64),func():g.sim.hero_auto_attack=not g.sim.hero_auto_attack;update(g))
  g.hud_widgets.auto_attack.add_theme_font_size_override("font_size",17)
  g.hud_widgets.follow=dock(g.button(g.hud,"Zum Helden",Rect2(1088,316,172,66),func():g.world.follow_hero=true))
- g.hud_widgets.follow.add_theme_font_size_override("font_size",22)
+ g.fit_button(g.hud_widgets.follow,Vector2(172,66))
  g.create_stick()
  var health_plate=plate(g,Rect2(265,621,442,79));health_plate.name="HeroStatus";g.icon(health_plate,g.sim.hero_key(),Rect2(17,12,55,55))
  g.label(health_plate,g.sim.stats().name,Rect2(89,13,173,30),22,GOLD)
  g.health_text=g.label(health_plate,"",Rect2(265,13,146,30),21,TEXT,true)
  g.health=ProgressBar.new();g.health.position=Vector2(88,51);g.health.size=Vector2(320,12);g.health.show_percentage=false;g.health.max_value=g.sim.hero.max_hp;g.health.mouse_filter=Control.MOUSE_FILTER_IGNORE
- g.health.add_theme_stylebox_override("background",g.style(Color("14262b"),Color.TRANSPARENT,0,5));g.health.add_theme_stylebox_override("fill",g.style(Color("80c56c"),Color.TRANSPARENT,0,5));health_plate.add_child(g.health)
+ g.health.add_theme_stylebox_override("background",g.style(Color("14262b"),Color.TRANSPARENT,0,5));g.health.add_theme_stylebox_override("fill",g.style(Color("80c56c"),Color.TRANSPARENT,0,5));health_plate.add_child(g.health);g.health.size=Vector2(320,12)
  var attack=dock(action(g,"attack","ANGRIFF",Rect2(1106,561,154,143),func():pass,true));attack_skin(g,attack)
  attack.get_child(0).position=Vector2(41,12);attack.get_child(0).size=Vector2(72,72)
  attack.button_down.connect(func():g.held=true);attack.button_up.connect(func():g.held=false)
@@ -140,7 +140,7 @@ static func combat(g):
  g.cooldowns.roll.tooltip_text="Ausweichen: Joystickrichtung, sonst Blickrichtung. 0,38 s kein Schaden · 2,5 s Abklingzeit (Ninja 2 s)."
  var bag=dock(g.button(g.hud,"Tränke wählen",Rect2(920,548,148,52),g.open_potions));bag.set_meta("hud_right_gap",212.0);bag.set_meta("hud_edge","");bag.add_theme_font_size_override("font_size",15)
  for key in g.cooldowns:
-  var b=g.cooldowns[key];var l=g.label(b,"",Rect2(4,8,b.size.x-8,53),34,g.Storybook.INK,true);b.set_meta("cooldown",l)
+  var b=g.cooldowns[key];var l=g.label(b,"",Rect2(b.size.x-45,14,26,29),21,g.Storybook.INK,true);b.set_meta("cooldown",l)
 static func scout(g):
  var v=g.sim.village;plate(g,Rect2(20,18,390,184))
  text(g,v.name,Rect2(35,26,359,39),27,GOLD);text(g,("Kampagne %d/10"%(g.sim.campaign_index+1) if g.sim.campaign_index>=0 else "KI-Lager")+" · Stärke %d"%g.Catalog.village_strength(v),Rect2(36,68,357,32),20)

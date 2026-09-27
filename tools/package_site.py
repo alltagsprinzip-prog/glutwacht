@@ -30,8 +30,8 @@ s=s.replace('src="index.js"',f'src="index.js?build={build}"').replace("window.__
 wrapper=target/'index.html';s=wrapper.read_text()
 import re
 s=re.sub(r"frame.src=.*?;",f"frame.src='game.html?build={build}'+(location.search?'&'+location.search.slice(1):'')+location.hash;",s)
-s=s.replace('iframe{display:block;','iframe{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);display:block;')
+s=re.sub(r'padding-(?:left|right):env\(safe-area-inset-(?:left|right)\);','',s)
 wrapper.write_text(s)
 (site/'dist/_headers').write_text('/*\n  Cache-Control: no-store\n  Referrer-Policy: no-referrer\n')
-(site/'dist/build.json').write_text(json.dumps({'build':build,'version':'0.16'}))
+(site/'dist/build.json').write_text(json.dumps({'build':build,'version':'0.17'}))
 print('SITE_BUILD',build,'WASM_PARTS',len(parts))

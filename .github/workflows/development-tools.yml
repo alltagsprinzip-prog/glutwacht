@@ -1,0 +1,34 @@
+name: Pinned development tools
+on:
+  push:
+    branches: [update/masterplan-online-20260925]
+    paths: [.github/workflows/development-tools.yml]
+permissions:
+  contents: read
+jobs:
+  tools:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+        working-directory: backend/tests
+      - name: Package the pinned local database test runtime
+        shell: bash
+        run: |
+          mkdir -p /tmp/development-tools
+          cp "$(command -v supabase)" /tmp/development-tools/supabase
+          tar -czf /tmp/development-tools/pglite.tar.gz -C backend/tests node_modules
+          supabase --version > /tmp/development-tools/SUPABASE_VERSION.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: development-tools
+          path: /tmp/development-tools
+          retention-days: 3
+          compression-level: 1

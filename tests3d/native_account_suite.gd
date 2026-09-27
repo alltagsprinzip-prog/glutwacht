@@ -22,7 +22,7 @@ func run():
  check(form.available_height(200,390,100,.54)<form.base_height,"form shrinks above keyboard")
  check(form.available_height(800,390,100,.54)>=70,"scroll remains usable on very small screen")
  form.email.text="native@example.test";form.password.text="Test-password-123";form.password.text_submitted.emit(form.password.text)
- check(g.submitted.get("email")==form.email.text and not g.submitted.get("register",true),"native keyboard submit forwards login")
+ check(g.submitted.is_empty() and form.email.text=="native@example.test" and form.password.text=="Test-password-123","keyboard Done preserves draft without submitting login")
  check(not FileAccess.file_exists(g.save_path),"locked native form does not overwrite saves")
  g.queue_free();await process_frame
  print("NATIVE_ACCOUNT_TESTS ",checks-failed,"/",checks);quit(1 if failed else 0)

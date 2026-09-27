@@ -170,7 +170,7 @@ func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CR
  var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
  l.add_theme_color_override("font_shadow_color",Color(0,.03,.07,.8));l.add_theme_constant_override("shadow_offset_y",1)
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
- parent.add_child(l);return l
+ parent.add_child(l);l.size=rect.size;return l
 func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool=false) -> Button:
  var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",27)
  b.add_theme_font_override("font",Storybook.FONT)
@@ -196,7 +196,7 @@ func fit_caption(c:Label,box:Rect2,size:int):
  c.position=box.position;c.size=box.size;c.clip_text=true;c.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
  var font=c.get_theme_font("font");var pixels=size
  while pixels>12 and font.get_string_size(c.text,HORIZONTAL_ALIGNMENT_LEFT,-1,pixels).x>box.size.x:pixels-=1
- c.add_theme_font_size_override("font_size",pixels)
+ c.add_theme_font_size_override("font_size",pixels);c.size=box.size
 func icon(parent:Control,key:String,rect:Rect2) -> TextureRect:
  var img=TextureRect.new();img.texture=icon_texture(key);img.expand_mode=TextureRect.EXPAND_IGNORE_SIZE;img.stretch_mode=TextureRect.STRETCH_KEEP_ASPECT_CENTERED;img.position=rect.position;img.size=rect.size;img.mouse_filter=Control.MOUSE_FILTER_IGNORE;img.texture_filter=CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS;parent.add_child(img);return img
 func icon_texture(key:String) -> Texture2D:
@@ -341,11 +341,11 @@ func qa_controls() -> Array:
 func deployment_preview_points() -> Array:
  var points=[]
  if sim.mode!="raid" or paused:return points
- for axis in range(4):
-  for z in range(-21,22,6):
-   var pos=Vector2(-27,z) if axis==0 else (Vector2(27,z) if axis==1 else (Vector2(z,-27) if axis==2 else Vector2(z,27)))
-   var screen=world.camera.unproject_position(Vector3(pos.x,0,pos.y))
-   if Rect2(180,185,690,340).has_point(screen) and sim.deployment_valid(pos) and pos.distance_to(sim.hero.pos)>2 and not blocks_world_at(screen):points.append([screen.x,screen.y])
+ # Sample the visible ground, not the obsolete 27-unit square.
+ for x in range(260,int(ui.size.x)-270,70):
+  for y in range(205,int(ui.size.y)-215,50):
+   var screen=Vector2(x,y);var pos=world.ground_position(screen)
+   if sim.deployment_valid(pos) and pos.distance_to(sim.hero.pos)>2 and not blocks_world_at(screen):points.append([screen.x,screen.y])
  return points
 func blocks_world_at(pos:Vector2,node:Node=null) -> bool:
  if is_instance_valid(modal):return true
@@ -766,7 +766,7 @@ func open_heroes():
    if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud();open_tutorial(),true)
 func open_raid():
  sim.campaign_index=-1
- close_dialog();build_kind="";selected_building="";world.build_focus=false;sim.scout(sim.selected_village);world.setup(sim);build_hud()
+ close_dialog();build_kind="";selected_building="";world.build_focus=false;sim.scout(int(progress.data.frontier.get("search_index",0)));world.setup(sim);build_hud()
 func open_campaign():
  var p=open_dialog("campaign","Kampagne · 10 Lager","")
  label(p,"Ein Stern öffnet das nächste Lager. Feste Stärke · beste Sterne bleiben gespeichert.",Rect2(28,78,795,40),19).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
@@ -779,7 +779,10 @@ func open_campaign():
 func open_campaign_stage(index:int):
  if not sim.scout_campaign(index):toast("Gewinne zuerst einen Stern im vorherigen Lager.");return
  close_dialog();build_kind="";selected_building="";world.build_focus=false;world.setup(sim);build_hud()
-func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
+func scout_next():
+ var next=sim.selected_village+1
+ if not profile_transaction(func():progress.data.frontier.search_index=next;return true):return
+ selected_building="";sim.scout(next);world.setup(sim);build_hud()
 func start_raid():
  deploy_group=false
  if sim.start(-1,true):close_dialog();result_shown=false;deploying="hero";world.setup(sim);build_hud();tone("battle_start")
@@ -1243,4 +1246,7 @@ func profile_transaction(operation:Callable) -> bool:
 func open_land():load("res://game3d/ui/advancement.gd").land(self)
 func open_potions():load("res://game3d/ui/advancement.gd").potions(self)
 func use_active_potion():
+ var hero_before=sim.hero.duplicate(true);var effects_before=sim.effects.duplicate(true);var texts_before=sim.combat_texts.duplicate(true)
  if profile_transaction(func():return sim.use_potion()):tone("skill");update_hud()
+ else:
+  sim.hero.clear();sim.hero.merge(hero_before,true);sim.effects=effects_before;sim.combat_texts=texts_before;sim.refresh_potion()

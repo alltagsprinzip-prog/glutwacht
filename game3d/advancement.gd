@@ -9,10 +9,11 @@ const POTIONS={
  "fury":{"name":"Drachenmut","hall":6,"hero":4,"color":"ffb671","base":.20,"step":.05,"duration":7.0,"cooldown":22.0}
 }
 static func fresh() -> Dictionary:
- return {"land":0,"selected":"healing","levels":{"healing":1,"ward":1,"haste":1,"fury":1},"charges":{"healing":3,"ward":0,"haste":0,"fury":0},"cooldowns":{}}
+ return {"search_index":0,"land":0,"selected":"healing","levels":{"healing":1,"ward":1,"haste":1,"fury":1},"charges":{"healing":3,"ward":0,"haste":0,"fury":0},"cooldowns":{}}
 static func clean(raw) -> Dictionary:
  var out=fresh()
  if not raw is Dictionary:return out
+ out.search_index=clampi(int(raw.get("search_index",0)),0,10000000)
  out.land=clampi(int(raw.get("land",0)),0,4)
  out.selected=String(raw.get("selected","healing")) if raw.get("selected","healing") in POTION_ORDER else "healing"
  for key in POTION_ORDER:
@@ -22,6 +23,7 @@ static func clean(raw) -> Dictionary:
  return out
 static func validate(raw) -> bool:
  if not raw is Dictionary:return false
+ if raw.has("search_index") and (not number(raw.search_index) or float(raw.search_index)!=int(raw.search_index) or raw.search_index<0 or raw.search_index>10000000):return false
  if raw.has("land") and (not number(raw.land) or float(raw.land)!=int(raw.land) or raw.land<0 or raw.land>4):return false
  if raw.get("selected","healing") not in POTION_ORDER:return false
  for field in ["levels","charges","cooldowns"]:
