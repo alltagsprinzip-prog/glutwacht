@@ -35,7 +35,7 @@ const social=(i,a,p={})=>rpc(i,'glutwacht_social',a,p),rank=(i,a,p={})=>rpc(i,'g
    await page.locator('#gw-email').fill(users[i].email);await page.locator('#gw-password').fill(users[i].password);
    await page.keyboard.press('Enter');await page.locator('#gw-account button[type=submit]').click();
    await page.waitForFunction(()=>window.__glutwacht?.mode==='home',null,{timeout:120000});
-   assert.equal((await page.evaluate(()=>__glutwacht)).hero,i===0?'mage':'warrior');
+   assert.equal((await page.evaluate(()=>window.__glutwacht)).hero,i===0?'mage':'warrior');
    await page.screenshot({path:'logs/live/account-'+i+'-landscape.png',timeout:20000});
    console.log('Game login and saved hero verified for session '+i);
    if(i===0)await page.goto('about:blank'); // one software WebGL world at a time; account storage stays isolated
@@ -50,9 +50,9 @@ const social=(i,a,p={})=>rpc(i,'glutwacht_social',a,p),rank=(i,a,p={})=>rpc(i,'g
    throw Error('Expected UI control missing: '+predicate.toString());
   };
   // The receiving browser retains the invitation across its real Auth login.
-  if((await b.evaluate(()=>__glutwacht.dialog))!=='social')await tap(b,c=>c.text==='FREUNDE');
+  if((await b.evaluate(()=>window.__glutwacht.dialog))!=='social')await tap(b,c=>c.text==='FREUNDE');
   await tap(b,c=>c.text==='Einladung ansehen');await tap(b,c=>c.text==='Freundschaft anfragen');
-  await b.waitForFunction(()=>GlutwachtInvite.peek()===''&&__glutwacht.dialog==='social',null,{timeout:45000});
+  await b.waitForFunction(()=>GlutwachtInvite.peek()===''&&window.__glutwacht.dialog==='social',null,{timeout:45000});
   let a=await social(0,'state');assert.equal(a.incoming.length,1);assert.equal(a.incoming[0].tag,profiles[1].me.tag);
   console.log('Friend request received through real game UI.');
   await social(0,'accept',{tag:profiles[1].me.tag});assert.equal((await social(1,'state')).friends.length,1);
@@ -77,13 +77,13 @@ const social=(i,a,p={})=>rpc(i,'glutwacht_social',a,p),rank=(i,a,p={})=>rpc(i,'g
   await b.goto('about:blank');
   for(let i=0;i<2;i++){
    const p=pages[i];await p.goto('http://127.0.0.1:8767/v08/?qa=1');
-   await p.waitForFunction(()=>__glutwacht?.mode==='home',null,{timeout:120000});if((await p.evaluate(()=>__glutwacht.dialog))!=='')await tap(p,c=>c.id==='CloseDialog');
+   await p.waitForFunction(()=>window.__glutwacht?.mode==='home',null,{timeout:120000});if((await p.evaluate(()=>window.__glutwacht.dialog))!=='')await tap(p,c=>c.id==='CloseDialog');
    await tap(p,c=>c.id==='Action_menu');await tap(p,c=>c.text==='Rangliste · Jadeprüfung');
-   await p.waitForFunction(()=>__glutwacht.dialog==='ranking');await p.screenshot({path:'logs/live/real-ranking-'+i+'.png',timeout:20000});
+   await p.waitForFunction(()=>window.__glutwacht.dialog==='ranking');await p.screenshot({path:'logs/live/real-ranking-'+i+'.png',timeout:20000});
    await p.goto('about:blank');
   }
   // Logout/re-login cannot combine villages, inventory, upgrades or hero identity.
-  await pages[0].goto('http://127.0.0.1:8767/v08/?qa=1');await pages[0].waitForFunction(()=>__glutwacht?.mode==='home',null,{timeout:120000});assert.equal((await pages[0].evaluate(()=>__glutwacht)).hero,'mage');
+  await pages[0].goto('http://127.0.0.1:8767/v08/?qa=1');await pages[0].waitForFunction(()=>window.__glutwacht?.mode==='home',null,{timeout:120000});assert.equal((await pages[0].evaluate(()=>window.__glutwacht)).hero,'mage');
   assert.deepEqual(errors,[]);
   fs.writeFileSync('logs/live/result.json',JSON.stringify({test:'real Auth + real existing Supabase backend',accounts:2,oldSaveHero:'mage',otherHero:'warrior',friendship:'requested in receiving game UI; accepted through authenticated API',clan:'create/find/invite/join/leave verified',scores:[first.own.score,second.own.score],ranks:[first.own.rank,second.own.rank],viewports:['956x440','844x390'],device:'Chromium emulation, no physical iPhone',errors},null,2));
   console.log('LIVE_TWO_ACCOUNT_ACCEPTANCE_OK');

@@ -35,7 +35,7 @@ jobs:
           python3 tools/web_bootstrap.py dist/v08
           npm install --prefix "$RUNNER_TEMP/live-browser" --no-package-lock playwright@1.56.1
           node "$RUNNER_TEMP/live-browser/node_modules/playwright/cli.js" install --with-deps chromium
-      - name: Isolated sessions, invitation, friends, clan and verified ranking
+      - name: Real accounts, confirmed invitations, clan and verified ranking
         timeout-minutes: 18
         run: NODE_PATH="$RUNNER_TEMP/live-browser/node_modules" node tools/live_acceptance.cjs
       - uses: actions/upload-artifact@v4
