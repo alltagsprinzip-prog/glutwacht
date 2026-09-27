@@ -38,6 +38,9 @@ static func build(g):
  g.hud_widgets.help=dock(g.button(g.hud,"?",Rect2(1148,124 if g.sim.active() else 288,112,76),func():g.open_help()))
  g.hud_widgets.help.name="HelpDock";g.hud_widgets.help.add_theme_font_size_override("font_size",39)
  g.hud_widgets.help.tooltip_text="Hilfe & nächstes Upgrade"
+ if g.sim.mode in ["raid","defense"] and g.sim.active():
+  var speed=dock(g.button(g.hud,"1×",Rect2(1148,218,112,82),g.toggle_battle_speed));speed.name="BattleSpeed"
+  speed.tooltip_text="Kampfgeschwindigkeit: normal oder doppelt";g.hud_widgets.battle_speed=speed
  update(g)
  if is_instance_valid(g.modal):g.ui.move_child(g.modal,-1)
 static func top(g):
@@ -160,6 +163,10 @@ static func scout(g):
  var b=action(g,"attack","ANGREIFEN",Rect2(991,597,269,107),func():g.start_raid(),true);b.disabled=g.Catalog.army_count(g.progress.data)==0
 static func update(g):
  if not g.stats:return
+ if g.hud_widgets.has("battle_speed"):
+  var speed=g.hud_widgets.battle_speed;speed.text=str(g.battle_speed)+"×"
+  if speed.get_meta("speed",0)!=g.battle_speed:
+   speed.set_meta("speed",g.battle_speed);speed.add_theme_stylebox_override("normal",g.skin("selected" if g.battle_speed==2 else "blue"))
  if is_instance_valid(g.ranking_ui) and g.ranking_ui.active:g.ranking_ui.update_hud();return
  if g.hud_widgets.has("sync"):g.hud_widgets.sync.text="GRAFIKPROBE · separates Testdorf · wird nicht gespeichert" if g.art_preview else (g.account.status if g.account.signed_in() else "Gastdorf · lokal gespeichert")
  for key in g.resource_bars:

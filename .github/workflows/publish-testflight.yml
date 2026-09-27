@@ -46,7 +46,7 @@ jobs:
         run: python3 tools/check_godot.py logs/roads.log godot --headless --path . --script tests3d/roads_suite.gd
       - name: Quest progression and battle reports
         run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd
-      - name: Live trial authority and client prediction
+      - name: Live trial authority, client prediction and 1x/2x attack speed
         run: |
           node backend/tests/live_trial.mjs
           python3 tools/check_godot.py logs/live-trial.log godot --headless --path . --script tests3d/live_trial_suite.gd

@@ -43,6 +43,11 @@ try{
  await db.exec('reset role');const wallCase=structuredClone(initial);wallCase.actors.forEach(a=>{if(['hall','tower'].includes(a.kind))a.hp=0});
  const won=(await db.query('select glutwacht_private.live_tick($1::jsonb,$2::jsonb) s',[JSON.stringify(wallCase),'{}'])).rows[0].s;
  check(won.won&&won.actors.some(a=>a.kind==='wall'&&a.hp>0),'intact walls do not prevent victory');
+ await login(1);let fast=await call('start');
+ await db.exec('reset role');await db.query("update glutwacht_private.ranked_matches set state=jsonb_set(state,'{live_started_at}',to_jsonb(now()-interval '1 second')) where user_id=$1",[ids[1]]);await login(1);
+ fast=await call('input',input(fast,Array.from({length:20},()=>({}))));fast=await call('input',input(fast,Array.from({length:20},()=>({}))));
+ check(fast.state.tick===40,'2x realtime ticks accepted within bounded retry allowance');
+ await assert.rejects(()=>call('input',input(fast,Array.from({length:20},()=>({})))),/clock_ahead/);checks++;
  await login(-1);await assert.rejects(()=>call('start'),/authentication_required/);checks++;
  await db.exec('reset role;set role anon');await assert.rejects(()=>call('start'),/permission denied/);checks++;
  mkdirSync('logs/live-trial',{recursive:true});writeFileSync('logs/live-trial/replay.json',JSON.stringify({initial,replay,final:r.state}));

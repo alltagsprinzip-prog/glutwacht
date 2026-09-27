@@ -51,6 +51,10 @@ func run():
   check(game.modal==null and not game.paused,name+" closes through real touch")
   game.modal_guard_until=0
  game.open_raid();game.start_raid();await frames(10);game.modal_guard_until=0
+ game.set_process(false);await click_button(game.hud_widgets.battle_speed)
+ var speed_time=game.sim.time;game.step_simulation(.05,.05)
+ check(game.battle_speed==2 and absf(game.sim.time-speed_time-.1)<.0001,"normal attack touch enables double simulation time")
+ await click_button(game.hud_widgets.battle_speed);check(game.battle_speed==1,"speed returns to normal through touch");game.set_process(true)
  var point=edge_point();check(point!=Vector2.ZERO,"legal visible deployment area found")
  for kind in ["melee","archers"]:
   await click_button(game.deployment_buttons[kind]);check(game.deploying==kind,"touch selects "+kind)
@@ -118,4 +122,8 @@ func live_touch():
  check(game.sim.target_id==target.id and game.deploying=="","enemy target touch leaves troop placement without consuming troops")
  var tick=int(game.sim.state.tick);game._process(.2)
  check(game.sim.state.tick>=tick+1,"trial time continues without command buttons")
+ await click_button(game.hud_widgets.battle_speed);tick=int(game.sim.state.tick);game.step_simulation(.1,.1)
+ check(game.battle_speed==2 and int(game.sim.state.tick)==tick+2,"trial speed touch advances two input ticks per real timestep")
+ await click_button(game.hud_widgets.battle_speed);tick=int(game.sim.state.tick);game.step_simulation(.1,.1)
+ check(game.battle_speed==1 and int(game.sim.state.tick)==tick+1,"trial speed can return to one times")
  game.ranking_ui.leave()

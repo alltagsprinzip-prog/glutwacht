@@ -27,6 +27,7 @@ var toast_label:Label
 var cooldowns:Dictionary={}
 var commands:Dictionary={}
 var held=false
+var battle_speed=1
 var paused=false
 var dialog=""
 var result_shown=false
@@ -276,6 +277,15 @@ func movement() -> Vector2:
  var v=stick.value
  v+=Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
  return world.screen_to_direction(v.limit_length(1))
+func combat_speed() -> int:
+ return battle_speed if sim.mode in ["raid","defense"] and sim.active() else 1
+func toggle_battle_speed():
+ battle_speed=3-battle_speed;update_hud()
+func step_simulation(dt:float,elapsed:float):
+ # Repeat stable simulation steps; camera gestures and account timers keep real time.
+ for i in range(combat_speed()):
+  if (held or Input.is_physical_key_pressed(KEY_J)) and sim.attack_cd<=0:sim.strike()
+  sim.step(dt,movement(),elapsed)
 func _process(dt):
  if OS.has_feature("web") and not art_preview:
   var request=JavaScriptBridge.eval("window.GlutwachtAccount?.take()",true)
@@ -323,12 +333,10 @@ func _process(dt):
  if not paused:
   update_gestures(dt)
   var hp=sim.hero.hp
-  sim.step(dt,movement(),elapsed)
+  step_simulation(dt,elapsed)
   for cue in sim.audio_events:tone(cue)
   sim.audio_events.clear()
-  if held or Input.is_physical_key_pressed(KEY_J):
-   if sim.attack_cd<=0:sim.strike()
-  world.sync(sim,dt)
+  world.sync(sim,dt*combat_speed())
   if sim.result!="" and not result_shown:result_shown=true;reward=sim.settle();progress.tutorial_event("battle");save();tone("victory" if sim.result=="victory" else "death");show_battle_completion()
  else:world.sync(sim,dt)
  toast_time=maxf(0,toast_time-dt)
