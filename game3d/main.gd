@@ -464,6 +464,7 @@ func _unhandled_input(event):
   if dialog=="result" or (dialog=="heroes" and progress.data.hero==""):return
   if paused:
    if get_viewport().gui_get_focus_owner() is LineEdit:get_node("KeyboardAccessory").dismiss()
+   elif dialog=="roads" and is_instance_valid(roads_ui):roads_ui.abort()
    else:close_dialog()
   elif build_kind!="":cancel_build()
   elif is_instance_valid(roads_ui) and roads_ui.editing:roads_ui.open()
@@ -546,6 +547,8 @@ func open_shop():
    if progress.shop_buy(it[0]):save();refresh_home();open_shop();tone("pickup"),true)
   buy.disabled=int(progress.data.gems)<it[2] or (it[0]=="builder" and int(progress.data.builder_bonus)>=1) or (it[0]!="builder" and int(progress.data[it[0]])>=progress.storage())
 func open_dialog(name:String,heading:String,sub:String) -> Control:
+ if dialog=="roads" and name!="roads" and is_instance_valid(roads_ui):
+  roads_ui.reset();world.render_paths(Progress.Roads.clean(progress.data.get("roads",{})),sim.buildings)
  close_dialog(true);dialog=name;paused=true;held=false;cancel_gestures()
  if stick:stick.release()
  modal=Control.new();modal.size=ui.size;modal.z_index=100;ui.add_child(modal)

@@ -23,7 +23,7 @@ automatischen Wege. Die optionale `roads`-Erweiterung bleibt in Schema 7 und wir
 und keine Datenmigration erforderlich. Eigene Wege sind auf 128 Stücke begrenzt.
 Die Auswahl „Keine Wege“ bewahrt den eigenen Entwurf für später auf.
 
-90 gezielte Rand-/Wegeprüfungen und 236 allgemeine HUD-Prüfungen lokal bestanden.
+92 gezielte Rand-/Wegeprüfungen und 236 allgemeine HUD-Prüfungen lokal bestanden.
 Eine Vorschau verändert den Spielstand erst durch Speichern/Fertig. Bei einem
 Schreibfehler werden die bisherigen Daten wiederhergestellt und der Entwurf
 bleibt zur erneuten Speicherung offen. Normale Offline-Produktion läuft weiter.
