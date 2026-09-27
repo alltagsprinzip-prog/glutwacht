@@ -278,7 +278,9 @@ func scenery(sim):
  for i in range(14):asset("rock_largeA.glb",landscape,Vector3(rng.randf_range(43,49),-.1,rng.randf_range(-34,34)),rng.randf_range(1,3),"height",rng.randf()*TAU)
  for i in range(4):
   var p=Vector3(-20+i*13.5,0,village_bounds.position.y-6)
-  asset("House_4.obj" if i%2 else "House_1.obj",landscape,p,5.5,"width",PI)
+  var dwelling=Node3D.new();dwelling.name="Chinese_SceneryDwelling";landscape.add_child(dwelling);dwelling.position=p
+  Architecture.pavilion(self,dwelling,Vector3.ZERO,4.8,3.5,2.25,Color("4a6663"),false,1)
+  Architecture.lantern(self,dwelling,Vector3(-1.8,2.1,1.9));batch_building_geometry(dwelling)
  # Kasernenhof: Feuer, Bänke und Vorräte geben der wartenden Armee einen klaren Platz.
  if mode=="home":
   var bp:Vector2=Catalog.CORE_POS.barracks
@@ -689,3 +691,37 @@ func create_boat(side:int,color:Color):
  asset("Barrel.obj",boat,Vector3(-.4,.4,-.8),.65)
  var wake=disc(1.25,Color(.65,.93,1,.22),Vector3(0,-.1,-2),boat);wake.scale=Vector3(.65,1,2)
  boats.append({"root":boat,"side":side,"phase":9.0 if side<0 else 0.0})
+
+func batch_building_geometry(body:Node3D):
+ # Retain each destructible building root, but join its static timber, roof
+ # trim and masonry per material. Hundreds of tiny meshes become a few draws.
+ var buckets={}
+ for node in body.find_children("*","MeshInstance3D",true,false):
+  if node.mesh==null or not node.visible:continue
+  var local=body.global_transform.affine_inverse()*node.global_transform
+  for surface in range(node.mesh.get_surface_count()):
+   var mat=node.get_active_material(surface)
+   if mat==null:continue
+   var arrays=node.mesh.surface_get_arrays(surface);var format=""
+   for array in arrays:format+="1" if array!=null and array.size()>0 else "0"
+   var key=str(mat.get_instance_id())+format+str(node.cast_shadow)
+   if not buckets.has(key):buckets[key]={"material":mat,"shadow":node.cast_shadow,"parts":[]}
+   buckets[key].parts.append({"node":node,"surface":surface,"transform":local})
+ var removed={}
+ for bucket in buckets.values():
+  if bucket.parts.size()<2:continue
+  var joined=SurfaceTool.new();joined.begin(Mesh.PRIMITIVE_TRIANGLES)
+  for part in bucket.parts:
+   joined.append_from(part.node.mesh,part.surface,part.transform)
+   if not removed.has(part.node):removed[part.node]=[]
+   removed[part.node].append(part.surface)
+  var batch=mesh_node(joined.commit(),Vector3.ZERO,bucket.material,body);batch.name="ChineseMeshBatch";batch.cast_shadow=bucket.shadow
+ for node in removed:
+  if removed[node].size()==node.mesh.get_surface_count():node.hide();node.queue_free()
+  else:
+   var remainder=ArrayMesh.new()
+   for surface in range(node.mesh.get_surface_count()):
+    if surface in removed[node]:continue
+    remainder.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,node.mesh.surface_get_arrays(surface));remainder.surface_set_material(remainder.get_surface_count()-1,node.get_active_material(surface))
+   node.mesh=remainder
+   for surface in range(remainder.get_surface_count()):node.set_surface_override_material(surface,null)

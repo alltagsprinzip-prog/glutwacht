@@ -74,8 +74,8 @@ func draw_trial():
  var s=trial.state
  var p=game.open_dialog("ranked_trial","Jadeprüfung I · Runde %d / 18"%int(s.round),"")
  status_label=game.label(p,"",Rect2(30,81,1012,40),21,game.GOLD)
- var viewport=SubViewport.new();viewport.size=Vector2i(1012,272);viewport.own_world_3d=true;viewport.msaa_3d=Viewport.MSAA_2X
- var container=SubViewportContainer.new();container.position=Vector2(34,121);container.size=Vector2(1012,272);container.mouse_filter=Control.MOUSE_FILTER_IGNORE;p.add_child(container);container.add_child(viewport)
+ var viewport=SubViewport.new();viewport.size=Vector2i(1012,190);viewport.own_world_3d=true;viewport.msaa_3d=Viewport.MSAA_2X
+ var container=SubViewportContainer.new();container.position=Vector2(34,121);container.size=Vector2(1012,190);container.mouse_filter=Control.MOUSE_FILTER_IGNORE;p.add_child(container);container.add_child(viewport)
  var profile=game.Progress.new().fresh();profile.hero="warrior";profile.hero_id="warrior";profile.structures=[];profile.obstacles=[]
  visual=game.Battle.new(profile);visual.mode="raid";visual.manual_deployment=false;visual.hero_deployed=true;visual.buildings=[];visual.allies=[];visual.enemies=[];visual.hero={}
  apply_actors(frames[0] if not frames.is_empty() else s.actors)
@@ -91,17 +91,22 @@ func draw_trial():
  status_label.text="%d Punkte · 1 Befehl = 4 Kampfsekunden · Truppe wählen und einsetzen oder vorrücken."%int(s.score)
  for i in range(3):
   var chosen=i-1
-  var b=game.button(p,["Nordflanke","Mitte","Südflanke"][i],Rect2(35+i*225,400,213,57),func():lane=chosen;draw_trial(),lane==chosen);controls.append(b)
- game.button(p,"Regeln",Rect2(728,400,150,57),rules)
- var stop=game.button(p,"Beenden",Rect2(890,400,155,57),func():order("finish"));controls.append(stop)
+  var b=game.button(p,["Nordflanke","Mitte","Südflanke"][i],Rect2(35+i*225,319,213,82),func():lane=chosen;draw_trial(),lane==chosen);controls.append(b)
+ game.button(p,"Regeln",Rect2(728,319,150,82),rules)
+ var stop=game.button(p,"Beenden",Rect2(890,319,155,82),func():order("finish"));controls.append(stop)
  for i in range(4):
   var key=game.Catalog.TROOP_ORDER[i]
-  var b=game.icon_button(p,"face_"+key,game.Catalog.TROOPS[key].name+" · %d"%int(s.reserve[key]),Rect2(35+i*205,468,193,69),func():order("deploy",key))
+  var b=game.button(p,"",Rect2(35+i*205,411,193,82),func():order("deploy",key))
+  b.tooltip_text=game.Catalog.TROOPS[key].name
+  game.icon(b,"face_"+key,Rect2(13,17,47,47))
+  var title=game.label(b,game.Catalog.TROOPS[key].name,Rect2(66,17,112,23),17,game.Storybook.INK)
+  game.fit_caption(title,Rect2(66,17,112,23),17)
+  game.label(b,"%d verfügbar"%int(s.reserve[key]),Rect2(66,43,112,22),17,game.Storybook.INK)
   b.disabled=int(s.reserve[key])<=0;b.set_meta("rank_locked",b.disabled);controls.append(b)
- var advance=game.button(p,"Vorrücken",Rect2(855,468,190,69),func():order("advance"),true);controls.append(advance)
- var heal=game.button(p,"Held heilen · %d"%int(s.heal),Rect2(35,546,315,57),func():order("heal"));heal.disabled=int(s.heal)==0 or float(s.actors[0].hp)<=0 or float(s.actors[0].hp)>=420;heal.set_meta("rank_locked",heal.disabled);controls.append(heal)
- var rally=game.button(p,"Kampfruf · %d"%int(s.rally),Rect2(365,546,315,57),func():order("rally"));rally.disabled=int(s.rally)==0;rally.set_meta("rank_locked",rally.disabled);controls.append(rally)
- game.label(p,"Held: %d / 420 LP"%int(s.actors[0].hp),Rect2(707,546,338,57),23,game.GOLD,true)
+ var advance=game.button(p,"Vorrücken",Rect2(855,411,190,82),func():order("advance"),true);controls.append(advance)
+ var heal=game.button(p,"Held heilen · %d"%int(s.heal),Rect2(35,503,315,82),func():order("heal"));heal.disabled=int(s.heal)==0 or float(s.actors[0].hp)<=0 or float(s.actors[0].hp)>=420;heal.set_meta("rank_locked",heal.disabled);controls.append(heal)
+ var rally=game.button(p,"Kampfruf · %d"%int(s.rally),Rect2(365,503,315,82),func():order("rally"));rally.disabled=int(s.rally)==0;rally.set_meta("rank_locked",rally.disabled);controls.append(rally)
+ game.label(p,"Held: %d / 420 LP"%int(s.actors[0].hp),Rect2(707,503,338,82),23,game.GOLD,true)
  for b in controls:b.disabled=not frames.is_empty() or bool(b.get_meta("rank_locked",false))
 func rules():
  frames=[]

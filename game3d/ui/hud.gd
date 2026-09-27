@@ -158,7 +158,9 @@ static func update(g):
  if g.hud_widgets.has("sync"):g.hud_widgets.sync.text="GRAFIKPROBE · separates Testdorf · wird nicht gespeichert" if g.art_preview else (g.account.status if g.account.signed_in() else "Gastdorf · lokal gespeichert")
  for key in g.resource_bars:
   var b=g.resource_bars[key];b.size.x=b.get_parent().size.x*clampf(float(g.progress.data[key])/maxf(1,g.progress.storage()),0,1)
-  g.resource_labels[key].text=format_number(g.progress.data[key])
+  var content=format_number(g.progress.data[key])
+  if g.resource_labels[key].text!=content:
+   g.resource_labels[key].text=content;g.fit_caption(g.resource_labels[key],Rect2(62,11,116,29),23)
   g.resource_labels[key].tooltip_text="Lager: "+format_number(g.progress.data[key])+" / "+format_number(g.progress.storage())
  if g.resource_labels.has("gems"):g.resource_labels.gems.text=str(g.progress.data.gems)
  if g.builder_text:g.builder_text.text="%d / %d frei"%[g.progress.free_builders(),g.progress.builders()]
@@ -166,11 +168,16 @@ static func update(g):
   var remaining=INF
   for job in g.progress.data.jobs+g.progress.data.obstacle_jobs:remaining=minf(remaining,float(job.finish)-Time.get_unix_time_from_system())
   g.hud_widgets.timer.text="Bauarbeiter" if remaining==INF else ("%d Tage"%ceili(remaining/86400.0) if remaining>=86400 else ("%dh %02dm"%[int(remaining)/3600,(int(remaining)%3600)/60] if remaining>=3600 else "%02d:%02d"%[maxi(0,ceili(remaining))/60,maxi(0,ceili(remaining))%60]))
- for key in g.loot_labels:g.loot_labels[key].text="%d / %d"%[g.sim.looted[key],g.sim.village[key]]
+ for key in g.loot_labels:
+  var content="%d / %d"%[g.sim.looted[key],g.sim.village[key]]
+  if g.loot_labels[key].text!=content:
+   var l=g.loot_labels[key];l.text=content;g.fit_caption(l,Rect2(l.position,l.size),26)
  if g.collect_button:
   var ready=g.progress.ready_resources();g.collect_button.disabled=ready.wood+ready.stone+ready.gold<=0
  if not g.sim.active():return
- if g.health:g.health.value=g.sim.hero.hp;g.health_text.text="%d / %d"%[ceili(g.sim.hero.hp),g.sim.hero.max_hp]
+ if g.health:
+  g.health.value=g.sim.hero.hp;g.health_text.text="%d / %d"%[ceili(g.sim.hero.hp),g.sim.hero.max_hp]
+  g.fit_caption(g.health_text,Rect2(265,13,146,30),21)
  if g.objective:
   var t=maxi(0,180-int(g.sim.time));g.objective.text="%d%%  %d:%02d"%[g.sim.destruction_percent(),t/60,t%60]
  for i in range(g.stars_view.size()):g.stars_view[i].modulate=Color.WHITE if i<g.sim.stars() else Color("63716c")

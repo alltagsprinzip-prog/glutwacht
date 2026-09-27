@@ -24,6 +24,9 @@
  done.addEventListener('click',dismissKeyboard);
  let dismissedTap=false;
  panel.addEventListener('pointerdown',e=>{
+  // Dismissing can hide the tapped Done button before a click is dispatched.
+  // Consume only that gesture, never the next deliberate button press.
+  dismissedTap=false;
   if([email,password].includes(document.activeElement)&&e.target!==email&&e.target!==password){
    dismissKeyboard();dismissedTap=true;e.preventDefault();e.stopImmediatePropagation();
   }
@@ -45,8 +48,8 @@
  // Stop canvas keyboard handlers from consuming native form typing.
  for(const type of ['keydown','keyup','keypress'])panel.addEventListener(type,e=>e.stopPropagation());
  window.GlutwachtAccount={
-  show(message){refreshEmails();panel.hidden=false;notice.textContent=message||'Dein Fortschritt wird automatisch in deinem Konto gespeichert.';disabled(false);},
-  hide(){panel.hidden=true;password.value='';},
+  show(message){dismissedTap=false;refreshEmails();panel.hidden=false;notice.textContent=message||'Dein Fortschritt wird automatisch in deinem Konto gespeichert.';disabled(false);},
+  hide(){dismissedTap=false;dismissKeyboard();panel.hidden=true;password.value='';},
   take(){const result=pending;pending=null;return result?JSON.stringify(result):null;}
  };
 })();

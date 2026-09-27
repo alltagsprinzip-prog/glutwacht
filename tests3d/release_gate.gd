@@ -22,10 +22,10 @@ func _init():
  check(int(b.reserve.melee)==invalid_before,"invalid deployment must not consume troop")
 
  for i in range(5):
-  check(b.deploy("melee",Vector2(-8.0+i*3.0,28.5)),"melee individual placement %d"%i)
+  check(b.deploy("melee",Vector2(-8.0+i*3.0,41.0)),"melee individual placement %d"%i)
  check(int(b.reserve.melee)==0,"all five melee must be individually consumed")
  for i in range(3):
-  check(b.deploy("archers",Vector2(-5.0+i*5.0,-28.5)),"archer individual placement %d"%i)
+  check(b.deploy("archers",Vector2(-5.0+i*5.0,-41.0)),"archer individual placement %d"%i)
  check(int(b.reserve.archers)==0,"all three archers must be individually consumed")
 
  var p2=Progress.new()
@@ -49,8 +49,9 @@ func _init():
  var loot=Battle.new(p3.data);check(loot.start(0,true),"loot raid start")
  var wood_target=null
  for building in loot.buildings:
-  if building.uid=="loot_wood":wood_target=building;break
+  if building.kind=="lumber" and int(building.loot.wood)>0:wood_target=building;break
  check(wood_target!=null,"wood loot building exists")
+ if wood_target==null:return
  loot.damage(wood_target,float(wood_target.max_hp)*.5)
  check(int(loot.raid_loot.wood)>0,"resource building damage must immediately loot wood")
  var earned=int(loot.raid_loot.wood)

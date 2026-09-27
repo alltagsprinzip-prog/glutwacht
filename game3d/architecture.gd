@@ -88,6 +88,7 @@ static func draw(w,b:Dictionary,parent:Node3D) -> float:
   roof(w,parent,Vector3(0,h,0),2.50,1.03,.33,tiles)
   for x in [-1.08,1.08]:w.box(parent,Vector3(x,h*.5,0),Vector3(.16,h+.1,.95),STONE)
   for i in range(level-1):w.box(parent,Vector3(-.95+(i%5)*.46,.20+int(i/5)*.25,.5),Vector3(.09,.12,.04),GOLD)
+  w.batch_building_geometry(parent)
   return h+.5
  var height=3.5
  match kind:
@@ -159,4 +160,5 @@ static func draw(w,b:Dictionary,parent:Node3D) -> float:
   w.box(parent,Vector3(x,.47+int(i/5)*.20,size*.33),Vector3(.13,.17,.10),GOLD if level>=5 else RED)
  if level>=5:
   for x in [-size*.36,size*.36]:lantern(w,parent,Vector3(x,1.7,size*.23))
+ w.batch_building_geometry(parent)
  return height
