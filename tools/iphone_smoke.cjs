@@ -27,6 +27,15 @@ const fs=require('node:fs');const assert=require('node:assert/strict');const clo
   await tap(b=>b.text==='Sparsam');await tap(b=>b.id==='Setting_brightness');await tap(b=>b.id==='Setting_music');await tap(b=>b.id==='Setting_effects');
   await page.waitForTimeout(1500);const settings=(await state()).settings;assert.equal(settings.quality,0);await page.screenshot({path:'logs/iphone/settings.png'});await tap(b=>b.id==='CloseDialog');
   await page.reload();await wait(()=>window.__glutwacht?.mode==='home'&&window.__glutwacht.dialog==='');assert.deepEqual((await state()).settings,settings,'settings persist across reload');assert.equal((await state()).hero,'mage');
+  await tap(b=>b.id==='Action_build');await tap(b=>b.id==='CatalogRoads');await wait(()=>window.__glutwacht.dialog==='roads');
+  await tap(b=>b.id==='RoadSurface_gravel');await tap(b=>b.id==='RoadDraw');await wait(()=>window.__glutwacht.roads_editing&&window.__glutwacht.road_points.length>1);
+  const roadState=await state(),v=page.viewportSize();
+  for(const [x,y] of roadState.road_points.slice(0,2)){await page.touchscreen.tap(x*v.width/roadState.ui_size[0],y*v.height/roadState.ui_size[1]);await page.waitForTimeout(450)}
+  await page.screenshot({path:'logs/iphone/roads-draft.png'});await tap(b=>b.id==='RoadFinish');
+  await wait(()=>window.__glutwacht.road_segments===1&&!window.__glutwacht.roads_editing);
+  await page.reload();await wait(()=>window.__glutwacht?.mode==='home'&&window.__glutwacht.dialog==='');
+  assert.equal((await state()).road_segments,1,'custom path survives authenticated reload');assert.equal((await state()).roads_mode,'custom');assert.equal((await state()).hero,'mage');
+  await page.screenshot({path:'logs/iphone/roads-saved.png'});
   await tap(b=>b.id==='Action_attack');await wait(()=>window.__glutwacht.mode==='scout');await tap(b=>b.id==='Action_attack');await wait(()=>window.__glutwacht.mode==='raid');
   const ground=async()=>{const s=await state();assert.ok(s.deployment_points.length);const v=page.viewportSize();return [s.deployment_points[0][0]*v.width/s.ui_size[0],s.deployment_points[0][1]*v.height/s.ui_size[1]]};
   await page.touchscreen.tap(...await ground());await wait(()=>window.__glutwacht.selected_troop==='');

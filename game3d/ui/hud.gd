@@ -27,9 +27,11 @@ static func build(g):
  g.subtitle=text(g,"",Rect2(0,0,1,1),1);g.subtitle.hide()
  g.toast_label=text(g,"",Rect2(245,452,790,55),28,TEXT,true)
  if g.sim.mode=="home":
-  top(g)
-  if g.build_kind!="":g.build_placement_hud()
-  else:home(g)
+  if is_instance_valid(g.roads_ui) and g.roads_ui.editing:g.roads_ui.build_hud()
+  else:
+   top(g)
+   if g.build_kind!="":g.build_placement_hud()
+   else:home(g)
  elif g.sim.mode=="scout":scout(g)
  else:combat(g)
  g.hud_widgets.help=dock(g.button(g.hud,"?",Rect2(1148,124 if g.sim.active() else 288,112,76),func():g.open_help()))
@@ -62,7 +64,7 @@ static func top(g):
  dock(action(g,"tasks","ZIELE",Rect2(20,174,112,78),func():g.open_tasks()),"left")
  dock(action(g,"shop","SHOP",Rect2(1148,100,112,78),func():g.open_shop()))
 static func home(g):
- var friends=dock(g.button(g.hud,"FREUNDE",Rect2(20,270,112,66),func():g.open_social()),"left");friends.add_theme_font_size_override("font_size",14);friends.size=Vector2(112,66)
+ var friends=dock(g.button(g.hud,"FREUNDE",Rect2(20,270,112,66),func():g.open_social()),"left");friends.name="FriendsDock";friends.add_theme_font_size_override("font_size",14);friends.size=Vector2(112,66)
  g.create_stick()
  g.collect_button=dock(action(g,"collect","SAMMELN",Rect2(1148,194,112,82),func():g.collect_resources(),true));g.collect_button.name="CollectAll";g.collect_button.tooltip_text="Alle verfügbaren Ressourcen einsammeln"
  g.fit_caption(g.collect_button.get_child(1),Rect2(14,48,84,20),13)
@@ -73,14 +75,14 @@ static func home(g):
  var attack=dock(action(g,"attack","ANGRIFF",Rect2(1074,524,186,180),func():g.open_raid(),true));attack_skin(g,attack)
  attack.get_child(0).position=Vector2(38,15);attack.get_child(0).size=Vector2(110,110)
  attack.get_child(1).position=Vector2(5,130);attack.get_child(1).size=Vector2(176,36);attack.get_child(1).add_theme_font_size_override("font_size",26)
- var toolbar=plate(g,Rect2(367,590,548,118));toolbar.name="BottomActionBar";toolbar.add_theme_stylebox_override("panel",g.skin("wood"))
+ var toolbar=plate(g,Rect2(402,612,476,96));toolbar.name="BottomActionBar";toolbar.add_theme_stylebox_override("panel",g.skin("wood"))
  var keys=["build","hero","army","training"]
  var titles=["BAUEN","HELD","ARMEE","TRAINING"]
  var callbacks=[g.open_catalog,g.open_heroes,g.open_army,g.open_training]
  for i in range(4):
-  var tile=action(g,keys[i],titles[i],Rect2(383+i*129,600,116,98),callbacks[i])
-  tile.get_child(0).position=Vector2(30,8);tile.get_child(0).size=Vector2(56,56)
-  g.fit_caption(tile.get_child(1),Rect2(15,60,86,22),16)
+  var tile=action(g,keys[i],titles[i],Rect2(412+i*116,618,108,84),callbacks[i])
+  tile.get_child(0).position=Vector2(33,8);tile.get_child(0).size=Vector2(42,42)
+  g.fit_caption(tile.get_child(1),Rect2(12,51,84,22),16)
  if g.selected_building!="":
   var b=g.progress.find_building(g.selected_building)
   if b.is_empty():return
@@ -193,7 +195,8 @@ static func update(g):
   var b=g.deployment_buttons[kind];b.get_meta("count").text=str(g.sim.reserve[kind]);b.disabled=g.sim.reserve[kind]<=0
   b.visible=true
   if b.visible:
-   b.set_meta("design_position",Vector2(20+(slot%2)*112,185+int(slot/2)*77));b.position=b.get_meta("design_position")+g.safe_rect().position-Vector2(20,0);slot+=1
+   var y=185+int(slot/2)*77
+   b.set_meta("design_position",Vector2(20+(slot%2)*112,y));b.position=Vector2((slot%2)*112+g.edge_left_inset(y,b.size.y),y+g.safe_rect().position.y);slot+=1
   var chosen=g.deploying==kind and not b.disabled
   if b.get_meta("selected",false)!=chosen:b.set_meta("selected",chosen);b.add_theme_stylebox_override("normal",g.skin("selected" if chosen else "blue"))
   if b.disabled and g.deploying==kind:g.deploying=""

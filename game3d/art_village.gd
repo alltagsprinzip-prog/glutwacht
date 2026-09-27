@@ -162,15 +162,6 @@ func foliage(p:Vector3,r:float,col:Color):
    var y=p+Vector3(cos(b)*cos(c),sin(b),cos(b)*sin(c))*r
    quad(w,v,y,x,col.lightened(rng.randf_range(-.04,.06)))
 func landscape(parent:Node3D,buildings:Array):
- for b in buildings:
-  var end=b.pos+Vector2(0,3.7);var start=Vector2(0,8)
-  var steps=maxi(1,int(start.distance_to(end)/.55))
-  var along=(end-start).normalized();var across=Vector2(along.y,-along.x);var turn=atan2(along.x,along.y)
-  for i in range(steps):
-   var pos=start.lerp(end,float(i)/steps)
-   for side in [-1,0,1]:
-    var q=pos+across*side*.49
-    block(Vector3(q.x,.035,q.y),Vector3(.45,.09,.51),Color("b7ac94").lightened(rng.randf_range(-.08,.08)),.05,Basis(Vector3.UP,turn+rng.randf_range(-.035,.035)))
  for x in range(-5,6):
   for z in range(-4,5):
    if Vector2(x,z).length()>5.0:continue

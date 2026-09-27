@@ -23,7 +23,7 @@ func run():
   root.size=Vector2i(width,720);await frames();g.layout_art_preview()
   for right in [false,true]:
    g.notch_right=right;g.build_hud()
-   check(is_equal_approx(g.stick.position.x,g.safe_rect().position.x),"left dock applies safe area once")
+   check(is_zero_approx(g.stick.position.x),"left joystick uses physical edge outside camera band")
    for value in [0,600,1200,99999999]:
     g.progress.data.wood=value;g.update_hud()
     var meter=g.resource_bars.wood;var clip=meter.get_parent()

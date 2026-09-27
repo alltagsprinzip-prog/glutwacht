@@ -149,8 +149,9 @@ func setup(sim):
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
  terrain()
  if art_preview and mode=="home":ArtVillage.new().landscape(landscape,sim.buildings)
- else:village_paths(sim);scenery(sim)
+ else:scenery(sim)
  batch_static_landscape()
+ village_paths(sim)
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
@@ -249,20 +250,12 @@ func terrain():
 # Paths follow the actual building positions, including relocated legacy buildings.
 func village_paths(sim):
  if mode!="home":return
- for b in sim.buildings:
-  if b.kind=="wall":continue
-  var end:Vector2=b.pos+Vector2(0,float(b.radius)*.72)
-  var start=Vector2(0,8)
-  var length=start.distance_to(end)
-  if length>.1:
-   var path=PlaneMesh.new();path.size=Vector2(2.0,length)
-   var gravel=ShaderMaterial.new();gravel.shader=load("res://game3d/path.gdshader");gravel.set_shader_parameter("length",length)
-   var middle=(start+end)*.5;var paving=mesh_node(path,Vector3(middle.x,.025,middle.y),gravel,landscape);paving.rotation.y=atan2(end.x-start.x,end.y-start.y)
- # A small meeting place rather than a square tile under each house.
- disc(3.4,Color("928163"),Vector3(0,.026,8),landscape)
- for i in range(9):
-  var angle=float(i)*TAU/9.0
-  asset("flower_yellowC.glb" if i%2 else "flower_purpleA.glb",landscape,Vector3(4.1*cos(angle),.03,8+4.1*sin(angle)),.6,"height",angle)
+ render_paths(load("res://game3d/roads.gd").clean(sim.profile.get("roads",{})),sim.buildings)
+func render_paths(data:Dictionary,buildings:Array):
+ var previous=get_node_or_null("VillagePaths")
+ if previous:remove_child(previous);previous.queue_free()
+ var parent=Node3D.new();parent.name="VillagePaths";add_child(parent)
+ if mode=="home":load("res://game3d/roads.gd").draw(parent,data,buildings)
 func scenery(sim):
  for i in range(95):
   var p=Vector3(rng.randf_range(-58,56),0,rng.randf_range(-52,46))

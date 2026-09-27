@@ -72,6 +72,7 @@ var save_import_callback
 var account
 var ranking_ui
 var social_ui
+var roads_ui
 var account_active=false
 var cloud_clock=0.0
 var cloud_sync_paused=false
@@ -151,6 +152,22 @@ func reflow_hud():
   if node.get_meta("hud_edge","")=="right":node.position.x=safe.end.x-node.size.x
   elif node.get_meta("hud_edge","")=="left":node.position.x=safe.position.x
   elif node.has_meta("hud_right_gap"):node.position.x=safe.end.x-node.size.x-float(node.get_meta("hud_right_gap"))
+  if base.x<240 and node!=stick:node.position.x=base.x-20+edge_left_inset(node.position.y,node.size.y)
+  if sim.mode=="home" and node.get_meta("hud_edge","")=="left":
+   node.position.x=0
+   if safe.position.x>1:
+    if node.name=="Action_tasks":node.position.y=minf(base.y,ui.size.y*.34-node.size.y-4)
+    elif node.name=="FriendsDock":node.position.y=ui.size.y*.66+4
+    elif node.name=="TutorialNext":node.position=Vector2(144,ui.size.y*.66+4)
+  if node==stick:
+   node.position.x=0
+   if safe.position.x>1:
+    node.size=Vector2(136,136);node.position.y=safe.end.y-node.size.y
+func edge_left_inset(y:float,height:float) -> float:
+ # iOS exposes a full-height safe rectangle, not the physical island outline.
+ # Keep a conservative middle band clear; above/below it use the actual edge.
+ var safe=safe_rect()
+ return safe.position.x if y<ui.size.y*.66 and y+height>ui.size.y*.34 else 0.0
 func decorate(control:Control):
  var finish=load("res://game3d/ui/button_finish.gd").new();finish.show_behind_parent=false;finish.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT);control.add_child(finish)
 func style(bg:Color,border:Color=Color("756344"),width:int=2,radius:int=11) -> StyleBoxFlat:
@@ -266,7 +283,7 @@ func create_stick():
 func update_hud():
  Hud.update(self)
 func movement() -> Vector2:
- if not stick or build_kind!="" or sim.mode=="scout":return Vector2.ZERO
+ if not stick or build_kind!="" or sim.mode=="scout" or (is_instance_valid(roads_ui) and roads_ui.editing):return Vector2.ZERO
  var v=stick.value
  v+=Vector2(float(Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT))-float(Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT)),float(Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN))-float(Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP)))
  return world.screen_to_direction(v.limit_length(1))
@@ -329,7 +346,7 @@ func _process(dt):
  if toast_time<=0 and toast_label:toast_label.text=""
  update_hud()
  if OS.has_feature("web") and fmod(clock,.25)<dt:
-  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.17","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
+  JavaScriptBridge.eval("window.__glutwacht="+JSON.stringify({"version":"Glutwacht 0.18","mode":sim.mode,"hero":sim.hero_key(),"hero_hp":sim.hero.hp,"hero_x":sim.hero.pos.x,"hero_z":sim.hero.pos.y,"reserve":sim.reserve,"selected_troop":deploying,"dialog":dialog,"stars":sim.stars(),"looted":sim.looted,"army":sim.living(sim.allies).size(),"command":sim.command,"village":sim.village.name,"result":sim.result,"wood":progress.data.wood,"stone":progress.data.stone,"gold":progress.data.gold,"jobs":progress.data.jobs.size(),"joystick_visible":is_instance_valid(stick) and stick.visible,"save_schema":progress.data.version,"hall":progress.data.hall,"hero_id":progress.data.hero_id,"elapsed":sim.time,"stick_value":[stick.value.x,stick.value.y] if stick else [],"sync_status":account.status,"sync_busy":account.busy,"sync_dirty":account.dirty,"notice":toast_label.text if toast_label else "","settings":progress.data.get("settings",{}),"roads_mode":progress.data.get("roads",{}).get("mode","auto"),"road_segments":progress.data.get("roads",{}).get("segments",[]).size(),"roads_editing":is_instance_valid(roads_ui) and roads_ui.editing,"road_points":road_draw_points(),"ui_size":[ui.size.x,ui.size.y],"controls":qa_controls(),"deployment_points":deployment_preview_points()}))
 # Read-only visible candidate points used for automated browser input tests.
 # No state mutations or game-rule overrides are exposed to JavaScript.
 func qa_controls() -> Array:
@@ -339,6 +356,15 @@ func qa_controls() -> Array:
   var r=node.get_global_rect()
   out.append({"id":String(node.name),"text":node.text if node is Button else (node.placeholder_text if node is LineEdit else ""),"rect":[r.position.x,r.position.y,r.size.x,r.size.y],"disabled":node.disabled if node is BaseButton else false})
  return out
+func road_draw_points() -> Array:
+ var points=[]
+ if not is_instance_valid(roads_ui) or not roads_ui.editing:return points
+ var bounds=Progress.village_bounds(int(progress.data.hall),int(progress.data.frontier.land))
+ for x in range(300,int(ui.size.x)-300,140):
+  for y in range(200,500,100):
+   var point=Vector2(x,y)
+   if Progress.Roads.ground_allowed(world.ground_position(point),bounds) and not blocks_world_at(point):points.append([point.x,point.y])
+ return points
 func deployment_preview_points() -> Array:
  var points=[]
  if sim.mode!="raid" or paused:return points
@@ -389,7 +415,10 @@ func pointer_end(id:int,pos:Vector2):
  if not gestures.has(id):return
  var g:Dictionary=gestures[id];gestures.erase(id)
  if not paused and g.role!="pinch" and not g.placed and not g.dragged and not blocks_world_at(pos):world_tap(pos)
- if gestures.is_empty():pinch_distance=0;world.deployment_marker.visible=false
+ if gestures.is_empty():
+  pinch_distance=0
+  if is_instance_valid(roads_ui) and roads_ui.editing and roads_ui.start!=null:world.preview_deployment(roads_ui.start,true)
+  else:world.deployment_marker.visible=false
 func update_gestures(dt:float):
  for g in gestures.values():
   g.age+=dt
@@ -437,6 +466,7 @@ func _unhandled_input(event):
    if get_viewport().gui_get_focus_owner() is LineEdit:get_node("KeyboardAccessory").dismiss()
    else:close_dialog()
   elif build_kind!="":cancel_build()
+  elif is_instance_valid(roads_ui) and roads_ui.editing:roads_ui.open()
   elif sim.mode=="scout":return_home()
   else:open_menu()
   return
@@ -451,6 +481,7 @@ func _unhandled_input(event):
   KEY_H:sim.heal()
 func world_tap(pos:Vector2):
  if paused or Time.get_ticks_msec()<modal_guard_until:return
+ if is_instance_valid(roads_ui) and roads_ui.editing:roads_ui.tap(world.ground_position(pos));return
  if build_kind!="":build_pos=world.ground_position(pos).snapped(Vector2(2.5,2.5));update_ghost()
  elif sim.mode=="home":
   var collect_uid=world.collection_at(pos)
@@ -543,6 +574,7 @@ func close_dialog(force:bool=false):
 func refresh_home():
  var pos:Vector2=sim.hero.pos;var zoom=world.target_zoom;var pan=world.pan
  sim.home();sim.hero.pos=pos;world.setup(sim);world.target_zoom=zoom;world.pan=pan;build_hud()
+ if is_instance_valid(roads_ui) and not roads_ui.draft.is_empty():roads_ui.preview()
 func building_preview(parent:Control,kind:String,rect:Rect2,level:int=1):
  var viewport=SubViewport.new();viewport.size=Vector2i(int(rect.size.x),int(rect.size.y));viewport.own_world_3d=true;viewport.transparent_bg=true;viewport.render_target_update_mode=SubViewport.UPDATE_ONCE;viewport.msaa_3d=Viewport.MSAA_2X
  var container=SubViewportContainer.new();container.position=rect.position;container.size=rect.size;container.mouse_filter=Control.MOUSE_FILTER_IGNORE;parent.add_child(container);container.add_child(viewport)
@@ -554,6 +586,7 @@ func building_preview(parent:Control,kind:String,rect:Rect2,level:int=1):
  hero_views.append(viewport)
 func open_catalog():
  var p=open_dialog("catalog","Bauen","")
+ var paths=button(p,"Wege gestalten",Rect2(617,13,222,51),open_roads);paths.name="CatalogRoads";paths.add_theme_font_size_override("font_size",19)
  var land_card=panel(p,Rect2(760,327,232,226))
  var land_map=load("res://game3d/ui/land_preview.gd").new();land_map.position=Vector2(12,12);land_map.size=Vector2(208,103);land_map.owned=Progress.village_bounds(int(progress.data.hall),int(progress.data.frontier.land));land_map.proposed=Progress.village_bounds(int(progress.data.hall),mini(4,int(progress.data.frontier.land)+1));land_map.buildings=progress.all_buildings();land_card.add_child(land_map)
  label(land_card,"Dorf erweitern",Rect2(12,113,208,30),20,GOLD,true)
@@ -825,6 +858,7 @@ func open_result():
  icon(p,"xp",Rect2(342,396,34,34));label(p,"+%d EP"%reward.get("xp",0),Rect2(385,397,166,33),20,CREAM)
  button(p,"ZURÜCK INS DORF",Rect2(210,449,440,65),func():return_home(),true)
 func return_home():
+ if is_instance_valid(roads_ui):roads_ui.reset()
  close_dialog();build_kind="";selected_building="";deploying="";world.build_focus=false;sim.home();result_shown=false;world.setup(sim);build_hud();save()
 func open_build_info(kind:String):
  load("res://game3d/ui/guidance.gd").building(self,kind)
@@ -837,6 +871,9 @@ func open_help():
  load("res://game3d/ui/guidance.gd").help(self)
 func open_settings():
  load("res://game3d/ui/guidance.gd").settings(self)
+func open_roads():
+ if not is_instance_valid(roads_ui):roads_ui=load("res://game3d/ui/roads.gd").new();add_child(roads_ui);roads_ui.setup(self)
+ roads_ui.open()
 func apply_settings():
  var settings=Progress.clean_settings(progress.data.get("settings",{}))
  if world:world.apply_settings(settings)
@@ -856,7 +893,7 @@ func open_menu():
  var logout=button(p,"Abmelden",Rect2(439,273,393,70),func():logout_from_menu());logout.name="MenuLogout";logout.disabled=not account.signed_in()
  if sim.active():logout.text="Angriff beenden & abmelden";logout.add_theme_font_size_override("font_size",21)
  button(p,"Rangliste · Jadeprüfung",Rect2(28,355,396,62),open_ranking,true)
- label(p,account.status if account.signed_in() else "Gastdorf · lokal gespeichert",Rect2(448,355,374,54),18,CREAM,true).autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ var paths=button(p,"Wege gestalten",Rect2(439,355,393,62),open_roads);paths.name="MenuRoads";paths.disabled=sim.mode!="home"
  label(p,"Stick: Bewegen · Ziehen: Kamera · Zwei Finger: Zoom",Rect2(29,409,801,30),18,CREAM,true)
  if sim.active():button(p,"Angriff beenden",Rect2(28,459,396,59),func():close_dialog();end_raid())
  elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(28,459,396,59),func():return_home())

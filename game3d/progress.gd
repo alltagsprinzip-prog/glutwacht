@@ -1,5 +1,6 @@
 extends RefCounted
 const Advancement=preload("res://game3d/advancement.gd")
+const Roads=preload("res://game3d/roads.gd")
 const Catalog=preload("res://game3d/catalog.gd")
 # Same filename permits a non-destructive migration of the already played version.
 const SAVE="user://glutwacht_dorf_v2.json"
@@ -37,7 +38,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"frontier":Advancement.fresh(),"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"battle_history":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"settings":clean_settings({}),"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":7,"frontier":Advancement.fresh(),"roads":Roads.fresh(),"tutorial_done":[],"player_name":"Mein Dorf","claimed_tasks":[],"battle_history":[],"campaign_stars":{},"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"shield":0,"siege":0,"wins":0,"sword":false,"sound":true,"settings":clean_settings({}),"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -302,6 +303,7 @@ func load_file(path:String=SAVE) -> bool:
  for k in ["sword","sound"]:clean[k]=bool(parsed.get(k,clean[k]))
  clean.settings=clean_settings(parsed.get("settings",{}))
  clean.frontier=Advancement.clean(parsed.get("frontier",{}))
+ clean.roads=Roads.clean(parsed.get("roads",{}))
  var legacy_capacity=4+int(clean.hall)*2
  clean.melee=clampi(int(parsed.get("melee",5)),0,legacy_capacity)
  clean.archers=clampi(int(parsed.get("archers",0)),0,legacy_capacity-int(clean.melee))
@@ -381,6 +383,7 @@ static func validate_save(raw) -> String:
  for key in ["wood","stone","gold","gems","hall","barracks","smithy","melee","archers","shield","siege","wins","builder_bonus","next_uid","last_production"]:
   if raw.has(key) and (not numeric(raw[key]) or float(raw[key])<0):return "Ungültiges Zahlenfeld: "+key
  if raw.has("frontier") and not Advancement.validate(raw.frontier):return "Ungültige Dorferweiterung oder Tränke."
+ if raw.has("roads") and not Roads.validate(raw.roads):return "Ungültige Dorfwege."
  if raw.has("settings"):
   if not raw.settings is Dictionary:return "Ungültige Einstellungen."
   for key in ["quality","brightness","music","effects"]:

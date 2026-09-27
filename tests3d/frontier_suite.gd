@@ -35,9 +35,9 @@ func run():
  var loaded=P.new();loaded.load_file(path);check(loaded.data.settings==p.data.settings,"all four settings survive save/reload")
  game=SafeGame.new();game.require_login=false;game.save_path=path;root.size=Vector2i(1558,720);root.add_child(game)
  await process_frame;await process_frame;game.set_process(false);game.close_dialog(true);game.build_hud()
- check(absf(game.stick.position.x-game.safe_rect().position.x)<.1,"joystick at usable left edge with iPhone notch inset")
+ check(absf(game.stick.position.x)<.1,"joystick at physical left edge below iPhone camera")
  check(game.safe_rect().encloses(game.hud_widgets.help.get_global_rect()),"help remains inside safe area")
- check(game.stick.position.x+game.stick.visible_circle().position.x-game.safe_rect().position.x<=2.1,"visible joystick rim has no hidden left gutter")
+ check(game.stick.position.x+game.stick.visible_circle().position.x<=2.1,"visible joystick rim has no hidden left gutter")
  for item in [game.collect_button,game.hud_widgets.help,game.hud.find_child("Action_menu",true,false),game.hud.find_child("Action_shop",true,false)]:
   check(absf(item.get_global_rect().end.x-game.safe_rect().end.x)<.1,"utility button on usable right edge: "+str(item.name))
  var collect_caption=game.collect_button.get_child(1)
