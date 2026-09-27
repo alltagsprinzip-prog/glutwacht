@@ -168,7 +168,7 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  p.add_theme_stylebox_override("panel",skin("panel"))
  parent.add_child(p);decorate(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
- var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ var l=Label.new();l.clip_text=true;l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
  l.add_theme_color_override("font_shadow_color",Color(0,.03,.07,.8));l.add_theme_constant_override("shadow_offset_y",1)
  if center:l.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
  parent.add_child(l);l.size=rect.size;return l

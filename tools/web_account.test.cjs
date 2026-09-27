@@ -28,6 +28,8 @@ const fs=require('node:fs');const assert=require('node:assert/strict');
    await page.locator('#gw-email').tap();await page.locator('#gw-email').fill('friend@example.test');
    await page.locator('#gw-password').fill('Second-test-password');
    await page.locator('#gw-keyboard-done').tap();
+   assert.equal(await page.evaluate(()=>['gw-email','gw-password'].includes(document.activeElement.id)),false,'Done releases the focused input');
+   assert.equal(await page.evaluate(()=>GlutwachtAccount.take()),null,'Done preserves the draft without registering');
    await page.locator('#gw-register').tap();
    assert.equal(JSON.parse(await page.evaluate(()=>GlutwachtAccount.take())).action,'register');
    await page.evaluate(()=>GlutwachtAccount.show(''));

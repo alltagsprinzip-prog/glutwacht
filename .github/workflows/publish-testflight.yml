@@ -44,7 +44,7 @@ jobs:
         run: python3 tools/check_godot.py logs/jade.log godot --headless --path . --script tests3d/jade_suite.gd
       - name: Quest progression and battle reports
         run: python3 tools/check_godot.py logs/quest-journey.log godot --headless --path . --script tests3d/quest_journey_suite.gd
-      - name: 0.17 saved village, fitted edge labels, batched architecture and direct menu logout
+      - name: 0.17 saved village, wrapped labels, batched architecture and direct menu logout
         run: |
           python3 tools/check_godot.py logs/session-resume.log godot --headless --path . --script tests3d/session_resume_suite.gd
           python3 tools/check_godot.py logs/frontier.log godot --headless --path . --script tests3d/frontier_suite.gd

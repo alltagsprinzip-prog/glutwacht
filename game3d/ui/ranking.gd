@@ -50,6 +50,7 @@ func draw_board():
  var p=game.open_dialog("ranking","Rangliste · Jadeprüfung I","")
  var info=game.label(p,"Dein bester Taktikangriff zählt. Gleiche Armee für alle · der Server berechnet jeden Zug. Gleiche Punkte = gleicher Rang.",Rect2(30,86,798,63),20)
  info.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ info.name="RankingExplanation"
  var own=board.get("own")
  game.label(p,"Dein Rang: #%d · %d Punkte"%[own.rank,own.score] if own is Dictionary else "Dein Rang: noch keine abgeschlossene Prüfung",Rect2(30,149,800,36),23,game.GOLD)
  var scroll=ScrollContainer.new();scroll.position=Vector2(30,195);scroll.size=Vector2(798,217);p.add_child(scroll)

@@ -49,6 +49,9 @@ func run():
   check(ranks.visual.hero.id==1 and ranks.visual.buildings.size()==7,"real server replay renders hero and seven targets")
   await shot("ranked-%d"%i)
  ranks.board={"rows":[{"name":"QA erste Sitzung","tag":"AABBCCDDEEFF","rank":1,"score":1525}],"own":{"name":"QA erste Sitzung","tag":"AABBCCDDEEFF","rank":1,"score":1525},"total":1};ranks.draw_board();await shot("ranked-board-fixture")
+ await frames()
+ var explanation=g.modal.find_child("RankingExplanation",true,false)
+ check(explanation.size.x<=798 and explanation.get_line_count()>1,"long ranking explanation wraps inside its allotted content width")
  g.close_dialog(true)
  # Inspect every type at its first, middle and maximum levels in real previews.
  for level in [1,5,10]:

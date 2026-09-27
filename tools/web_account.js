@@ -27,6 +27,8 @@
   // Dismissing can hide the tapped Done button before a click is dispatched.
   // Consume only that gesture, never the next deliberate button press.
   dismissedTap=false;
+  // Keep Done in the layout until its click completes (especially WebKit).
+  if(e.target===done)return;
   if([email,password].includes(document.activeElement)&&e.target!==email&&e.target!==password){
    dismissKeyboard();dismissedTap=true;e.preventDefault();e.stopImmediatePropagation();
   }
