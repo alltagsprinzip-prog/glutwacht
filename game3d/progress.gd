@@ -2,6 +2,7 @@ extends RefCounted
 const Catalog=preload("res://game3d/catalog.gd")
 # Same filename permits a non-destructive migration of the already played version.
 const SAVE="user://glutwacht_dorf_v2.json"
+const Journey=preload("res://game3d/progression.gd")
 const MAX_LEVEL=10
 const TITLES={"hall":"Haupthaus","barracks":"Kaserne","smithy":"Schmiede"}
 var data:Dictionary
@@ -25,7 +26,7 @@ func fresh_obstacles() -> Array:
   {"uid":"o8","kind":"bush","x":-6.0,"z":-28.0}
  ]
 func fresh() -> Dictionary:
- return {"version":7,"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
+ return {"version":8,"journey":Journey.fresh(),"hero_id":"","core_positions":{},"wood":300,"stone":240,"gold":160,"gems":25,"builder_bonus":0,"hall":1,"barracks":1,"smithy":1,"melee":5,"archers":0,"wins":0,"sword":false,"sound":true,"hero":"","xp":{"warrior":0,"ninja":0,"shaman":0,"mage":0},"training":new_training(),"jobs":[],"obstacle_jobs":[],"obstacles":fresh_obstacles(),"next_uid":3,"last_production":Time.get_unix_time_from_system(),"structures":[{"uid":"s1","kind":"lumber","level":1,"x":-22.5,"z":15.0,"rotation":0,"stock":25.0},{"uid":"s2","kind":"quarry","level":1,"x":22.5,"z":-15.0,"rotation":0,"stock":20.0}]}
 func builders() -> int:
  var base=4 if int(data.hall)>=8 else (3 if int(data.hall)>=5 else 2)
  return mini(5,base+int(data.get("builder_bonus",0)))
@@ -268,12 +269,17 @@ func load_file(path:String=SAVE) -> bool:
  var decoder=JSON.new()
  var parse_error=decoder.parse(FileAccess.get_file_as_string(path))
  var parsed=decoder.data if parse_error==OK else null
- if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5,6,7]:
+ if not parsed is Dictionary or int(parsed.get("version",0)) not in [2,3,4,5,6,7,8]:
   protected_path=path
   warning="Spielstand nicht kompatibel oder unlesbar. Die Originaldatei bleibt unverändert; Speichern ist gesperrt."
   return false
  protected_path=""
+ if int(parsed.version)<8 and not FileAccess.file_exists(path+".v7-backup"):
+  var backup=FileAccess.open(path+".v7-backup",FileAccess.WRITE)
+  if backup==null:protected_path=path;warning="Migration: Sicherung fehlgeschlagen.";return false
+  backup.store_string(JSON.stringify(parsed));backup.close()
  var clean=fresh()
+ clean.journey=Journey.normalize(parsed.get("journey",{}))
  for k in ["wood","stone","gold","wins"]:clean[k]=clampi(int(parsed.get(k,clean[k])),0,999999)
  clean.gems=clampi(int(parsed.get("gems",clean.gems)),0,999999)
  clean.builder_bonus=clampi(int(parsed.get("builder_bonus",0)),0,1)

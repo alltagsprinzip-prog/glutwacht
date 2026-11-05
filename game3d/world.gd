@@ -107,17 +107,17 @@ func setup(sim):
  effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
  landscape=Node3D.new();add_child(landscape)
  var env=WorldEnvironment.new();sky_env=Environment.new();env.environment=sky_env;add_child(env)
- sky_env.background_mode=Environment.BG_COLOR;sky_env.background_color=Color("9fdcfa")
+ sky_env.background_mode=Environment.BG_COLOR;sky_env.background_color=Color("263c59")
  sky_env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR;sky_env.ambient_light_color=Color("d6ebff");sky_env.ambient_light_energy=.43
- sky_env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;sky_env.fog_enabled=true;sky_env.fog_light_color=Color("91aeba");sky_env.fog_density=.001
- var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=.8;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
+ sky_env.tonemap_mode=Environment.TONE_MAPPER_FILMIC;sky_env.fog_enabled=true;sky_env.fog_light_color=Color("405673");sky_env.fog_density=.001
+ var sun=DirectionalLight3D.new();sun.light_color=Color("ffebc9");sun.light_energy=1.1;sun.rotation_degrees=Vector3(-48,-28,0);sun.shadow_enabled=true;sun.directional_shadow_max_distance=115;sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS;add_child(sun)
  var fill=DirectionalLight3D.new();fill.rotation_degrees=Vector3(-30,140,0);fill.light_color=Color("c1e9ff");fill.light_energy=.12;add_child(fill)
  camera=Camera3D.new();add_child(camera);camera.projection=Camera3D.PROJECTION_ORTHOGONAL;camera.far=210;camera.current=true
  if mode=="scout":target_zoom=48;focus=Vector3(0,0,-2)
  elif sim.active():target_zoom=48;focus=Vector3.ZERO
  else:target_zoom=46;focus=Vector3(0,0,1)
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
- terrain();scenery(sim)
+ terrain();scenery(sim);settlement_paths()
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
@@ -523,3 +523,15 @@ func show_ghost(kind:String,pos:Vector2,valid:bool,rotation:int=0):
  var body=Node3D.new();ghost.add_child(body)
  Architecture.draw(self,{"kind":kind,"level":1,"team":"ally","rotation":rotation},body)
  for part in body.find_children("*","GeometryInstance3D",true,false):part.transparency=.35
+
+func settlement_paths():
+ # Broad stone avenues and landmark plaza make the settlement readable from above.
+ for axis in range(2):
+  box(landscape,Vector3(0,.035,0),Vector3(5,.06,57) if axis==0 else Vector3(57,.06,5),Color("777c7e"))
+ disc(7,Color("989891"),Vector3(0,.08,0),landscape)
+ for x in [-1,1]:
+  for z in [-1,1]:
+   var pos=Vector3(x*6,.1,z*6)
+   box(landscape,pos+Vector3(0,1.1,0),Vector3(.4,2.2,.4),Color("344353"))
+   var orb=SphereMesh.new();orb.radius=.3;orb.height=.6
+   mesh_node(orb,pos+Vector3(0,2.35,0),material(Color("ffbf70"),.4,true),landscape)

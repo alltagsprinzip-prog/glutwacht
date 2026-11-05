@@ -1,6 +1,8 @@
 extends RefCounted
 const Catalog=preload("res://game3d/catalog.gd")
 const Progress=preload("res://game3d/progress.gd")
+const Journey=preload("res://game3d/progression.gd")
+var expedition=-1
 var profile:Dictionary
 var mode="home"
 var command="Angriff"
@@ -52,8 +54,16 @@ func unit(kind:String,pos:Vector2,hp:float,damage:float,team:String) -> Dictiona
 func make_hero(pos:Vector2):
  var c=stats();var level=Catalog.level(profile,hero_key())
  hero=unit("hero",pos,c.hp+35*(int(profile.hall)-1)+20*(level-1)+25*training("vitality"),c.damage+8*(int(profile.smithy)-1)+4*(level-1)+6*training("power")+(12 if profile.sword else 0),"ally")
+ var e=profile.get("journey",Journey.fresh())
+ hero.damage+=int(e.weapon)*4
+ hero.max_hp+=int(e.armor)*25
+ if int(e.build)==0:hero.damage*=1.12
+ elif int(e.build)==1:hero.max_hp*=1.18;hero.damage*=.94
+ else:hero.damage*=1.04
+ hero.hp=hero.max_hp
  hero.class_key=hero_key()
 func home():
+ expedition=-1
  mode="home";time=0;pending_hits.clear();audio_events.clear();result="";command="Angriff";enemies.clear();effects.clear();combat_texts.clear();traps.clear();reserve={"melee":0,"archers":0};manual_deployment=false;make_hero(Vector2(0,18));form_army();home_buildings()
 func soldier(kind:String,pos:Vector2) -> Dictionary:
  var rank=int(profile.get("training",{}).get("troops",{}).get("archers" if kind=="archer" else "melee",0))
@@ -179,6 +189,12 @@ func start(index:int=-1,manual:bool=false) -> bool:
  mode="raid";reset_battle();layout(index);make_hero(entry_position());manual_deployment=manual
  if manual:allies.clear();reserve={"melee":int(profile.melee),"archers":int(profile.archers)}
  else:form_army()
+ if expedition>=0:
+  var factor=1.0+float(expedition)*.08
+  for enemy in enemies:enemy.hp*=factor;enemy.max_hp=enemy.hp;enemy.damage*=factor
+  if expedition%3==2:
+   var boss=unit("captain",Vector2(0,-15),650*factor,42*factor,"enemy")
+   boss.boss=true;enemies.append(boss)
  return true
 func start_defense():
  mode="defense";reset_battle();make_hero(Vector2(0,15));form_army();home_buildings();wave=0;next_wave=0;spawn_wave()
@@ -401,6 +417,10 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
    else:approach(u,target,2.8 if u.kind=="captain" else 3.2,dt)
   elif u.cd<=0:
    u.facing=(target.pos-u.pos).normalized();u.cd=2.2 if u.kind=="captain" else 1.6
+   if u.get("boss",false):
+    u.wind=1.2;u.aim=target.pos
+    effects.append({"kind":"skill","pos":u.aim,"life":1.2,"max":1.2,"color":Color("ff604b")})
+    continue
    animate_attack(u,1.0 if u.kind=="captain" else .75)
    queue_hit(u,target,u.damage,reach,u.kind=="ranger",Color("f0a27e"))
  var bodies=living(allies)+living(enemies)
@@ -436,5 +456,7 @@ func settle() -> Dictionary:
   var available=int(looted[k])
   reward[k]=mini(available,maxi(0,1200*int(profile.hall)-int(profile[k])));profile[k]+=reward[k]
  if int(reward.stars)>0:profile.wins+=1
+ if expedition>=0:
+  reward.shards=Journey.complete(profile,expedition,int(reward.stars)>=2 and not enemies.any(func(u):return u.get("boss",false) and u.hp>0))
  profile.xp[hero_key()]+=reward.xp
  return reward
