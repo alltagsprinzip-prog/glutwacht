@@ -4,6 +4,7 @@ const Progress=preload("res://game3d/progress.gd")
 const Battle=preload("res://game3d/battle.gd")
 const World=preload("res://game3d/world.gd")
 const Stick=preload("res://game3d/stick.gd")
+const Journey=preload("res://game3d/progression.gd")
 const CREAM=Color("f6e9c7")
 const GOLD=Color("f2c46b")
 var progress
@@ -86,7 +87,7 @@ func panel(parent:Control,rect:Rect2,color:Color=Color(.07,.09,.08,.94)) -> Pane
  if color.v>.65:color=Color("294953")
  elif color.a>.9:color=Color("193943")
  var p=Panel.new();p.position=rect.position;p.size=rect.size
- p.add_theme_stylebox_override("panel",skin("panel"))
+ p.add_theme_stylebox_override("panel",style(Color("101f30"),Color("39526b"),1,16))
  parent.add_child(p);return p
 func label(parent:Control,text:String,rect:Rect2,font_size:int=21,color:Color=CREAM,center:bool=false) -> Label:
  var l=Label.new();l.text=text;l.position=rect.position;l.size=rect.size;l.add_theme_font_size_override("font_size",font_size);l.add_theme_color_override("font_color",color);l.vertical_alignment=VERTICAL_ALIGNMENT_CENTER;l.mouse_filter=Control.MOUSE_FILTER_IGNORE
@@ -97,8 +98,8 @@ func button(parent:Control,text:String,rect:Rect2,callback:Callable,primary:bool
  var b=Button.new();b.text=text;b.position=rect.position;b.size=rect.size;b.focus_mode=Control.FOCUS_NONE;b.add_theme_font_size_override("font_size",19)
  b.add_theme_color_override("font_color",Color("3c2c17") if primary else Color.WHITE)
  b.add_theme_color_override("font_hover_color",Color.WHITE);b.add_theme_color_override("font_pressed_color",Color.WHITE);b.add_theme_color_override("font_disabled_color",Color("394b53") if primary else Color("abb7b0"))
- b.add_theme_stylebox_override("normal",skin("gold" if primary else "blue"))
- b.add_theme_stylebox_override("hover",skin("gold" if primary else "blue"))
+ b.add_theme_stylebox_override("normal",style(Color("edb86c") if primary else Color("23394f"),Color("f8dba1") if primary else Color("456582"),1,12))
+ b.add_theme_stylebox_override("hover",style(Color("edb86c") if primary else Color("23394f"),Color("f8dba1") if primary else Color("456582"),1,12))
  b.add_theme_stylebox_override("pressed",skin("pressed"))
  b.add_theme_stylebox_override("disabled",style(Color("acb9b9"),Color("586a6b"),3,13) if primary else skin("disabled"))
  b.pressed.connect(callback);parent.add_child(b);return b
@@ -131,7 +132,7 @@ func build_hud():
  toast_label.add_theme_color_override("font_shadow_color",Color("18333c"));toast_label.add_theme_constant_override("shadow_offset_x",2);toast_label.add_theme_constant_override("shadow_offset_y",2)
  if sim.mode=="home" or build_kind!="":
   panel(hud,Rect2(16,12,290,76));icon(hud,"badge",Rect2(14,12,70,76));label(hud,str(Catalog.level(progress.data,sim.hero_key())),Rect2(20,24,58,40),26,CREAM,true)
-  label(hud,"SONNENHAIN",Rect2(89,15,210,28),22,CREAM)
+  label(hud,"GLUTWACHT",Rect2(89,15,210,28),22,CREAM)
   label(hud,"Haupthaus "+str(progress.data.hall),Rect2(91,45,200,23),15,CREAM)
   panel(hud,Rect2(360,16,103,48));icon(hud,"worker",Rect2(365,21,34,34));builder_text=label(hud,"",Rect2(399,20,60,37),18,CREAM,true)
   panel(hud,Rect2(477,16,120,48));icon(hud,"gems",Rect2(483,21,36,36));resource_labels.gems=label(hud,"",Rect2(521,20,68,38),18,CREAM,true)
@@ -151,6 +152,8 @@ func build_hud():
  update_hud()
  if is_instance_valid(modal):ui.move_child(modal,-1)
 func build_home_hud():
+ button(hud,"EXPEDITIONEN",Rect2(92,95,210,54),func():open_expeditions(),true)
+ button(hud,"WERKSTATT",Rect2(92,160,210,54),func():open_workshop())
  icon_button(hud,"attack","ANGRIFF",Rect2(18,608,172,94),func():open_raid(),true)
  icon_button(hud,"build","BAUEN",Rect2(972,608,136,94),func():open_catalog(),true)
  icon_button(hud,"shop","SHOP",Rect2(1120,608,136,94),func():open_shop(),true)
@@ -633,8 +636,9 @@ func open_heroes():
   var choose=button(p,"WÄHLEN",Rect2(x+12,482,215, 60),func():
    if progress.choose_hero(key):save();close_dialog();sim.home();world.setup(sim);build_hud(),true)
 func open_raid():
+ sim.expedition=-1
  close_dialog();build_kind="";selected_building="";world.build_focus=false;sim.scout(sim.selected_village);world.setup(sim);build_hud()
-func scout_next():selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
+func scout_next():sim.expedition=-1;selected_building="";sim.scout(sim.selected_village+1);world.setup(sim);build_hud()
 func start_raid():
  if sim.start(-1,true):close_dialog();result_shown=false;deploying="melee" if sim.reserve.melee>0 else "archers";world.setup(sim);build_hud();tone("equip")
 func start_defense():
@@ -657,6 +661,7 @@ func open_result():
  for i in range(3):
   var key=["wood","stone","gold"][i];var x=162+i*191;icon(p,key,Rect2(x,339,48,48));var count=label(p,"0",Rect2(x+52,340,114,46),26)
   count.create_tween().tween_method(func(v:float):count.text=str(roundi(v)),0.0,float(reward.get(key,0)),.9).set_delay(.25)
+ if reward.get("shards",0)>0:label(p,"+%d Runensplitter · Expedition abgeschlossen"%reward.shards,Rect2(100,430,660,23),15,GOLD,true)
  icon(p,"xp",Rect2(342,396,34,34));label(p,"+%d EP"%reward.get("xp",0),Rect2(385,397,166,33),20,CREAM)
  button(p,"ZURÜCK INS DORF",Rect2(210,449,440,65),func():return_home(),true)
 func return_home():
@@ -671,3 +676,33 @@ func open_menu():
  label(p,"Spielstand lokal gespeichert · Gegner werden von der KI gesteuert",Rect2(29,416,801,31),15,CREAM,true)
  if sim.active():button(p,"Angriff beenden",Rect2(500,459,328,59),func():close_dialog();end_raid())
  elif sim.mode=="scout":button(p,"Zurück ins Dorf",Rect2(500,459,328,59),func():return_home())
+
+func open_expeditions():
+ var e=progress.data.journey
+ var p=open_dialog("expeditions","DIE GRENZLANDE","Zwei Sterne erringen. Bei Bossmissionen zusätzlich den Wächter besiegen.")
+ for i in range(3):
+  var stage=maxi(0,int(e.stage)-2)+i
+  var y=120+i*105
+  panel(p,Rect2(25,y,810,98))
+  label(p,Journey.title(stage),Rect2(43,y+8,530,34),24,GOLD)
+  label(p,"Bosswächter" if stage%3==2 else "Festung erobern · Runensplitter bergen",Rect2(43,y+47,520,30),17)
+  var b=button(p,"AUFBRECHEN",Rect2(606,y+17,208,62),func():
+   close_dialog();sim.scout(stage);sim.expedition=stage;world.setup(sim);build_hud(),true)
+  b.disabled=stage>int(e.stage)
+ label(p,"Fortschritt: %d Missionen · %d Runensplitter"%[e.stage,e.shards],Rect2(35,455,780,40),20)
+func open_workshop():
+ var e=progress.data.journey
+ var p=open_dialog("workshop","RUNENWERKSTATT","")
+ label(p,"%d RUNENSPLITTER"%e.shards,Rect2(28,85,790,40),24,GOLD)
+ var keys=["weapon","armor","research"]
+ var names=["Runenklinge · +4 Angriff / Rang","Wachtrüstung · +25 Leben / Rang","Expeditionskunde · +1 Splitter / Sieg"]
+ for i in range(3):
+  var key=keys[i];var y=137+i*85
+  label(p,names[i]+"  (%d)"%e[key],Rect2(28,y,570,45),19)
+  var b=button(p,"%d SPLITTER"%Journey.cost(e[key]),Rect2(610,y,210,58),func():
+   if Journey.craft(progress.data,key):save();refresh_home();open_workshop(),true)
+  b.disabled=e.shards<Journey.cost(e[key]) or e[key]>=(5 if key=="research" else 10)
+ label(p,"Spezialisierung · kostenlos im Dorf wechseln",Rect2(28,400,790,35),18,GOLD)
+ for i in range(3):
+  button(p,("✓ " if int(e.build)==i else "")+Journey.BUILDS[i]+["\n+12% Angriff","\n+18% HP / −6% ATK","\n−2s Super / +4% ATK"][i],Rect2(28+i*270,451,250,60),func():
+   e.build=i;save();refresh_home();open_workshop(),int(e.build)==i)

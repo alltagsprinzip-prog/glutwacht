@@ -40,6 +40,11 @@ const assert=require('node:assert/strict');
    await tap(closeX,name==='catalog'?107:129);
    await wait(()=>window.__glutwacht?.dialog==='');
   }
+  for(const [x,y,name] of [[190,120,'expeditions'],[190,185,'workshop']]){
+   await tap(x,y);await wait(new Function(`return window.__glutwacht?.dialog===${JSON.stringify(name)}`));
+   await page.screenshot({path:`logs/browser/${name}.png`});
+   await tap(1025,129);await wait(()=>window.__glutwacht?.dialog==='');
+  }
   await page.reload();
   await wait(()=>window.__glutwacht?.mode==='home' && window.__glutwacht.dialog==='',120000);
   assert.equal((await state()).hero,'warrior','hero selection survives browser reload');
