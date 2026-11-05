@@ -704,5 +704,5 @@ func open_workshop():
   b.disabled=e.shards<Journey.cost(e[key]) or e[key]>=(5 if key=="research" else 10)
  label(p,"Spezialisierung · kostenlos im Dorf wechseln",Rect2(28,400,790,35),18,GOLD)
  for i in range(3):
-  button(p,("✓ " if int(e.build)==i else "")+Journey.BUILDS[i]+[" +12% Angriff"," +18% HP / −6% ATK"," −2s Super / +4% ATK"][i],Rect2(28+i*270,451,250,60),func():
+  button(p,("✓ " if int(e.build)==i else "")+Journey.BUILDS[i]+["\n+12% Angriff","\n+18% HP / −6% ATK","\n−2s Super / +4% ATK"][i],Rect2(28+i*270,451,250,60),func():
    e.build=i;save();refresh_home();open_workshop(),int(e.build)==i)

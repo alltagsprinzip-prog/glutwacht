@@ -435,7 +435,7 @@ func step(dt:float,input:Vector2,elapsed_seconds:float=-1.0):
   if target!=null and distance(b,target)<13 and b.cd<=0:
    b.cd=2.0;queue_hit(b,target,(12+8*int(b.level))*float(village.get("combat_scale",1.0)),13,true,Color("ffce84"),0)
  if mode=="raid":
-  if destruction_percent()>=100:result="victory"
+  if destruction_percent()>=100 and not (expedition>=0 and enemies.any(func(u):return u.get("boss",false) and u.hp>0)):result="victory"
   elif hero.hp<=0 and living(allies).is_empty() and int(reserve.melee)+int(reserve.archers)==0:result="complete"
  elif mode=="defense":
   if hero.hp<=0:result="defeat"
