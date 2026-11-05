@@ -7,6 +7,7 @@ var fx: Node3D
 var labels: Array = []
 var rng = RandomNumberGenerator.new()
 var mode="home"
+var region=0
 var materials: Dictionary = {}
 var asset_cache: Dictionary = {}
 var asset_materials: Dictionary = {}
@@ -102,6 +103,7 @@ func asset(name:String,parent:Node,pos:Vector3,size:float,axis:String="height",r
  holder.set_meta("height",bounds.size.y*factor)
  return holder
 func setup(sim):
+ region=mini(2,maxi(0,int(sim.expedition/3))) if sim.expedition>=0 else 0
  mode=sim.mode;rng.seed=74291 if mode in ["home","defense"] else int(sim.village.seed)
  for child in get_children():child.queue_free()
  effect_nodes.clear();actors.clear();forts.clear();labels.clear();workers.clear();obstacles.clear();ghost=null;pan=Vector2.ZERO;shown_buildings=sim.buildings;selected_uid="";selected_obstacle=""
@@ -118,6 +120,8 @@ func setup(sim):
  else:target_zoom=46;focus=Vector3(0,0,1)
  zoom=target_zoom;camera.size=zoom;camera.position=focus+Vector3(26,36,38);camera.look_at(focus)
  terrain();scenery(sim);settlement_paths()
+ if region==1:sky_env.background_color=Color("503849");sky_env.fog_light_color=Color("735262")
+ elif region==2:sky_env.background_color=Color("829eb8");sky_env.fog_light_color=Color("91abc5")
  if mode=="home":
   for o in sim.profile.get("obstacles",[]):create_obstacle(o,sim.profile.get("obstacle_jobs",[]))
  for b in sim.buildings:create_building(b)
@@ -140,7 +144,12 @@ func terrain():
     var noise=sin(v.x*.4+v.y*.25)*.017+rng.randf_range(-.012,.012)
     surf.set_normal(Vector3.UP);surf.set_color(c.lightened(noise).srgb_to_linear());surf.add_vertex(Vector3(v.x,0,v.y))
  var ground=mesh_node(surf.commit(),Vector3.ZERO,null,landscape)
- var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+ var mat=ShaderMaterial.new();mat.shader=load("res://game3d/terrain.gdshader");ground.material_override=mat;
+ if region==1:
+  mat.set_shader_parameter("grass_dark",Color("352d3d"));mat.set_shader_parameter("grass_light",Color("79604c"))
+ elif region==2:
+  mat.set_shader_parameter("grass_dark",Color("384c65"));mat.set_shader_parameter("grass_light",Color("a6bbc2"))
+ ground.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
  var water=PlaneMesh.new();water.size=Vector2(6,132)
  mesh_node(water,Vector3(39,.025,0),material(Color("218ba1"),.18),landscape)
  asset("bridge_woodRound.glb",landscape,Vector3(39,.04,3),7.2,"width",PI/2)
@@ -278,6 +287,7 @@ func create_actor(u:Dictionary):
   mesh_node(torus,Vector3(0,.065,0),material(color,.4,true),holder)
  var bar=Label3D.new();bar.font_size=24;bar.pixel_size=.017;bar.position.y=size+.3;bar.billboard=BaseMaterial3D.BILLBOARD_ENABLED;bar.modulate=color;bar.outline_size=6;bar.no_depth_test=true;holder.add_child(bar)
  var hpbar=health_bar(holder,size+.18,1.7 if u.kind=="hero" else 1.3,Color("f16656") if u.team=="enemy" else Color("4bd887"))
+ if u.get("boss",false):holder.scale=Vector3.ONE*1.45
  actors[u.id]={"node":holder,"anim":anim,"bar":bar,"hpbar":hpbar,"ring":ring,"state":"","size":size}
 func sync(sim,dt:float):
  for u in ([sim.hero]+sim.allies if mode!="scout" else [])+sim.enemies:

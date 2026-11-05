@@ -36,16 +36,23 @@ static func draw(w,b:Dictionary,parent:Node3D) -> float:
  w.box(parent,Vector3(0,.21,size*.4),Vector3(size*.35,.25,.65),Color("c6c4a0"))
  match kind:
   "hall":
-   var house=w.asset("Inn.obj",parent,Vector3(0,.18,0),size*.90,"width",0,Color("ea9b38"));height=float(house.get_meta("height"))+.3
-   w.asset("Bell_Tower.obj",parent,Vector3(-2.8,.15,-2.2),2.4,"width",0,Color("dc802f"))
-   for x in [-size*.44,size*.44]:w.banner(parent,Vector3(x,0,size*.3),3.5+float(tier)*.35,enemy)
-   if level>=3:w.asset("House_1.obj",parent,Vector3(2.7,.16,-2.1),3.2,"width",PI/2,Color("ea9b38"))
-   if level>=5:
-    column(w,parent,Vector3(-3.4,0,2.6),3.9,.85,stone)
-    roof(w,parent,Vector3(-3.4,3.9,2.6),2.1,2.1,1.2,accent)
-   if level>=7:
-    column(w,parent,Vector3(3.4,0,2.6),4.5,.85,stone)
-    roof(w,parent,Vector3(3.4,4.5,2.6),2.1,2.1,1.2,accent)
+   # Runic citadel: layered stone, tall slate roofs, luminous entrance.
+   height=7.2+tier*.35
+   w.box(parent,Vector3(0,1.8,0),Vector3(6.4,3.3,5.2),Color("b2b3a6"))
+   w.box(parent,Vector3(0,.5,0),Vector3(7.1,.6,5.8),Color("445465"))
+   roof(w,parent,Vector3(0,3.5,0),7.3,6.3,2.8,Color("294a65"))
+   w.box(parent,Vector3(0,1.5,2.65),Vector3(1.6,2.7,.18),Color("152533"))
+   for x in [-1.0,1.0]:column(w,parent,Vector3(x,.2,2.8),3.0,.2,gold)
+   w.box(parent,Vector3(0,3.1,2.8),Vector3(2.5,.3,.5),gold)
+   for x in [-2.2,2.2]:
+    for z in [-2.0,2.0]:
+     column(w,parent,Vector3(x,.2,z),4.4+tier*.25,.7,Color("667d8e"))
+     roof(w,parent,Vector3(x,4.6+tier*.25,z),1.9,1.9,1.6,accent)
+     crystal(w,parent,Vector3(x,6.35+tier*.25,z),.19,Color("83e5dc"))
+   for x in [-2.0,2.0]:
+    w.box(parent,Vector3(x,2.0,2.64),Vector3(.65,1.2,.08),Color("f1cb82"))
+   for i in range(3):w.box(parent,Vector3(0,.12+i*.12,3.7-i*.35),Vector3(2.8-i*.25,.24,.8),Color("adb6ae"))
+   w.banner(parent,Vector3(0,5.2,-.5),2.2+tier*.2,enemy)
   "barracks":
    var house=w.asset("Stable.obj",parent,Vector3(0,.15,-1.2),size*.80,"width",0,Color("b84544"));height=float(house.get_meta("height"))+.3
    w.box(parent,Vector3(0,.17,2.5),Vector3(6,.15,3.1),Color("bb9b63"))

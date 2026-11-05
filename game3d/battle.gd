@@ -297,7 +297,7 @@ func strike():
    if distance(hero,t)<c.range and (t.pos-hero.pos).normalized().dot(facing)>-.2:queue_hit(hero,t,hero.damage,c.range,false,Color(c.color))
 func skill():
  if not active() or result!="" or skill_cd>0 or hero.hp<=0:return
- var c=stats();skill_cd=maxf(2,c.skill_cd-.4*training("skill"));animate_attack(hero,.65)
+ var c=stats();skill_cd=maxf(2,c.skill_cd-.4*training("skill")-(2.0 if int(profile.get("journey",Journey.fresh()).build)==2 else 0.0));animate_attack(hero,.65)
  var skill_scale=1.0+.12*training("skill")
  var center:Vector2=hero.pos
  if hero_key()=="ninja":
