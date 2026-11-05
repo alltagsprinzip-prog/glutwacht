@@ -682,7 +682,7 @@ func open_expeditions():
  var p=open_dialog("expeditions","DIE GRENZLANDE","Zwei Sterne erringen. Bei Bossmissionen zusätzlich den Wächter besiegen.")
  for i in range(3):
   var stage=maxi(0,int(e.stage)-2)+i
-  var y=105+i*112
+  var y=120+i*105
   panel(p,Rect2(25,y,810,98))
   label(p,Journey.title(stage),Rect2(43,y+8,530,34),24,GOLD)
   label(p,"Bosswächter" if stage%3==2 else "Festung erobern · Runensplitter bergen",Rect2(43,y+47,520,30),17)
@@ -692,7 +692,7 @@ func open_expeditions():
  label(p,"Fortschritt: %d Missionen · %d Runensplitter"%[e.stage,e.shards],Rect2(35,455,780,40),20)
 func open_workshop():
  var e=progress.data.journey
- var p=open_dialog("workshop","RUNENWERKSTATT","Expeditionen liefern Splitter. Verbesserungen gelten sofort und bleiben erhalten.")
+ var p=open_dialog("workshop","RUNENWERKSTATT","")
  label(p,"%d RUNENSPLITTER"%e.shards,Rect2(28,85,790,40),24,GOLD)
  var keys=["weapon","armor","research"]
  var names=["Runenklinge · +4 Angriff / Rang","Wachtrüstung · +25 Leben / Rang","Expeditionskunde · +1 Splitter / Sieg"]
@@ -704,5 +704,5 @@ func open_workshop():
   b.disabled=e.shards<Journey.cost(e[key]) or e[key]>=(5 if key=="research" else 10)
  label(p,"Spezialisierung · kostenlos im Dorf wechseln",Rect2(28,400,790,35),18,GOLD)
  for i in range(3):
-  button(p,("✓ " if int(e.build)==i else "")+Journey.BUILDS[i]+[" +12% Angriff"," +18% Leben"," −2s Super"][i],Rect2(28+i*270,451,250,60),func():
+  button(p,("✓ " if int(e.build)==i else "")+Journey.BUILDS[i]+[" +12% Angriff"," +18% HP / −6% ATK"," −2s Super / +4% ATK"][i],Rect2(28+i*270,451,250,60),func():
    e.build=i;save();refresh_home();open_workshop(),int(e.build)==i)
